@@ -1,11 +1,16 @@
 ## Git Workflow — NON-NEGOTIABLE
-- Branches: `main` (production) and `dev` (staging). Both are protected —
-  PRs required, no direct pushes, no force pushes, no bypass list.
+- Default branch on GitHub is `dev`, not `main`. `dev` = staging,
+  `main` = production.
+- Both branches are protected — PRs required, no direct pushes, no force
+  pushes, no bypass list.
 - All work happens on `feature/<phase>-<short-desc>` or `fix/<short-desc>`
   branches cut from `dev`.
-- PR into `dev` first. Only promote `dev` → `main` once verified working.
+- Flow: `feature/* → dev → main`. PRs always target `dev` first.
+  Only open a `dev → main` PR once features on `dev` are tested and
+  confirmed ready for production release.
 - Never commit directly to `main` or `dev` even for "trivial" fixes.
-- Delete feature branches after merge.
+  Always double-check the PR base branch is `dev`, not `main`, before
+  merging feature work — `main` should only ever receive merges from `dev`.
 
 ## Environment & Secrets
 - `.env` files are gitignored. Never commit secrets, ever, under any
@@ -28,20 +33,27 @@ prefix on new routes "because it's just one endpoint."
 ## Coding Standards (apply to every file, no exceptions)
 
 ### File headers
-Every source file starts with a short comment block stating its purpose:
+Every Python source file starts with a module-level docstring stating its
+path and purpose:
 ```python
-# app/services/property_lifecycle.py
-# Defines the Property status state machine (Draft -> Pending -> Active ->
-# Sold/Rented -> Expired -> Rejected) and valid transition rules.
+"""
+app/services/property_lifecycle.py
+
+Defines the property status state machine (draft -> pending -> active
+-> sold/rented -> expired -> rejected) and validates transitions
+between states.
+"""
 ```
+TypeScript files use a `//` comment block instead, since TS has no
+module-docstring equivalent:
 ```typescript
 // components/shared/PropertyCard.tsx
 // Reusable property listing card used across homepage, search results,
 // saved properties, and broker listings views.
 ```
 
-### Function-level comments
-Every non-trivial function gets a comment block above it explaining *why*,
+### Function and class-level comments
+Every non-trivial function or class gets a docstring explaining *why*,
 not just what (the code already shows what):
 ```python
 def transition_property_status(current: str, new: str) -> bool:
@@ -51,6 +63,11 @@ def transition_property_status(current: str, new: str) -> bool:
     handle rejection gracefully in the API layer rather than via exception.
     """
 ```
+Comments — file headers, docstrings, and inline `#` notes alike — describe
+the code as it is: professional, factual, and self-contained. They never
+narrate the development process (task IDs, "confirmed empirically", "first
+attempt failed", phase numbers) or point elsewhere for the full explanation.
+A reader should understand the code from the comment alone.
 
 ### Modularity rules
 - One responsibility per file. If a file is doing two unrelated things,
@@ -88,16 +105,27 @@ def transition_property_status(current: str, new: str) -> bool:
   (`(client)`, `(broker)`, `(admin)`), empty shared component folders in place
 - Backend: FastAPI scaffold, `/health` route, config split (`DB_*` vars),
   Supabase Postgres connected (Mumbai region), Sentry wired (Developer tier)
+- Backend: Alembic initialized and wired to `app/core/config.py` settings;
+  engine hardened with `pool_pre_ping` + pool sizing
+- Core SQLAlchemy models: User, BrokerProfile (1:1 extension table), Property
+  + PropertyMedia, Lead + LeadNote, Conversation + Message, Notification,
+  SavedProperty, BoostPlan — 11 tables, 13 domain enums, all relationships verified
+- Property status lifecycle implemented as an actual state machine
+  (`transition_property_status` in `app/services/property_lifecycle.py`),
+  fully unit-tested (every legal transition + a broad illegal sample)
+- First Alembic migration (M1) written and verified against the real dev
+  database: upgrade → downgrade → upgrade cycle confirmed clean
+- pytest scaffolding: transactional `db_session` + `client` fixtures; test
+  isolation itself is regression-tested (a broken fixture would fail loudly,
+  not just leak data silently)
+- GitHub Actions CI for both frontend and backend: lint/typecheck/build
+  (frontend), ruff + migration reversibility + pytest against an ephemeral
+  Postgres+PostGIS service container (backend)
 
 ### ⏳ Pending — Phase 1 (Weeks 1–4)
-- GitHub Actions CI/CD workflows (frontend + backend)
 - Design tokens from Figma into `globals.css` `@theme` block
 - Shared components: TopNavBar, Sidebar, Property Card, Modal, Toast, Table
-- Core SQLAlchemy models: User, Property, Lead, Message, Notification,
-  SavedProperty, Boost/Plan
-- Property status lifecycle as an actual enum/state machine (not built yet)
-- First Alembic migration
-- Upload pipeline architecture (R2 + Stream) design, before endpoints exist
+- Upload pipeline (R2 + Stream) architecture design, before endpoints exist
 
 ### Known open decisions
 - SMS/OTP provider: MSG91 vs Fast2SMS — not yet chosen
