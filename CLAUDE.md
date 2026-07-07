@@ -132,6 +132,9 @@ A reader should understand the code from the comment alone.
   and early-access sections, all in `features/homepage/`. Pulled forward
   from its originally-scheduled Phase 3 slot since the design was ready;
   runs on mock data until Property APIs exist
+- PostGIS spike: `ST_DWithin` radius search on `properties.location`
+  confirmed via `EXPLAIN` to use the `ix_properties_location` GIST index,
+  not a sequential scan — de-risks Phase 3 search
 
 ### ⏳ Pending — Phase 1 (Weeks 1–4)
 - Design tokens: still the stock shadcn placeholder palette — needs real
@@ -144,7 +147,8 @@ A reader should understand the code from the comment alone.
 - Upload pipeline (R2 + Stream) architecture design, before endpoints exist
 
 ### Known open decisions
-- SMS/OTP provider: MSG91 vs Fast2SMS — not yet chosen
+- (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
+  docs/architecture/15_Decision_Log.md); integrate via `services/sms_service.py` adapter
 
 ## What NOT to do
 - Don't run `npm audit fix --force` reflexively on scaffold warnings.
