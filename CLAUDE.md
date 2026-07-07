@@ -121,10 +121,26 @@ A reader should understand the code from the comment alone.
 - GitHub Actions CI for both frontend and backend: lint/typecheck/build
   (frontend), ruff + migration reversibility + pytest against an ephemeral
   Postgres+PostGIS service container (backend)
+- Frontend: shadcn/ui component library (45 components) ported in as the
+  Tier 0/1 primitive foundation — Button, Dialog, Table, Sidebar, Tooltip,
+  etc. — for forms/tables/modals in later phases
+- Frontend: `components/shared/TopNavBar.tsx` and `Footer.tsx` built, shared
+  across all Client View pages via `app/(client)/layout.tsx`
+- Frontend: homepage built and wired at `/` (`app/(client)/page.tsx`) —
+  hero search widget, listings, areas, new launches, how-it-works, EMI
+  calculator, testimonials, cities, agent connect, property alerts, trust,
+  and early-access sections, all in `features/homepage/`. Pulled forward
+  from its originally-scheduled Phase 3 slot since the design was ready;
+  runs on mock data until Property APIs exist
 
 ### ⏳ Pending — Phase 1 (Weeks 1–4)
-- Design tokens from Figma into `globals.css` `@theme` block
-- Shared components: TopNavBar, Sidebar, Property Card, Modal, Toast, Table
+- Design tokens: still the stock shadcn placeholder palette — needs real
+  brand colors/type scale from the actual Figma design file (not the Make
+  export used for the homepage)
+- Shared components not yet composed from the shadcn primitives: Sidebar
+  (for Broker/Admin layouts), Property Card (Listings.tsx has a one-off
+  version, not the reusable shared one), Modal/Toast/Table wrappers
+- `(broker)` and `(admin)` route group layouts — still empty
 - Upload pipeline (R2 + Stream) architecture design, before endpoints exist
 
 ### Known open decisions
