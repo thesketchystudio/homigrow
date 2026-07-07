@@ -1,5 +1,13 @@
+"""
+app/main.py
+
+FastAPI application entry point. Initializes Sentry and mounts routes.
+Business logic does not live here — route handlers delegate to services.
+"""
+
 import sentry_sdk
 from fastapi import FastAPI
+
 from app.core.config import settings
 
 if settings.SENTRY_DSN:
@@ -11,7 +19,8 @@ if settings.SENTRY_DSN:
 
 app = FastAPI(title="Homigrow API")
 
-# --- Routes ---
+
 @app.get("/health")
 def health_check():
+    """Liveness/readiness probe reporting the running environment."""
     return {"status": "ok", "environment": settings.ENVIRONMENT}
