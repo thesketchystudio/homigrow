@@ -157,12 +157,39 @@ A reader should understand the code from the comment alone.
   `contain-[layout]` to the demo wrapper so it establishes a containing block
   for the fixed sidebar. Scoped to `/dev/components` only — no change to
   `Sidebar.tsx`, `globals.css`, or the real `(broker)`/`(admin)` layouts
+- Backend Phase 2 (on `feature/phase_2_backend`, cut from `dev`; frontend
+  Phase 2 work goes on a separate `feature/phase_2_frontend` branch — same
+  split for all later phases): P2-T01 migration M2 (`refresh_tokens`,
+  `otp_codes`) verified upgrade→downgrade→upgrade clean, `alembic check`
+  confirms zero drift · P2-T02 `app/core/security.py` (bcrypt hashing,
+  JWT encode/decode; `JWT_SECRET`/`JWT_ACCESS_TTL_MIN` added to
+  `config.py`) · P2-T03 `POST /api/v1/auth/signup` (password path;
+  creates `broker_profile` when role=broker; 409 on duplicate phone;
+  issues a signup OTP — logged in dev mode, real SMS delivery is P2-T10)
+  · P2-T04 `POST /api/v1/auth/login` (password check, 5-failure/15-min
+  lockout). 44/44 tests pass (17 new); both endpoints verified against
+  the real Supabase dev DB via curl, then the verification rows deleted.
+  Full writeup: `docs/implementation/backend/Phase_2_Implementation.md`.
+  **Not yet built:** refresh-token issuance/rotation (P2-T05 — login
+  currently returns only the access token), the global error-envelope
+  handler (P2-T06 — auth errors currently return
+  `{"detail": {"code", "message"}}`, forward-compatible with T06 wrapping
+  it into `{"error": {...}}`), real OTP SMS delivery (P2-T10).
 
 ### ⏳ Pending — Phase 1 (Weeks 1–4)
 - Design tokens: still the stock shadcn placeholder palette — needs real
   brand colors/type scale from the actual Figma design file (not the Make
   export used for the homepage)
 - Upload pipeline (R2 + Stream) architecture design, before endpoints exist
+- T31 (Phase 1 close-out) blocked on the above
+
+### ⏳ Pending — Phase 2 (Weeks 5–8)
+- P2-T05 refresh-token issue/rotate/revoke + httpOnly cookie wiring
+- P2-T06 `deps.py` (`get_current_user`, `require_role`) + `core/exceptions.py`
+  global error envelope
+- P2-T07/T08 password reset, auth rate limiting
+- P2-T10–T12 OTP request/verify + MSG91 `sms_service.py` adapter
+- P2-T15+ frontend auth screens (separate `feature/phase_2_frontend` branch)
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

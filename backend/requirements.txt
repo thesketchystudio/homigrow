@@ -8,6 +8,13 @@ python-dotenv==1.0.1
 pydantic-settings==2.7.1
 sentry-sdk[fastapi]==2.19.2
 
+# Auth (P2): password hashing + JWT. bcrypt pinned <4.1 — newer releases
+# dropped the __about__.__version__ attribute passlib's bcrypt backend
+# reads to detect the installed version.
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+PyJWT==2.10.1
+
 # Test tooling (pulled forward from T13 — T10's lifecycle tests need pytest
 # to run; T13 adds the fuller conftest.py/DB-fixture scaffolding on top).
 pytest==8.3.4

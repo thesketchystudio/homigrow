@@ -12,8 +12,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
+from app.core.security import hash_password
 from app.db.session import engine, get_db
 from app.main import app
+from app.models.enums import UserRole
+from app.models.user import User
 
 
 @pytest.fixture()
@@ -40,3 +43,26 @@ def client(db_session):
     app.dependency_overrides[get_db] = _get_db_override
     yield TestClient(app)
     app.dependency_overrides.clear()
+
+
+def make_user(
+    db_session,
+    *,
+    phone: str = "+919876500000",
+    role: UserRole = UserRole.client,
+    password: str | None = "correct-horse-battery-staple",
+    **kwargs,
+) -> User:
+    """
+    Creates and flushes a User row for tests that need one already
+    persisted, without going through the signup service/OTP flow.
+    """
+    user = User(
+        phone=phone,
+        role=role,
+        password_hash=hash_password(password) if password else None,
+        **kwargs,
+    )
+    db_session.add(user)
+    db_session.flush()
+    return user

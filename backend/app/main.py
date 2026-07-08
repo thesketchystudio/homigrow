@@ -8,6 +8,7 @@ Business logic does not live here — route handlers delegate to services.
 import sentry_sdk
 from fastapi import FastAPI
 
+from app.api.v1.router import api_router
 from app.core.config import settings
 
 if settings.SENTRY_DSN:
@@ -18,6 +19,7 @@ if settings.SENTRY_DSN:
     )
 
 app = FastAPI(title="Homigrow API")
+app.include_router(api_router)
 
 
 @app.get("/health")
