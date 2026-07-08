@@ -63,7 +63,7 @@ export default function ComponentGalleryPage() {
       <h1 className="text-2xl font-bold">Tier 0/1 Component Gallery (temp — delete before prod)</h1>
 
       <Section title="Sidebar (T23)">
-        <div className="h-64 overflow-hidden rounded-lg border">
+        <div className="relative h-64 overflow-hidden rounded-lg border contain-[layout]">
           <SidebarProvider className="min-h-0">
             <AppSidebar
               activeRoute="/broker/dashboard"

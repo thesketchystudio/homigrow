@@ -149,6 +149,14 @@ A reader should understand the code from the comment alone.
   every Tier 1 composite's loading/empty/error/saved/sold states — the
   artifact the P1→P2 phase gate requires (`07_Implementation_Strategy.md`);
   delete before prod
+- Frontend: `/dev/components` and both portal shells visually verified with
+  Playwright (T22-28) — all composite states render and interact correctly
+  (modal, drawer, toast, confirm dialog, table states). Fixed one gallery-only
+  bug: the Sidebar demo's `position: fixed` (correct for real usage) escaped
+  its `overflow-hidden` demo box and covered the rest of the page; added
+  `contain-[layout]` to the demo wrapper so it establishes a containing block
+  for the fixed sidebar. Scoped to `/dev/components` only — no change to
+  `Sidebar.tsx`, `globals.css`, or the real `(broker)`/`(admin)` layouts
 
 ### ⏳ Pending — Phase 1 (Weeks 1–4)
 - Design tokens: still the stock shadcn placeholder palette — needs real
