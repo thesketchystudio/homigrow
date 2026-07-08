@@ -24,6 +24,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Playwright MCP test artifacts
+.playwright-mcp/
+
 # Sentry
 .sentryclirc
 
