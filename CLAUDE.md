@@ -135,15 +135,25 @@ A reader should understand the code from the comment alone.
 - PostGIS spike: `ST_DWithin` radius search on `properties.location`
   confirmed via `EXPLAIN` to use the `ix_properties_location` GIST index,
   not a sequential scan — de-risks Phase 3 search
+- Frontend: Tier 1 shared composites built from the shadcn primitives —
+  `Sidebar`, `PropertyCard`, `Modal` (modal + drawer variants), toast system
+  (`lib/toast.ts` + `<Toaster/>` mounted in the root layout), `Table`,
+  `EmptyState`, `ErrorState`, `ConfirmDialog`, `StatusPill` — plus
+  `lib/enums.ts` mirroring the backend's Python enums as the single source
+  for status values. All styled with `globals.css` theme classes, not
+  hardcoded hex, so real Figma tokens re-skin them for free once T20 lands
+- Frontend: `(broker)/broker/` and `(admin)/admin/` route group layouts
+  wired with the shared `Sidebar` + placeholder dashboard pages, matching
+  the folder structure in `04_Frontend_Architecture.md`
+- Frontend: temporary `/dev/components` gallery page added, exercising
+  every Tier 1 composite's loading/empty/error/saved/sold states — the
+  artifact the P1→P2 phase gate requires (`07_Implementation_Strategy.md`);
+  delete before prod
 
 ### ⏳ Pending — Phase 1 (Weeks 1–4)
 - Design tokens: still the stock shadcn placeholder palette — needs real
   brand colors/type scale from the actual Figma design file (not the Make
   export used for the homepage)
-- Shared components not yet composed from the shadcn primitives: Sidebar
-  (for Broker/Admin layouts), Property Card (Listings.tsx has a one-off
-  version, not the reusable shared one), Modal/Toast/Table wrappers
-- `(broker)` and `(admin)` route group layouts — still empty
 - Upload pipeline (R2 + Stream) architecture design, before endpoints exist
 
 ### Known open decisions
