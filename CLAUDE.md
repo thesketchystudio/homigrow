@@ -165,6 +165,39 @@ A reader should understand the code from the comment alone.
   `contain-[layout]` to the demo wrapper so it establishes a containing block
   for the fixed sidebar. Scoped to `/dev/components` only — no change to
   `Sidebar.tsx`, `globals.css`, or the real `(broker)`/`(admin)` layouts
+- P1-T20 (real design tokens): `frontend/app/globals.css` re-skinned from
+  the stock shadcn placeholder palette to real Homigrow brand tokens, pulled
+  from the actual Figma design file's published Variables (not the Make
+  export). Primary/Secondary are neutral grayscales (Primary = near-black
+  text tones, Secondary = near-white surface tones); Accent Green is the
+  real brand action color, used for `--primary`/`--ring`/etc. Full 100–900
+  brand scales also exposed as `--color-brand-{primary,secondary,green}-*`
+  utilities for one-off use beyond the semantic tokens. Added the Figma
+  type scale (`--text-h1`..`--text-h5`, `--text-body-*`, `--text-label-*`,
+  each with a paired `--line-height`) plus `--font-heading`/`--font-body`
+  (Space Grotesk / Plus Jakarta Sans — already the fonts loaded via
+  `@import` at the top of the file, so no font-loading change was needed).
+  No destructive/error or dark-mode brand colors exist in Figma yet, so
+  those keep their shadcn placeholder values. Since T22-27's Tier 1
+  composites were deliberately built against theme classes rather than
+  hardcoded hex, they re-skin for free — no component code changed.
+  `next build` verified clean; Playwright visual verification completed
+  2026-07-10 — confirmed computed CSS custom properties (`--primary`,
+  `--font-heading`, `--text-h1`, etc.) resolve to the real brand values at
+  runtime, and `/dev/components`, `/broker/dashboard`, `/admin/dashboard`
+  all render the green accent/near-black tokens correctly with zero
+  console errors. Homepage sections in `features/homepage/` still
+  intentionally set their own colors/fonts directly and do not consume
+  these tokens (separate, not part of T20). Per T20's literal verify step
+  (`08_Phase_1.md`: "a scratch page renders token swatches; contrast-check
+  primary combos"), added a temporary `app/dev/tokens/page.tsx`, confirmed
+  via a live dev server that every semantic token, the full
+  `brand-{primary,secondary,green}-*` scale, and every type-scale utility
+  render correctly, and computed real WCAG contrast ratios for all 9
+  foreground/background pairs actually used in the app — all pass AA
+  (4.70:1–19.91:1, worst case `muted-foreground` on `muted`). Deleted the
+  scratch page after confirming, same pattern as T12/T30 (verify via a
+  temp artifact, then remove it — commit history is the evidence).
 - Backend Phase 2 (on `feature/phase_2_backend`, cut from `dev`; frontend
   Phase 2 work goes on a separate `feature/phase_2_frontend` branch — same
   split for all later phases): P2-T01 migration M2 (`refresh_tokens`,
@@ -244,11 +277,7 @@ A reader should understand the code from the comment alone.
   without checking this invariant actually holds afterward.
 
 ### ⏳ Pending — Phase 1 (Weeks 1–4)
-- Design tokens: still the stock shadcn placeholder palette — needs real
-  brand colors/type scale from the actual Figma design file (not the Make
-  export used for the homepage)
-- Upload pipeline (R2 + Stream) architecture design, before endpoints exist
-- T31 (Phase 1 close-out) blocked on the above
+- (none) — T20 landed above; T31 (this status update) closes Phase 1
 
 ### ⏳ Pending — Phase 2 (Weeks 5–8)
 - P2-T10–T12 OTP request/verify + MSG91 `sms_service.py` adapter
