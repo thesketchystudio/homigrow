@@ -24,6 +24,14 @@
 - `ENVIRONMENT` values: `dev` (local/staging) and `production`. This is
   unrelated to the git branch name sharing the same word — don't conflate them.
 
+## docs/ folder
+The entire `docs/` directory (architecture docs, implementation writeups) is
+gitignored — confirmed permanent policy, not a one-off. Keep writing
+`docs/implementation/<area>/PhaseN_Implementation.md` writeups after each
+task/batch as local reference, but don't expect `git add`/`git status` to
+pick them up, and don't re-verify this each session — it won't change
+unless explicitly told otherwise.
+
 ## API Versioning
 All backend routes live under `api/v1/`. This is deliberate — if a response
 shape needs a breaking change later, add `api/v2/` alongside it rather than
