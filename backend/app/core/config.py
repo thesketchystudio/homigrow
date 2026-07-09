@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     JWT_ACCESS_TTL_MIN: int = 15
     JWT_REFRESH_TTL_DAYS: int = 30
 
+    RESEND_API_KEY: str
+    RESEND_FROM_EMAIL: str
+
     @computed_field
     @property
     def DATABASE_URL(self) -> str:
