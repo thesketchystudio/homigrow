@@ -181,9 +181,93 @@ A reader should understand the code from the comment alone.
   console errors. Homepage sections in `features/homepage/` still
   intentionally set their own colors/fonts directly and do not consume
   these tokens (separate, not part of T20).
+- Backend Phase 2 (on `feature/phase_2_backend`, cut from `dev`; frontend
+  Phase 2 work goes on a separate `feature/phase_2_frontend` branch — same
+  split for all later phases): P2-T01 migration M2 (`refresh_tokens`,
+  `otp_codes`) verified upgrade→downgrade→upgrade clean, `alembic check`
+  confirms zero drift · P2-T02 `app/core/security.py` (bcrypt hashing,
+  JWT encode/decode; `JWT_SECRET`/`JWT_ACCESS_TTL_MIN` added to
+  `config.py`) · P2-T03 `POST /api/v1/auth/signup` (password path;
+  creates `broker_profile` when role=broker; 409 on duplicate phone;
+  issues a signup OTP — logged in dev mode, real SMS delivery is P2-T10)
+  · P2-T04 `POST /api/v1/auth/login` (password check, 5-failure/15-min
+  lockout) · P2-T05 refresh-token issue/rotate/revoke
+  (`app/services/auth_service.py`: `refresh()`, `logout()`) with
+  reuse-detection (replaying a rotated token revokes every session for
+  that user, per `14_Security.md`); delivered as an
+  `httpOnly; SameSite=Lax; Path=/api/v1/auth` cookie, `Secure` only when
+  `ENVIRONMENT=production`. New `POST /api/v1/auth/refresh` and
+  `POST /api/v1/auth/logout` routes; login/refresh responses renamed
+  `TokenResponse` (`{access_token, token_type, expires_in, user}`, shared
+  shape per `05_API_Design.md`) · P2-T06 global error envelope +
+  RBAC deps. New `app/core/exceptions.py`: `AppError` base
+  (`NotFoundError`/`ConflictError`/`ValidationFailed`/`AuthError`/
+  `ForbiddenError`/`LockedError`/`RateLimited`) + four handlers
+  (`AppError`, plain `HTTPException`, `RequestValidationError`,
+  catch-all → Sentry + generic 500) — every error response is now
+  `{"error": {"code", "message", "fields"?}}`, matching
+  `05_API_Design.md`. `auth_service.py` migrated off `HTTPException`
+  onto `AppError` subclasses. New `app/api/v1/deps.py`:
+  `get_current_user` (decodes Bearer JWT → user, 401 on any failure),
+  `require_role(*roles)` factory (403 on mismatch), and the
+  `CurrentUser`/`RequireBroker`/`RequireAdmin` annotated aliases routes
+  will import going forward — not yet consumed by any route (first
+  consumer is `GET/PATCH /users/me`, P2-T20). 72/72 tests pass (13 new);
+  signup/login/refresh/logout all re-verified against the real Supabase
+  dev DB via curl, plus two throwaway routes exercised the 401/403/200
+  RBAC paths live before being deleted · P2-T07 password forgot/reset.
+  New `POST /api/v1/auth/password/forgot` (always 204, no email
+  enumeration) and `POST /api/v1/auth/password/reset` (revokes every
+  session on success). Reset token is a signed, purpose-scoped JWT
+  embedding a fingerprint of the account's current `password_hash`
+  (`app/core/security.py`: `create_password_reset_token`/
+  `decode_password_reset_token`/`password_fingerprint`) — self-
+  invalidates the moment the password changes, so it's single-use with
+  no `reset_tokens` table. Real Resend delivery is deferred to P2-T30
+  (user's explicit choice — Resend account doesn't exist yet); for now
+  the token is dev-mode-logged, same pattern as T03's OTP · **fixed a
+  real pre-existing bug found while verifying this:** no logging
+  handler was configured anywhere in the app, so every `logger.info()`
+  call (including T03's "dev-mode OTP logging") had been silently
+  dropped since it was written. Fixed with `logging.basicConfig(...)`
+  in `app/main.py`; JSON-formatted production logging
+  (`03_Backend_Architecture.md`) is still open, this is just the
+  plain-dev half · P2-T08 rate limiting: `slowapi` `Limiter` (in-process,
+  ADR-010) applied to all six `/auth` routes at 5/min/IP
+  (`app/core/middleware.py`), `429 RATE_LIMITED` in the standard
+  envelope. 84/84 tests pass (12 new); forgot/reset and rate-limiting
+  both verified against the real Supabase dev DB via curl — read the
+  reset token out of the server's own log, completed a full
+  reset-then-login round trip, confirmed reuse fails with
+  `TOKEN_EXPIRED`, confirmed the 6th rapid `/login` call returns `429`.
+  Full writeup: `docs/implementation/backend/Phase_2_Implementation.md`.
+  **Not yet built:** real OTP SMS delivery (P2-T10), real Resend email
+  delivery (P2-T30), JSON production logging. `/auth/logout` still
+  authenticates via the refresh cookie alone rather than also requiring
+  a Bearer token now that `get_current_user` exists — a deliberate
+  choice, not an oversight (see T05/T06 notes in the implementation
+  writeup); revisit once a real protected route exists.
+- **Known gap, deliberately left open (2026-07-09 docs-vs-code pass):**
+  `02_Database_Design.md`'s invariant `password_hash IS NOT NULL OR
+  is_phone_verified` ("deferred to P2 service-level") is not yet enforced.
+  `signup()` allows `password=None` (the OTP-only path the `User` model
+  supports) while `is_phone_verified` defaults false, so a password-less
+  signup currently satisfies neither side — and permanently reserves the
+  phone number (409 on retry) with no verify/expiry path, since OTP-verify
+  (P2-T11) doesn't exist yet. User explicitly chose to leave this open
+  rather than require password now — **P2-T11 (OTP verify) must close this
+  gap** by flipping `is_phone_verified` true on verify; don't mark T11 done
+  without checking this invariant actually holds afterward.
 
 ### ⏳ Pending — Phase 1 (Weeks 1–4)
 - (none) — T20 landed above; T31 (this status update) closes Phase 1
+
+### ⏳ Pending — Phase 2 (Weeks 5–8)
+- P2-T10–T12 OTP request/verify + MSG91 `sms_service.py` adapter
+- P2-T15+ frontend auth screens (separate `feature/phase_2_frontend` branch)
+- P2-T30 real Resend email delivery (signup verification + password
+  reset templates) — password reset logic itself (T07) is done, dev-
+  mode-logged only; blocked on a Resend account existing
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

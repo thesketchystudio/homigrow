@@ -42,6 +42,10 @@ jobs:
       DB_USER: postgres
       DB_PASSWORD: postgres
       ENVIRONMENT: dev
+      # Signs JWTs issued against the ephemeral CI database only — not a
+      # real secret, so a hardcoded value is fine here (same reasoning as
+      # DB_PASSWORD above), no GitHub secret needed.
+      JWT_SECRET: ci-test-secret-never-used-outside-this-workflow
       # SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
 
     steps:
