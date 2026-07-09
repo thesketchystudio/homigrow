@@ -175,17 +175,29 @@ A reader should understand the code from the comment alone.
   `ENVIRONMENT=production`. New `POST /api/v1/auth/refresh` and
   `POST /api/v1/auth/logout` routes; login/refresh responses renamed
   `TokenResponse` (`{access_token, token_type, expires_in, user}`, shared
-  shape per `05_API_Design.md`). 59/59 tests pass (15 new); signup,
-  login, refresh-rotation, replay-detection, and logout all verified
-  against the real Supabase dev DB via curl, then the verification rows
-  deleted. Full writeup: `docs/implementation/backend/Phase_2_Implementation.md`.
-  **Not yet built:** the global error-envelope handler (P2-T06 — auth
-  errors currently return `{"detail": {"code", "message"}}`,
-  forward-compatible with T06 wrapping it into `{"error": {...}}`) and
-  `get_current_user`/`require_role` (also T06 — `/auth/logout` currently
-  authenticates via the refresh cookie itself rather than a Bearer token,
-  since no `get_current_user` dependency exists yet; see T05 note in the
-  implementation writeup), real OTP SMS delivery (P2-T10).
+  shape per `05_API_Design.md`) · P2-T06 global error envelope +
+  RBAC deps. New `app/core/exceptions.py`: `AppError` base
+  (`NotFoundError`/`ConflictError`/`ValidationFailed`/`AuthError`/
+  `ForbiddenError`/`LockedError`/`RateLimited`) + four handlers
+  (`AppError`, plain `HTTPException`, `RequestValidationError`,
+  catch-all → Sentry + generic 500) — every error response is now
+  `{"error": {"code", "message", "fields"?}}`, matching
+  `05_API_Design.md`. `auth_service.py` migrated off `HTTPException`
+  onto `AppError` subclasses. New `app/api/v1/deps.py`:
+  `get_current_user` (decodes Bearer JWT → user, 401 on any failure),
+  `require_role(*roles)` factory (403 on mismatch), and the
+  `CurrentUser`/`RequireBroker`/`RequireAdmin` annotated aliases routes
+  will import going forward — not yet consumed by any route (first
+  consumer is `GET/PATCH /users/me`, P2-T20). 72/72 tests pass (13 new);
+  signup/login/refresh/logout all re-verified against the real Supabase
+  dev DB via curl, plus two throwaway routes exercised the 401/403/200
+  RBAC paths live before being deleted. Full writeup:
+  `docs/implementation/backend/Phase_2_Implementation.md`.
+  **Not yet built:** real OTP SMS delivery (P2-T10). `/auth/logout`
+  still authenticates via the refresh cookie alone rather than also
+  requiring a Bearer token now that `get_current_user` exists — a
+  deliberate choice, not an oversight (see T05/T06 notes in the
+  implementation writeup); revisit once a real protected route exists.
 - **Known gap, deliberately left open (2026-07-09 docs-vs-code pass):**
   `02_Database_Design.md`'s invariant `password_hash IS NOT NULL OR
   is_phone_verified` ("deferred to P2 service-level") is not yet enforced.
@@ -206,8 +218,6 @@ A reader should understand the code from the comment alone.
 - T31 (Phase 1 close-out) blocked on the above
 
 ### ⏳ Pending — Phase 2 (Weeks 5–8)
-- P2-T06 `deps.py` (`get_current_user`, `require_role`) + `core/exceptions.py`
-  global error envelope
 - P2-T07/T08 password reset, auth rate limiting
 - P2-T10–T12 OTP request/verify + MSG91 `sms_service.py` adapter
 - P2-T15+ frontend auth screens (separate `feature/phase_2_frontend` branch)

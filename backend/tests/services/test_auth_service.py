@@ -9,8 +9,8 @@ P2 auth suite priority in 12_Testing.md.
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from fastapi import HTTPException
 
+from app.core.exceptions import AppError
 from app.core.security import hash_refresh_token
 from app.models.broker_profile import BrokerProfile
 from app.models.enums import UserRole
@@ -68,7 +68,7 @@ class TestSignup:
     def test_duplicate_phone_raises_409(self, db_session):
         make_user(db_session, phone="+919876543214")
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             auth_service.signup(
                 db_session,
                 phone="+919876543214",
@@ -79,7 +79,7 @@ class TestSignup:
             )
 
         assert exc_info.value.status_code == 409
-        assert exc_info.value.detail["code"] == "PHONE_TAKEN"
+        assert exc_info.value.code == "PHONE_TAKEN"
 
 
 class TestLogin:
@@ -112,16 +112,16 @@ class TestLogin:
         assert row.token_hash == hash_refresh_token(raw_refresh_token)
 
     def test_unknown_identifier_raises_401(self, db_session):
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             auth_service.login(db_session, "+919999999999", "whatever")
 
         assert exc_info.value.status_code == 401
-        assert exc_info.value.detail["code"] == "BAD_CREDENTIALS"
+        assert exc_info.value.code == "BAD_CREDENTIALS"
 
     def test_wrong_password_raises_401_and_increments_counter(self, db_session):
         user = make_user(db_session, phone="+919876543222", password="correct-horse-battery-staple")
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             auth_service.login(db_session, "+919876543222", "wrong-password")
 
         assert exc_info.value.status_code == 401
@@ -132,12 +132,12 @@ class TestLogin:
         make_user(db_session, phone="+919876543223", password="correct-horse-battery-staple")
 
         for _ in range(4):
-            with pytest.raises(HTTPException) as exc_info:
+            with pytest.raises(AppError) as exc_info:
                 auth_service.login(db_session, "+919876543223", "wrong-password")
             assert exc_info.value.status_code == 401
 
         # 5th failure crosses the threshold and locks the account.
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             auth_service.login(db_session, "+919876543223", "wrong-password")
         assert exc_info.value.status_code == 401
 
@@ -152,11 +152,11 @@ class TestLogin:
         user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
         db_session.flush()
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             auth_service.login(db_session, "+919876543224", "correct-horse-battery-staple")
 
         assert exc_info.value.status_code == 423
-        assert exc_info.value.detail["code"] == "ACCOUNT_LOCKED"
+        assert exc_info.value.code == "ACCOUNT_LOCKED"
 
     def test_successful_login_resets_the_failure_counter(self, db_session):
         user = make_user(db_session, phone="+919876543225", password="correct-horse-battery-staple")
@@ -197,14 +197,14 @@ class TestRefresh:
         assert new_row.revoked_at is None
 
     def test_missing_token_raises_401(self, db_session):
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             auth_service.refresh(db_session, None)
 
         assert exc_info.value.status_code == 401
-        assert exc_info.value.detail["code"] == "REFRESH_INVALID"
+        assert exc_info.value.code == "REFRESH_INVALID"
 
     def test_unknown_token_raises_401(self, db_session):
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             auth_service.refresh(db_session, "not-a-real-token")
 
         assert exc_info.value.status_code == 401
@@ -221,7 +221,7 @@ class TestRefresh:
         row.expires_at = datetime.now(timezone.utc) - timedelta(days=1)
         db_session.flush()
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             auth_service.refresh(db_session, raw_refresh_token)
 
         assert exc_info.value.status_code == 401
@@ -235,7 +235,7 @@ class TestRefresh:
         auth_service.refresh(db_session, raw_refresh_token)
 
         # Replaying the now-rotated (revoked) original token is the theft signal.
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             auth_service.refresh(db_session, raw_refresh_token)
         assert exc_info.value.status_code == 401
 

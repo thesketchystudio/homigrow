@@ -36,7 +36,7 @@ class TestSignupRoute:
         )
 
         assert response.status_code == 409
-        assert response.json()["detail"]["code"] == "PHONE_TAKEN"
+        assert response.json()["error"]["code"] == "PHONE_TAKEN"
 
 
 class TestLoginRoute:
@@ -64,7 +64,7 @@ class TestLoginRoute:
         )
 
         assert response.status_code == 401
-        assert response.json()["detail"]["code"] == "BAD_CREDENTIALS"
+        assert response.json()["error"]["code"] == "BAD_CREDENTIALS"
 
     def test_login_sets_an_httponly_refresh_cookie(self, client, db_session):
         make_user(db_session, phone="+919876540012", password="correct-horse-battery-staple")
@@ -103,7 +103,7 @@ class TestRefreshRoute:
         response = client.post("/api/v1/auth/refresh")
 
         assert response.status_code == 401
-        assert response.json()["detail"]["code"] == "REFRESH_INVALID"
+        assert response.json()["error"]["code"] == "REFRESH_INVALID"
 
     def test_replaying_a_rotated_refresh_cookie_returns_401(self, client, db_session):
         make_user(db_session, phone="+919876540021", password="correct-horse-battery-staple")
@@ -119,7 +119,7 @@ class TestRefreshRoute:
         response = client.post("/api/v1/auth/refresh")
 
         assert response.status_code == 401
-        assert response.json()["detail"]["code"] == "REFRESH_INVALID"
+        assert response.json()["error"]["code"] == "REFRESH_INVALID"
 
 
 class TestLogoutRoute:

@@ -10,6 +10,7 @@ from fastapi import FastAPI
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.exceptions import install_exception_handlers
 
 if settings.SENTRY_DSN:
     sentry_sdk.init(
@@ -19,6 +20,7 @@ if settings.SENTRY_DSN:
     )
 
 app = FastAPI(title="Homigrow API")
+install_exception_handlers(app)
 app.include_router(api_router)
 
 

@@ -16,12 +16,12 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import HTTPException
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.exceptions import AuthError, ConflictError, LockedError
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -41,10 +41,7 @@ OTP_EXPIRE_MINUTES = 10
 LOCKOUT_THRESHOLD = 5
 LOCKOUT_MINUTES = 15
 
-REFRESH_INVALID = HTTPException(
-    status_code=401,
-    detail={"code": "REFRESH_INVALID", "message": "Session expired or invalid, please log in again."},
-)
+REFRESH_INVALID = AuthError("REFRESH_INVALID", "Session expired or invalid, please log in again.")
 
 
 def _safe_ip(host: Optional[str]) -> Optional[str]:
@@ -114,10 +111,7 @@ def signup(
     registered, 409 EMAIL_TAKEN on a concurrent duplicate email.
     """
     if db.query(User).filter(User.phone == phone).first() is not None:
-        raise HTTPException(
-            status_code=409,
-            detail={"code": "PHONE_TAKEN", "message": "This phone number is already registered."},
-        )
+        raise ConflictError("PHONE_TAKEN", "This phone number is already registered.")
 
     user = User(
         phone=phone,
@@ -138,10 +132,7 @@ def signup(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail={"code": "EMAIL_TAKEN", "message": "This email is already registered."},
-        )
+        raise ConflictError("EMAIL_TAKEN", "This email is already registered.")
 
     db.refresh(user)
     return user
@@ -160,10 +151,7 @@ def login(
     Returns an access token, a raw refresh token, and the authenticated
     user.
     """
-    bad_credentials = HTTPException(
-        status_code=401,
-        detail={"code": "BAD_CREDENTIALS", "message": "Invalid phone/email or password."},
-    )
+    bad_credentials = AuthError("BAD_CREDENTIALS", "Invalid phone/email or password.")
 
     user = (
         db.query(User)
@@ -175,13 +163,7 @@ def login(
 
     now = datetime.now(timezone.utc)
     if user.locked_until is not None and user.locked_until > now:
-        raise HTTPException(
-            status_code=423,
-            detail={
-                "code": "ACCOUNT_LOCKED",
-                "message": "Account temporarily locked due to repeated failed logins.",
-            },
-        )
+        raise LockedError("ACCOUNT_LOCKED", "Account temporarily locked due to repeated failed logins.")
 
     if not verify_password(password, user.password_hash):
         user.failed_login_attempts += 1
