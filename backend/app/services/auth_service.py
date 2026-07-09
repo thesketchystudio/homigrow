@@ -1,13 +1,16 @@
 """
 app/services/auth_service.py
 
-Password-path signup and login. Signup creates the user (and a
-broker_profile row when role=broker) and issues a phone-verification
-OTP; login checks credentials and enforces the lockout policy.
-Refresh-token issuance is added on top of login's return value in
-P2-T05 — this module intentionally does not touch refresh_tokens.
+Password-path signup and login, plus refresh-token issuance, rotation,
+and revocation. Signup creates the user (and a broker_profile row when
+role=broker) and issues a phone-verification OTP; login checks
+credentials and enforces the lockout policy, then issues a session
+(access token + refresh token). refresh() rotates a presented refresh
+token and detects reuse of an already-rotated one as a theft signal
+(14_Security.md §Token design).
 """
 
+import ipaddress
 import logging
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -19,10 +22,17 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    hash_password,
+    hash_refresh_token,
+    verify_password,
+)
 from app.models.broker_profile import BrokerProfile
 from app.models.enums import OTPPurpose, UserRole
 from app.models.otp_code import OTPCode
+from app.models.refresh_token import RefreshToken
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -30,6 +40,43 @@ logger = logging.getLogger(__name__)
 OTP_EXPIRE_MINUTES = 10
 LOCKOUT_THRESHOLD = 5
 LOCKOUT_MINUTES = 15
+
+REFRESH_INVALID = HTTPException(
+    status_code=401,
+    detail={"code": "REFRESH_INVALID", "message": "Session expired or invalid, please log in again."},
+)
+
+
+def _safe_ip(host: Optional[str]) -> Optional[str]:
+    """
+    Returns host if it parses as a valid IP address, else None. Guards
+    the refresh_tokens.ip column (Postgres INET) against non-IP client
+    hosts such as the test client's "testclient" placeholder.
+    """
+    if not host:
+        return None
+    try:
+        ipaddress.ip_address(host)
+        return host
+    except ValueError:
+        return None
+
+
+def _issue_refresh_token(
+    db: Session, user: User, user_agent: Optional[str], ip: Optional[str]
+) -> str:
+    """Creates a new refresh_tokens row and returns the raw (unhashed) token to hand to the client."""
+    raw_token = create_refresh_token()
+    db.add(
+        RefreshToken(
+            user_id=user.id,
+            token_hash=hash_refresh_token(raw_token),
+            user_agent=user_agent,
+            ip=_safe_ip(ip),
+            expires_at=datetime.now(timezone.utc) + timedelta(days=settings.JWT_REFRESH_TTL_DAYS),
+        )
+    )
+    return raw_token
 
 
 def _issue_otp(db: Session, phone: str, purpose: OTPPurpose) -> None:
@@ -100,11 +147,18 @@ def signup(
     return user
 
 
-def login(db: Session, phone_or_email: str, password: str) -> tuple[str, User]:
+def login(
+    db: Session,
+    phone_or_email: str,
+    password: str,
+    user_agent: Optional[str] = None,
+    ip: Optional[str] = None,
+) -> tuple[str, str, User]:
     """
     Verifies credentials and enforces the lockout policy: 5 consecutive
     failures locks the account for 15 minutes, reset on success.
-    Returns an access token and the authenticated user.
+    Returns an access token, a raw refresh token, and the authenticated
+    user.
     """
     bad_credentials = HTTPException(
         status_code=401,
@@ -138,8 +192,71 @@ def login(db: Session, phone_or_email: str, password: str) -> tuple[str, User]:
 
     user.failed_login_attempts = 0
     user.locked_until = None
+
+    access_token = create_access_token(user.id, user.role.value)
+    refresh_token = _issue_refresh_token(db, user, user_agent, ip)
     db.commit()
     db.refresh(user)
 
-    token = create_access_token(user.id, user.role.value)
-    return token, user
+    return access_token, refresh_token, user
+
+
+def refresh(
+    db: Session,
+    raw_token: Optional[str],
+    user_agent: Optional[str] = None,
+    ip: Optional[str] = None,
+) -> tuple[str, str, User]:
+    """
+    Rotates a presented refresh token: revokes it and issues a new
+    access/refresh pair. Presenting a token whose row is already
+    revoked is the reuse/theft signal from 14_Security.md — instead of
+    just failing, it revokes every active refresh token belonging to
+    that user, forcing re-login everywhere.
+    """
+    if not raw_token:
+        raise REFRESH_INVALID
+
+    row = db.query(RefreshToken).filter(RefreshToken.token_hash == hash_refresh_token(raw_token)).first()
+    if row is None:
+        raise REFRESH_INVALID
+
+    now = datetime.now(timezone.utc)
+
+    if row.revoked_at is not None:
+        db.query(RefreshToken).filter(
+            RefreshToken.user_id == row.user_id,
+            RefreshToken.revoked_at.is_(None),
+        ).update({"revoked_at": now}, synchronize_session=False)
+        db.commit()
+        raise REFRESH_INVALID
+
+    if row.expires_at <= now:
+        raise REFRESH_INVALID
+
+    user = db.query(User).filter(User.id == row.user_id).first()
+    if user is None:
+        raise REFRESH_INVALID
+
+    row.revoked_at = now
+    access_token = create_access_token(user.id, user.role.value)
+    new_refresh_token = _issue_refresh_token(db, user, user_agent, ip)
+    db.commit()
+
+    return access_token, new_refresh_token, user
+
+
+def logout(db: Session, raw_token: Optional[str]) -> None:
+    """
+    Revokes the session identified by the presented refresh-token
+    cookie, if any. Idempotent: a missing, unknown, or already-revoked
+    token is not an error — the caller's intent (be logged out) is
+    already satisfied.
+    """
+    if not raw_token:
+        return
+
+    row = db.query(RefreshToken).filter(RefreshToken.token_hash == hash_refresh_token(raw_token)).first()
+    if row is not None and row.revoked_at is None:
+        row.revoked_at = datetime.now(timezone.utc)
+        db.commit()

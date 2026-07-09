@@ -57,6 +57,15 @@ class UserOut(BaseModel):
     role: UserRole
 
 
-class LoginResponse(BaseModel):
+class TokenResponse(BaseModel):
+    """
+    Shared response shape for every endpoint that hands back a session
+    (login, refresh) — per 05_API_Design.md's "token response shape
+    everywhere" contract. The refresh token itself is never in this
+    body; it travels only as the httpOnly cookie.
+    """
+
     access_token: str
+    token_type: str = "bearer"
+    expires_in: int
     user: UserOut

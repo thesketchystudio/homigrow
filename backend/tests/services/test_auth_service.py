@@ -11,9 +11,11 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi import HTTPException
 
+from app.core.security import hash_refresh_token
 from app.models.broker_profile import BrokerProfile
 from app.models.enums import UserRole
 from app.models.otp_code import OTPCode
+from app.models.refresh_token import RefreshToken
 from app.models.user import User
 from app.services import auth_service
 from tests.conftest import make_user
@@ -84,17 +86,30 @@ class TestLogin:
     def test_correct_credentials_returns_a_token_and_user(self, db_session):
         user = make_user(db_session, phone="+919876543220", password="correct-horse-battery-staple")
 
-        token, logged_in_user = auth_service.login(db_session, "+919876543220", "correct-horse-battery-staple")
+        access_token, refresh_token, logged_in_user = auth_service.login(
+            db_session, "+919876543220", "correct-horse-battery-staple"
+        )
 
-        assert isinstance(token, str) and token
+        assert isinstance(access_token, str) and access_token
+        assert isinstance(refresh_token, str) and refresh_token
         assert logged_in_user.id == user.id
 
     def test_login_by_email_also_works(self, db_session):
         make_user(db_session, phone="+919876543221", email="ravi@example.com", password="correct-horse-battery-staple")
 
-        token, _ = auth_service.login(db_session, "ravi@example.com", "correct-horse-battery-staple")
+        access_token, _, _ = auth_service.login(db_session, "ravi@example.com", "correct-horse-battery-staple")
 
-        assert token
+        assert access_token
+
+    def test_issues_a_refresh_token_row(self, db_session):
+        user = make_user(db_session, phone="+919876543226", password="correct-horse-battery-staple")
+
+        _, raw_refresh_token, _ = auth_service.login(db_session, "+919876543226", "correct-horse-battery-staple")
+
+        row = db_session.query(RefreshToken).filter(RefreshToken.user_id == user.id).first()
+        assert row is not None
+        assert row.revoked_at is None
+        assert row.token_hash == hash_refresh_token(raw_refresh_token)
 
     def test_unknown_identifier_raises_401(self, db_session):
         with pytest.raises(HTTPException) as exc_info:
@@ -153,3 +168,108 @@ class TestLogin:
         db_session.refresh(user)
         assert user.failed_login_attempts == 0
         assert user.locked_until is None
+
+
+class TestRefresh:
+    def test_rotates_the_token_and_returns_a_new_pair(self, db_session):
+        user = make_user(db_session, phone="+919876543230", password="correct-horse-battery-staple")
+        _, raw_refresh_token, _ = auth_service.login(db_session, "+919876543230", "correct-horse-battery-staple")
+
+        access_token, new_raw_refresh_token, refreshed_user = auth_service.refresh(db_session, raw_refresh_token)
+
+        assert access_token
+        assert new_raw_refresh_token != raw_refresh_token
+        assert refreshed_user.id == user.id
+
+        old_row = (
+            db_session.query(RefreshToken)
+            .filter(RefreshToken.token_hash == hash_refresh_token(raw_refresh_token))
+            .first()
+        )
+        assert old_row.revoked_at is not None
+
+        new_row = (
+            db_session.query(RefreshToken)
+            .filter(RefreshToken.token_hash == hash_refresh_token(new_raw_refresh_token))
+            .first()
+        )
+        assert new_row is not None
+        assert new_row.revoked_at is None
+
+    def test_missing_token_raises_401(self, db_session):
+        with pytest.raises(HTTPException) as exc_info:
+            auth_service.refresh(db_session, None)
+
+        assert exc_info.value.status_code == 401
+        assert exc_info.value.detail["code"] == "REFRESH_INVALID"
+
+    def test_unknown_token_raises_401(self, db_session):
+        with pytest.raises(HTTPException) as exc_info:
+            auth_service.refresh(db_session, "not-a-real-token")
+
+        assert exc_info.value.status_code == 401
+
+    def test_expired_token_raises_401(self, db_session):
+        make_user(db_session, phone="+919876543231", password="correct-horse-battery-staple")
+        _, raw_refresh_token, _ = auth_service.login(db_session, "+919876543231", "correct-horse-battery-staple")
+
+        row = (
+            db_session.query(RefreshToken)
+            .filter(RefreshToken.token_hash == hash_refresh_token(raw_refresh_token))
+            .first()
+        )
+        row.expires_at = datetime.now(timezone.utc) - timedelta(days=1)
+        db_session.flush()
+
+        with pytest.raises(HTTPException) as exc_info:
+            auth_service.refresh(db_session, raw_refresh_token)
+
+        assert exc_info.value.status_code == 401
+
+    def test_reusing_a_rotated_token_revokes_every_session(self, db_session):
+        user = make_user(db_session, phone="+919876543232", password="correct-horse-battery-staple")
+        _, raw_refresh_token, _ = auth_service.login(db_session, "+919876543232", "correct-horse-battery-staple")
+        # A second, independent session for the same user (e.g. a different device).
+        _, second_raw_refresh_token, _ = auth_service.login(db_session, "+919876543232", "correct-horse-battery-staple")
+
+        auth_service.refresh(db_session, raw_refresh_token)
+
+        # Replaying the now-rotated (revoked) original token is the theft signal.
+        with pytest.raises(HTTPException) as exc_info:
+            auth_service.refresh(db_session, raw_refresh_token)
+        assert exc_info.value.status_code == 401
+
+        active_rows = (
+            db_session.query(RefreshToken)
+            .filter(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))
+            .all()
+        )
+        assert active_rows == []
+
+        second_row = (
+            db_session.query(RefreshToken)
+            .filter(RefreshToken.token_hash == hash_refresh_token(second_raw_refresh_token))
+            .first()
+        )
+        assert second_row.revoked_at is not None
+
+
+class TestLogout:
+    def test_revokes_the_presented_session(self, db_session):
+        make_user(db_session, phone="+919876543233", password="correct-horse-battery-staple")
+        _, raw_refresh_token, _ = auth_service.login(db_session, "+919876543233", "correct-horse-battery-staple")
+
+        auth_service.logout(db_session, raw_refresh_token)
+
+        row = (
+            db_session.query(RefreshToken)
+            .filter(RefreshToken.token_hash == hash_refresh_token(raw_refresh_token))
+            .first()
+        )
+        assert row.revoked_at is not None
+
+    def test_is_idempotent_for_a_missing_token(self, db_session):
+        auth_service.logout(db_session, None)
+
+    def test_is_idempotent_for_an_unknown_token(self, db_session):
+        auth_service.logout(db_session, "not-a-real-token")

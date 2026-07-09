@@ -167,14 +167,25 @@ A reader should understand the code from the comment alone.
   creates `broker_profile` when role=broker; 409 on duplicate phone;
   issues a signup OTP — logged in dev mode, real SMS delivery is P2-T10)
   · P2-T04 `POST /api/v1/auth/login` (password check, 5-failure/15-min
-  lockout). 44/44 tests pass (17 new); both endpoints verified against
-  the real Supabase dev DB via curl, then the verification rows deleted.
-  Full writeup: `docs/implementation/backend/Phase_2_Implementation.md`.
-  **Not yet built:** refresh-token issuance/rotation (P2-T05 — login
-  currently returns only the access token), the global error-envelope
-  handler (P2-T06 — auth errors currently return
-  `{"detail": {"code", "message"}}`, forward-compatible with T06 wrapping
-  it into `{"error": {...}}`), real OTP SMS delivery (P2-T10).
+  lockout) · P2-T05 refresh-token issue/rotate/revoke
+  (`app/services/auth_service.py`: `refresh()`, `logout()`) with
+  reuse-detection (replaying a rotated token revokes every session for
+  that user, per `14_Security.md`); delivered as an
+  `httpOnly; SameSite=Lax; Path=/api/v1/auth` cookie, `Secure` only when
+  `ENVIRONMENT=production`. New `POST /api/v1/auth/refresh` and
+  `POST /api/v1/auth/logout` routes; login/refresh responses renamed
+  `TokenResponse` (`{access_token, token_type, expires_in, user}`, shared
+  shape per `05_API_Design.md`). 59/59 tests pass (15 new); signup,
+  login, refresh-rotation, replay-detection, and logout all verified
+  against the real Supabase dev DB via curl, then the verification rows
+  deleted. Full writeup: `docs/implementation/backend/Phase_2_Implementation.md`.
+  **Not yet built:** the global error-envelope handler (P2-T06 — auth
+  errors currently return `{"detail": {"code", "message"}}`,
+  forward-compatible with T06 wrapping it into `{"error": {...}}`) and
+  `get_current_user`/`require_role` (also T06 — `/auth/logout` currently
+  authenticates via the refresh cookie itself rather than a Bearer token,
+  since no `get_current_user` dependency exists yet; see T05 note in the
+  implementation writeup), real OTP SMS delivery (P2-T10).
 - **Known gap, deliberately left open (2026-07-09 docs-vs-code pass):**
   `02_Database_Design.md`'s invariant `password_hash IS NOT NULL OR
   is_phone_verified` ("deferred to P2 service-level") is not yet enforced.
@@ -195,7 +206,6 @@ A reader should understand the code from the comment alone.
 - T31 (Phase 1 close-out) blocked on the above
 
 ### ⏳ Pending — Phase 2 (Weeks 5–8)
-- P2-T05 refresh-token issue/rotate/revoke + httpOnly cookie wiring
 - P2-T06 `deps.py` (`get_current_user`, `require_role`) + `core/exceptions.py`
   global error envelope
 - P2-T07/T08 password reset, auth rate limiting
