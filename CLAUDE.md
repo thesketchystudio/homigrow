@@ -175,6 +175,17 @@ A reader should understand the code from the comment alone.
   handler (P2-T06 — auth errors currently return
   `{"detail": {"code", "message"}}`, forward-compatible with T06 wrapping
   it into `{"error": {...}}`), real OTP SMS delivery (P2-T10).
+- **Known gap, deliberately left open (2026-07-09 docs-vs-code pass):**
+  `02_Database_Design.md`'s invariant `password_hash IS NOT NULL OR
+  is_phone_verified` ("deferred to P2 service-level") is not yet enforced.
+  `signup()` allows `password=None` (the OTP-only path the `User` model
+  supports) while `is_phone_verified` defaults false, so a password-less
+  signup currently satisfies neither side — and permanently reserves the
+  phone number (409 on retry) with no verify/expiry path, since OTP-verify
+  (P2-T11) doesn't exist yet. User explicitly chose to leave this open
+  rather than require password now — **P2-T11 (OTP verify) must close this
+  gap** by flipping `is_phone_verified` true on verify; don't mark T11 done
+  without checking this invariant actually holds afterward.
 
 ### ⏳ Pending — Phase 1 (Weeks 1–4)
 - Design tokens: still the stock shadcn placeholder palette — needs real
