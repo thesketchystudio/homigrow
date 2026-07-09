@@ -157,12 +157,33 @@ A reader should understand the code from the comment alone.
   `contain-[layout]` to the demo wrapper so it establishes a containing block
   for the fixed sidebar. Scoped to `/dev/components` only — no change to
   `Sidebar.tsx`, `globals.css`, or the real `(broker)`/`(admin)` layouts
+- P1-T20 (real design tokens): `frontend/app/globals.css` re-skinned from
+  the stock shadcn placeholder palette to real Homigrow brand tokens, pulled
+  from the actual Figma design file's published Variables (not the Make
+  export). Primary/Secondary are neutral grayscales (Primary = near-black
+  text tones, Secondary = near-white surface tones); Accent Green is the
+  real brand action color, used for `--primary`/`--ring`/etc. Full 100–900
+  brand scales also exposed as `--color-brand-{primary,secondary,green}-*`
+  utilities for one-off use beyond the semantic tokens. Added the Figma
+  type scale (`--text-h1`..`--text-h5`, `--text-body-*`, `--text-label-*`,
+  each with a paired `--line-height`) plus `--font-heading`/`--font-body`
+  (Space Grotesk / Plus Jakarta Sans — already the fonts loaded via
+  `@import` at the top of the file, so no font-loading change was needed).
+  No destructive/error or dark-mode brand colors exist in Figma yet, so
+  those keep their shadcn placeholder values. Since T22-27's Tier 1
+  composites were deliberately built against theme classes rather than
+  hardcoded hex, they re-skin for free — no component code changed.
+  `next build` verified clean; Playwright visual verification completed
+  2026-07-10 — confirmed computed CSS custom properties (`--primary`,
+  `--font-heading`, `--text-h1`, etc.) resolve to the real brand values at
+  runtime, and `/dev/components`, `/broker/dashboard`, `/admin/dashboard`
+  all render the green accent/near-black tokens correctly with zero
+  console errors. Homepage sections in `features/homepage/` still
+  intentionally set their own colors/fonts directly and do not consume
+  these tokens (separate, not part of T20).
 
 ### ⏳ Pending — Phase 1 (Weeks 1–4)
-- Design tokens: still the stock shadcn placeholder palette — needs real
-  brand colors/type scale from the actual Figma design file (not the Make
-  export used for the homepage)
-- Upload pipeline (R2 + Stream) architecture design, before endpoints exist
+- (none) — T20 landed above; T31 (this status update) closes Phase 1
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
