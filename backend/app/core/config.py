@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "dev"
     SENTRY_DSN: str = ""
 
+    # Secret, so no default — fails fast at startup if missing rather
+    # than silently signing tokens with a predictable value.
+    JWT_SECRET: str
+    JWT_ACCESS_TTL_MIN: int = 15
+    JWT_REFRESH_TTL_DAYS: int = 30
+
     @computed_field
     @property
     def DATABASE_URL(self) -> str:

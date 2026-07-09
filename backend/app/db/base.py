@@ -37,3 +37,5 @@ from app.models import conversation  # noqa: E402,F401
 from app.models import notification  # noqa: E402,F401
 from app.models import saved_property  # noqa: E402,F401
 from app.models import boost  # noqa: E402,F401
+from app.models import refresh_token  # noqa: E402,F401
+from app.models import otp_code  # noqa: E402,F401
