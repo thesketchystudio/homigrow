@@ -1,11 +1,12 @@
 """
 tests/api/v1/routes/test_auth.py
 
-Integration tests for POST /api/v1/auth/signup and /login through the
+Integration tests for the /api/v1/auth/* routes through the
 TestClient — status codes and response shape, not business-rule edge
 cases (those live in tests/services/test_auth_service.py).
 """
 
+from app.core.security import create_password_reset_token
 from tests.conftest import make_user
 
 
@@ -141,3 +142,61 @@ class TestLogoutRoute:
         response = client.post("/api/v1/auth/logout")
 
         assert response.status_code == 204
+
+
+class TestForgotPasswordRoute:
+    def test_always_returns_204_known_or_unknown_email(self, client, db_session):
+        make_user(db_session, phone="+919876540040", email="anon@example.com")
+
+        known = client.post("/api/v1/auth/password/forgot", json={"email": "anon@example.com"})
+        unknown = client.post("/api/v1/auth/password/forgot", json={"email": "nobody@example.com"})
+
+        assert known.status_code == 204
+        assert unknown.status_code == 204
+
+
+class TestResetPasswordRoute:
+    def test_valid_token_returns_204_and_the_new_password_logs_in(self, client, db_session):
+        user = make_user(db_session, phone="+919876540041", password="old-password-123")
+        token = create_password_reset_token(user.id, user.password_hash, 30)
+
+        response = client.post(
+            "/api/v1/auth/password/reset",
+            json={"token": token, "new_password": "new-password-456"},
+        )
+        assert response.status_code == 204
+
+        login_response = client.post(
+            "/api/v1/auth/login",
+            json={"phone_or_email": "+919876540041", "password": "new-password-456"},
+        )
+        assert login_response.status_code == 200
+
+    def test_invalid_token_returns_410(self, client):
+        response = client.post(
+            "/api/v1/auth/password/reset",
+            json={"token": "not-a-real-token", "new_password": "new-password-456"},
+        )
+
+        assert response.status_code == 410
+        assert response.json()["error"]["code"] == "TOKEN_EXPIRED"
+
+
+class TestAuthRateLimiting:
+    def test_sixth_login_request_within_a_minute_returns_429(self, client, db_session):
+        make_user(db_session, phone="+919876540050", password="correct-horse-battery-staple")
+
+        for _ in range(5):
+            response = client.post(
+                "/api/v1/auth/login",
+                json={"phone_or_email": "+919876540050", "password": "wrong-password"},
+            )
+            assert response.status_code == 401
+
+        sixth = client.post(
+            "/api/v1/auth/login",
+            json={"phone_or_email": "+919876540050", "password": "wrong-password"},
+        )
+
+        assert sixth.status_code == 429
+        assert sixth.json()["error"]["code"] == "RATE_LIMITED"

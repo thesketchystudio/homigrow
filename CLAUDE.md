@@ -191,13 +191,38 @@ A reader should understand the code from the comment alone.
   consumer is `GET/PATCH /users/me`, P2-T20). 72/72 tests pass (13 new);
   signup/login/refresh/logout all re-verified against the real Supabase
   dev DB via curl, plus two throwaway routes exercised the 401/403/200
-  RBAC paths live before being deleted. Full writeup:
-  `docs/implementation/backend/Phase_2_Implementation.md`.
-  **Not yet built:** real OTP SMS delivery (P2-T10). `/auth/logout`
-  still authenticates via the refresh cookie alone rather than also
-  requiring a Bearer token now that `get_current_user` exists — a
-  deliberate choice, not an oversight (see T05/T06 notes in the
-  implementation writeup); revisit once a real protected route exists.
+  RBAC paths live before being deleted · P2-T07 password forgot/reset.
+  New `POST /api/v1/auth/password/forgot` (always 204, no email
+  enumeration) and `POST /api/v1/auth/password/reset` (revokes every
+  session on success). Reset token is a signed, purpose-scoped JWT
+  embedding a fingerprint of the account's current `password_hash`
+  (`app/core/security.py`: `create_password_reset_token`/
+  `decode_password_reset_token`/`password_fingerprint`) — self-
+  invalidates the moment the password changes, so it's single-use with
+  no `reset_tokens` table. Real Resend delivery is deferred to P2-T30
+  (user's explicit choice — Resend account doesn't exist yet); for now
+  the token is dev-mode-logged, same pattern as T03's OTP · **fixed a
+  real pre-existing bug found while verifying this:** no logging
+  handler was configured anywhere in the app, so every `logger.info()`
+  call (including T03's "dev-mode OTP logging") had been silently
+  dropped since it was written. Fixed with `logging.basicConfig(...)`
+  in `app/main.py`; JSON-formatted production logging
+  (`03_Backend_Architecture.md`) is still open, this is just the
+  plain-dev half · P2-T08 rate limiting: `slowapi` `Limiter` (in-process,
+  ADR-010) applied to all six `/auth` routes at 5/min/IP
+  (`app/core/middleware.py`), `429 RATE_LIMITED` in the standard
+  envelope. 84/84 tests pass (12 new); forgot/reset and rate-limiting
+  both verified against the real Supabase dev DB via curl — read the
+  reset token out of the server's own log, completed a full
+  reset-then-login round trip, confirmed reuse fails with
+  `TOKEN_EXPIRED`, confirmed the 6th rapid `/login` call returns `429`.
+  Full writeup: `docs/implementation/backend/Phase_2_Implementation.md`.
+  **Not yet built:** real OTP SMS delivery (P2-T10), real Resend email
+  delivery (P2-T30), JSON production logging. `/auth/logout` still
+  authenticates via the refresh cookie alone rather than also requiring
+  a Bearer token now that `get_current_user` exists — a deliberate
+  choice, not an oversight (see T05/T06 notes in the implementation
+  writeup); revisit once a real protected route exists.
 - **Known gap, deliberately left open (2026-07-09 docs-vs-code pass):**
   `02_Database_Design.md`'s invariant `password_hash IS NOT NULL OR
   is_phone_verified` ("deferred to P2 service-level") is not yet enforced.
@@ -218,9 +243,11 @@ A reader should understand the code from the comment alone.
 - T31 (Phase 1 close-out) blocked on the above
 
 ### ⏳ Pending — Phase 2 (Weeks 5–8)
-- P2-T07/T08 password reset, auth rate limiting
 - P2-T10–T12 OTP request/verify + MSG91 `sms_service.py` adapter
 - P2-T15+ frontend auth screens (separate `feature/phase_2_frontend` branch)
+- P2-T30 real Resend email delivery (signup verification + password
+  reset templates) — password reset logic itself (T07) is done, dev-
+  mode-logged only; blocked on a Resend account existing
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

@@ -1,13 +1,14 @@
 """
 app/services/auth_service.py
 
-Password-path signup and login, plus refresh-token issuance, rotation,
-and revocation. Signup creates the user (and a broker_profile row when
-role=broker) and issues a phone-verification OTP; login checks
-credentials and enforces the lockout policy, then issues a session
-(access token + refresh token). refresh() rotates a presented refresh
-token and detects reuse of an already-rotated one as a theft signal
-(14_Security.md §Token design).
+Password-path signup and login, refresh-token issuance/rotation/
+revocation, and password reset. Signup creates the user (and a
+broker_profile row when role=broker) and issues a phone-verification
+OTP; login checks credentials and enforces the lockout policy, then
+issues a session (access token + refresh token). refresh() rotates a
+presented refresh token and detects reuse of an already-rotated one as
+a theft signal (14_Security.md §Token design). reset_password()
+verifies a signed, stateless reset token and revokes every session.
 """
 
 import ipaddress
@@ -15,18 +16,23 @@ import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from uuid import UUID
 
+import jwt
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.exceptions import AuthError, ConflictError, LockedError
+from app.core.exceptions import AuthError, ConflictError, ExpiredError, LockedError
 from app.core.security import (
     create_access_token,
+    create_password_reset_token,
     create_refresh_token,
+    decode_password_reset_token,
     hash_password,
     hash_refresh_token,
+    password_fingerprint,
     verify_password,
 )
 from app.models.broker_profile import BrokerProfile
@@ -40,8 +46,10 @@ logger = logging.getLogger(__name__)
 OTP_EXPIRE_MINUTES = 10
 LOCKOUT_THRESHOLD = 5
 LOCKOUT_MINUTES = 15
+PASSWORD_RESET_TTL_MINUTES = 30
 
 REFRESH_INVALID = AuthError("REFRESH_INVALID", "Session expired or invalid, please log in again.")
+RESET_TOKEN_INVALID = ExpiredError("TOKEN_EXPIRED", "This password reset link is invalid or has expired.")
 
 
 def _safe_ip(host: Optional[str]) -> Optional[str]:
@@ -242,3 +250,55 @@ def logout(db: Session, raw_token: Optional[str]) -> None:
     if row is not None and row.revoked_at is None:
         row.revoked_at = datetime.now(timezone.utc)
         db.commit()
+
+
+def forgot_password(db: Session, email: str) -> None:
+    """
+    Always succeeds with no signal about whether the email is
+    registered (05_API_Design.md: no enumeration). If a matching
+    account exists, generates a signed, 30-minute password-reset token
+    and sends a reset email — real Resend delivery is P2-T30, so for
+    now (like the signup OTP) this only logs the token in non-production
+    environments.
+    """
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
+        return
+
+    token = create_password_reset_token(user.id, user.password_hash, PASSWORD_RESET_TTL_MINUTES)
+
+    if settings.ENVIRONMENT != "production":
+        logger.info("Password reset token for %s: %s", email, token)
+
+
+def reset_password(db: Session, token: str, new_password: str) -> None:
+    """
+    Verifies a password-reset token and sets the new password, then
+    revokes every refresh token for the user (05_API_Design.md:
+    revoke-all on reset) so a compromised session can't outlive the
+    reset. The token embeds a fingerprint of the password_hash it was
+    issued against; once this function changes password_hash, replaying
+    the same token no longer fingerprint-matches — a stateless
+    single-use mechanism, no reset_tokens table needed.
+    """
+    try:
+        payload = decode_password_reset_token(token)
+        user_id = UUID(payload["sub"])
+    except (jwt.InvalidTokenError, KeyError, ValueError):
+        raise RESET_TOKEN_INVALID
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise RESET_TOKEN_INVALID
+
+    if payload.get("pwd_fp") != password_fingerprint(user.password_hash):
+        raise RESET_TOKEN_INVALID
+
+    user.password_hash = hash_password(new_password)
+
+    db.query(RefreshToken).filter(
+        RefreshToken.user_id == user.id,
+        RefreshToken.revoked_at.is_(None),
+    ).update({"revoked_at": datetime.now(timezone.utc)}, synchronize_session=False)
+
+    db.commit()

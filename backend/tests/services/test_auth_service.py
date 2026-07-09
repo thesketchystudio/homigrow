@@ -7,11 +7,20 @@ P2 auth suite priority in 12_Testing.md.
 """
 
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
+import jwt
 import pytest
 
+from app.core.config import settings
 from app.core.exceptions import AppError
-from app.core.security import hash_refresh_token
+from app.core.security import (
+    JWT_ALGORITHM,
+    create_password_reset_token,
+    hash_refresh_token,
+    password_fingerprint,
+    verify_password,
+)
 from app.models.broker_profile import BrokerProfile
 from app.models.enums import UserRole
 from app.models.otp_code import OTPCode
@@ -273,3 +282,89 @@ class TestLogout:
 
     def test_is_idempotent_for_an_unknown_token(self, db_session):
         auth_service.logout(db_session, "not-a-real-token")
+
+
+class TestForgotPassword:
+    def test_unknown_email_does_not_raise(self, db_session):
+        auth_service.forgot_password(db_session, "nobody@example.com")
+
+    def test_known_email_logs_a_reset_token(self, db_session, caplog):
+        user = make_user(db_session, phone="+919876543240", email="asha@example.com")
+
+        with caplog.at_level("INFO"):
+            auth_service.forgot_password(db_session, "asha@example.com")
+
+        assert any("Password reset token for asha@example.com" in record.message for record in caplog.records)
+        assert user.password_hash is not None  # untouched by forgot_password itself
+
+
+class TestResetPassword:
+    def test_valid_token_changes_the_password_and_revokes_sessions(self, db_session):
+        user = make_user(db_session, phone="+919876543241", password="old-password-123")
+        _, raw_refresh_token, _ = auth_service.login(db_session, "+919876543241", "old-password-123")
+        token = create_password_reset_token(user.id, user.password_hash, 30)
+
+        auth_service.reset_password(db_session, token, "new-password-456")
+
+        db_session.refresh(user)
+        assert verify_password("new-password-456", user.password_hash)
+        assert not verify_password("old-password-123", user.password_hash)
+
+        row = (
+            db_session.query(RefreshToken)
+            .filter(RefreshToken.token_hash == hash_refresh_token(raw_refresh_token))
+            .first()
+        )
+        assert row.revoked_at is not None
+
+    def test_reusing_a_consumed_token_raises_410(self, db_session):
+        user = make_user(db_session, phone="+919876543242", password="old-password-123")
+        token = create_password_reset_token(user.id, user.password_hash, 30)
+
+        auth_service.reset_password(db_session, token, "new-password-456")
+
+        with pytest.raises(AppError) as exc_info:
+            auth_service.reset_password(db_session, token, "yet-another-password")
+
+        assert exc_info.value.status_code == 410
+        assert exc_info.value.code == "TOKEN_EXPIRED"
+
+    def test_expired_token_raises_410(self, db_session):
+        user = make_user(db_session, phone="+919876543243", password="old-password-123")
+        expired_payload = {
+            "sub": str(user.id),
+            "purpose": "password_reset",
+            "pwd_fp": password_fingerprint(user.password_hash),
+            "iat": datetime.now(timezone.utc) - timedelta(minutes=60),
+            "exp": datetime.now(timezone.utc) - timedelta(minutes=30),
+        }
+        expired_token = jwt.encode(expired_payload, settings.JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+        with pytest.raises(AppError) as exc_info:
+            auth_service.reset_password(db_session, expired_token, "new-password-456")
+
+        assert exc_info.value.status_code == 410
+        assert exc_info.value.code == "TOKEN_EXPIRED"
+
+    def test_garbage_token_raises_410(self, db_session):
+        with pytest.raises(AppError) as exc_info:
+            auth_service.reset_password(db_session, "not-a-real-token", "new-password-456")
+
+        assert exc_info.value.status_code == 410
+
+    def test_an_access_token_cannot_be_used_as_a_reset_token(self, db_session):
+        make_user(db_session, phone="+919876543244", password="old-password-123")
+        access_token, _, _ = auth_service.login(db_session, "+919876543244", "old-password-123")
+
+        with pytest.raises(AppError) as exc_info:
+            auth_service.reset_password(db_session, access_token, "new-password-456")
+
+        assert exc_info.value.status_code == 410
+
+    def test_unknown_user_raises_410(self, db_session):
+        token = create_password_reset_token(uuid4(), None, 30)
+
+        with pytest.raises(AppError) as exc_info:
+            auth_service.reset_password(db_session, token, "new-password-456")
+
+        assert exc_info.value.status_code == 410

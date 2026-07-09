@@ -15,6 +15,7 @@ import sentry_sdk
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,12 @@ class LockedError(AppError):
     status_code = 423
 
 
+class ExpiredError(AppError):
+    """410 — a one-shot credential (password-reset token, later OTP) past its lifetime or already used."""
+
+    status_code = 410
+
+
 class RateLimited(AppError):
     status_code = 429
 
@@ -105,8 +112,13 @@ def unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespons
     return _error_response(500, "INTERNAL_ERROR", "An unexpected error occurred.")
 
 
+def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    return _error_response(429, "RATE_LIMITED", "Too many requests. Please try again shortly.")
+
+
 def install_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)

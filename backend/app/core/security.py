@@ -1,15 +1,17 @@
 """
 app/core/security.py
 
-Password hashing, access-JWT encode/decode, and refresh-token
-generation/hashing — the only place auth code touches bcrypt, JWT, or
-token internals directly, so the hashing scheme or token format can
-change without touching services/routes.
+Password hashing, access-JWT encode/decode, refresh-token
+generation/hashing, and password-reset token encode/decode — the only
+place auth code touches bcrypt, JWT, or token internals directly, so
+the hashing scheme or token format can change without touching
+services/routes.
 """
 
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 from uuid import UUID, uuid4
 
 import jwt
@@ -20,6 +22,7 @@ from app.core.config import settings
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 JWT_ALGORITHM = "HS256"
+PASSWORD_RESET_PURPOSE = "password_reset"
 
 
 def hash_password(password: str) -> str:
@@ -67,3 +70,39 @@ def hash_refresh_token(token: str) -> str:
     factor to resist brute-forcing.
     """
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+def password_fingerprint(password_hash: Optional[str]) -> str:
+    """
+    Short, non-reversible fingerprint of a user's current password_hash.
+    Embedding this in a password-reset token lets the token
+    self-invalidate the moment the password actually changes, without a
+    dedicated reset_tokens table: once reset_password() overwrites
+    password_hash, replaying the same token no longer fingerprint-matches.
+    """
+    return hashlib.sha256((password_hash or "").encode()).hexdigest()[:16]
+
+
+def create_password_reset_token(user_id: UUID, password_hash: Optional[str], ttl_minutes: int) -> str:
+    """Issues a signed, short-lived, purpose-scoped password-reset token — never accepted as an access token or vice versa."""
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(user_id),
+        "purpose": PASSWORD_RESET_PURPOSE,
+        "pwd_fp": password_fingerprint(password_hash),
+        "iat": now,
+        "exp": now + timedelta(minutes=ttl_minutes),
+    }
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def decode_password_reset_token(token: str) -> dict:
+    """
+    Verifies and decodes a password-reset token. Raises a jwt exception
+    on invalid/expired tokens, or if the token's purpose claim doesn't
+    match — an access token can never be replayed as a reset token.
+    """
+    payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    if payload.get("purpose") != PASSWORD_RESET_PURPOSE:
+        raise jwt.InvalidTokenError("Not a password-reset token.")
+    return payload
