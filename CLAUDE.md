@@ -180,7 +180,16 @@ A reader should understand the code from the comment alone.
   all render the green accent/near-black tokens correctly with zero
   console errors. Homepage sections in `features/homepage/` still
   intentionally set their own colors/fonts directly and do not consume
-  these tokens (separate, not part of T20).
+  these tokens (separate, not part of T20). Per T20's literal verify step
+  (`08_Phase_1.md`: "a scratch page renders token swatches; contrast-check
+  primary combos"), added a temporary `app/dev/tokens/page.tsx`, confirmed
+  via a live dev server that every semantic token, the full
+  `brand-{primary,secondary,green}-*` scale, and every type-scale utility
+  render correctly, and computed real WCAG contrast ratios for all 9
+  foreground/background pairs actually used in the app — all pass AA
+  (4.70:1–19.91:1, worst case `muted-foreground` on `muted`). Deleted the
+  scratch page after confirming, same pattern as T12/T30 (verify via a
+  temp artifact, then remove it — commit history is the evidence).
 - Backend Phase 2 (on `feature/phase_2_backend`, cut from `dev`; frontend
   Phase 2 work goes on a separate `feature/phase_2_frontend` branch — same
   split for all later phases): P2-T01 migration M2 (`refresh_tokens`,
