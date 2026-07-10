@@ -263,7 +263,57 @@ A reader should understand the code from the comment alone.
   authenticates via the refresh cookie alone rather than also requiring
   a Bearer token now that `get_current_user` exists — a deliberate
   choice, not an oversight (see T05/T06 notes in the implementation
-  writeup); revisit once a real protected route exists.
+  writeup); revisit once a real protected route exists (P2-T20, below,
+  is now that route, so this is worth a second look next time this
+  area is touched).
+  · P2-T20 profile CRUD: `GET/PATCH /api/v1/users/me` (first real
+  consumer of `CurrentUser`), `PATCH /api/v1/users/me/password`. New
+  `users.preferences jsonb default '{}'` column (M3 migration,
+  verified up/down/up clean) backs a free-form prefs blob the profile
+  tabs will read later. Changing email resets `is_email_verified`
+  (real verification-send is still P2-T30). New `app/services/
+  user_service.py`, `app/schemas/users.py`, `app/api/v1/routes/
+  users.py`. **Fixed a real boot-blocking bug found while wiring
+  this:** `.env` already had `MSG91_AUTH_KEY` set, but `Settings`
+  never declared it — pydantic-settings rejects undeclared env vars by
+  default, so `Settings()` (and therefore every `alembic` command and
+  the app itself) was failing to start at all. Fixed by declaring
+  `MSG91_AUTH_KEY: str = ""` in `config.py` (the MSG91 adapter itself
+  is still P2-T10, on hold) · P2-T26 sessions API:
+  `GET /api/v1/users/me/sessions` (list active, newest first),
+  `DELETE /api/v1/users/me/sessions/{id}` (404 if not owned),
+  `POST /api/v1/users/me/sessions/revoke-all` (logout-everywhere,
+  reuses T07's bulk-revoke pattern) · P2-T27 account deactivation:
+  `POST /api/v1/users/me/deactivate` — soft (`is_active=false`),
+  revokes every session, 409 `ACTIVE_LISTINGS_EXIST` if a broker has a
+  `status=active` listing. **Closed a gap that made this meaningful:**
+  `login()` never checked `is_active`, so a deactivated account could
+  just log back in; added a `403 ACCOUNT_DEACTIVATED` check ahead of
+  the lockout check. `get_current_user` deliberately still doesn't
+  check `is_active` per request — `14_Security.md` already accepts
+  suspension taking effect within the ≤15-min access-token TTL, not
+  instantly · P2-T31 password strength + closed a real CSRF gap:
+  every password (signup/reset/change) is now scored with `zxcvbn`,
+  rejected below score 3/4 server-side, wired as a pydantic
+  field_validator so it folds into the existing 422 envelope with no
+  new error code. **`14_Security.md`'s CSRF stance claimed `/auth/
+  refresh` was protected by "SameSite=Lax + Origin header check" but
+  only the SameSite half existed in code** — added the Origin check
+  (`_validate_refresh_origin` in `routes/auth.py`): a present but
+  mismatched `Origin` header now gets `401 REFRESH_INVALID`; a missing
+  Origin (non-browser clients) still passes. New `FRONTEND_ORIGIN`
+  config setting (default `http://localhost:3000`) backs the check —
+  no `CORSMiddleware` added, that's real frontend-integration
+  infrastructure for P2-T15+, out of scope here. 117/117 tests pass
+  (33 new). All of T20/T26/T27/T31 verified live against the real
+  Supabase dev DB via curl end-to-end (signup → login → get/patch
+  profile → change password → list/revoke sessions → deactivate →
+  confirm re-login is blocked → confirm cross-origin refresh is
+  rejected); verification user row deleted afterward.
+  **P2-T32 (2FA/TOTP backend) explicitly deferred to P4** — per
+  `09_Phase_2.md`'s own "safely deferrable to P4 if time pressure"
+  clause; your explicit choice this session, not an oversight. The M2+
+  columns and `/auth/2fa/*` endpoints defer with it.
 - **Known gap, deliberately left open (2026-07-09 docs-vs-code pass):**
   `02_Database_Design.md`'s invariant `password_hash IS NOT NULL OR
   is_phone_verified` ("deferred to P2 service-level") is not yet enforced.
@@ -280,11 +330,18 @@ A reader should understand the code from the comment alone.
 - (none) — T20 landed above; T31 (this status update) closes Phase 1
 
 ### ⏳ Pending — Phase 2 (Weeks 5–8)
-- P2-T10–T12 OTP request/verify + MSG91 `sms_service.py` adapter
+- P2-T10–T12 OTP request/verify + MSG91 `sms_service.py` adapter — on
+  hold pending DLT registration
 - P2-T15+ frontend auth screens (separate `feature/phase_2_frontend` branch)
 - P2-T30 real Resend email delivery (signup verification + password
   reset templates) — password reset logic itself (T07) is done, dev-
-  mode-logged only; blocked on a Resend account existing
+  mode-logged only; on hold by explicit choice this session (kept
+  paired with OTP as the two remaining provider-dependent pieces)
+- P2-T32 2FA (TOTP) backend — explicitly deferred to P4, see T27/T31
+  notes above
+- No `CORSMiddleware` configured yet — needed once a browser frontend
+  actually calls this API cross-origin with credentials (P2-T15+
+  territory, not closed by T31's Origin-header CSRF check alone)
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

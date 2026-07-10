@@ -15,6 +15,7 @@ passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 PyJWT==2.10.1
 slowapi==0.1.10
+zxcvbn==4.5.0
 
 # Test tooling (pulled forward from T13 — T10's lifecycle tests need pytest
 # to run; T13 adds the fuller conftest.py/DB-fixture scaffolding on top).

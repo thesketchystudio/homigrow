@@ -167,6 +167,15 @@ class TestLogin:
         assert exc_info.value.status_code == 423
         assert exc_info.value.code == "ACCOUNT_LOCKED"
 
+    def test_deactivated_account_raises_403(self, db_session):
+        make_user(db_session, phone="+919876543227", password="correct-horse-battery-staple", is_active=False)
+
+        with pytest.raises(AppError) as exc_info:
+            auth_service.login(db_session, "+919876543227", "correct-horse-battery-staple")
+
+        assert exc_info.value.status_code == 403
+        assert exc_info.value.code == "ACCOUNT_DEACTIVATED"
+
     def test_successful_login_resets_the_failure_counter(self, db_session):
         user = make_user(db_session, phone="+919876543225", password="correct-horse-battery-staple")
         user.failed_login_attempts = 3

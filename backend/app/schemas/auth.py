@@ -12,6 +12,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.core.security import validate_password_strength
 from app.models.enums import UserRole
 
 
@@ -33,6 +34,14 @@ class SignupRequest(BaseModel):
         """
         if value == UserRole.admin:
             raise ValueError("role must be client or broker")
+        return value
+
+    @field_validator("password")
+    @classmethod
+    def password_must_be_strong(cls, value: Optional[str]) -> Optional[str]:
+        """Only checked when a password is actually supplied — OTP-only signup passes password=None."""
+        if value is not None:
+            validate_password_strength(value)
         return value
 
 
@@ -78,3 +87,9 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def new_password_must_be_strong(cls, value: str) -> str:
+        validate_password_strength(value)
+        return value

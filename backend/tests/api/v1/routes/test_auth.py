@@ -6,6 +6,7 @@ TestClient — status codes and response shape, not business-rule edge
 cases (those live in tests/services/test_auth_service.py).
 """
 
+from app.core.config import settings
 from app.core.security import create_password_reset_token
 from tests.conftest import make_user
 
@@ -38,6 +39,14 @@ class TestSignupRoute:
 
         assert response.status_code == 409
         assert response.json()["error"]["code"] == "PHONE_TAKEN"
+
+    def test_weak_password_returns_422(self, client):
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={"phone": "+919876540004", "role": "client", "password": "whatever"},
+        )
+
+        assert response.status_code == 422
 
 
 class TestLoginRoute:
@@ -122,6 +131,29 @@ class TestRefreshRoute:
         assert response.status_code == 401
         assert response.json()["error"]["code"] == "REFRESH_INVALID"
 
+    def test_matching_origin_header_is_allowed(self, client, db_session):
+        make_user(db_session, phone="+919876540023", password="correct-horse-battery-staple")
+        client.post(
+            "/api/v1/auth/login",
+            json={"phone_or_email": "+919876540023", "password": "correct-horse-battery-staple"},
+        )
+
+        response = client.post("/api/v1/auth/refresh", headers={"Origin": settings.FRONTEND_ORIGIN})
+
+        assert response.status_code == 200
+
+    def test_mismatched_origin_header_returns_401(self, client, db_session):
+        make_user(db_session, phone="+919876540024", password="correct-horse-battery-staple")
+        client.post(
+            "/api/v1/auth/login",
+            json={"phone_or_email": "+919876540024", "password": "correct-horse-battery-staple"},
+        )
+
+        response = client.post("/api/v1/auth/refresh", headers={"Origin": "https://evil.example.com"})
+
+        assert response.status_code == 401
+        assert response.json()["error"]["code"] == "REFRESH_INVALID"
+
 
 class TestLogoutRoute:
     def test_logout_clears_the_cookie_and_revokes_the_session(self, client, db_session):
@@ -180,6 +212,17 @@ class TestResetPasswordRoute:
 
         assert response.status_code == 410
         assert response.json()["error"]["code"] == "TOKEN_EXPIRED"
+
+    def test_weak_new_password_returns_422(self, client, db_session):
+        user = make_user(db_session, phone="+919876540042", password="old-password-123")
+        token = create_password_reset_token(user.id, user.password_hash, 30)
+
+        response = client.post(
+            "/api/v1/auth/password/reset",
+            json={"token": token, "new_password": "whatever"},
+        )
+
+        assert response.status_code == 422
 
 
 class TestAuthRateLimiting:

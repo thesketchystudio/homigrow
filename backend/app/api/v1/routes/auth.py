@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.cookies import REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH
 from app.core.middleware import limiter
 from app.db.session import get_db
 from app.schemas.auth import (
@@ -28,9 +29,6 @@ from app.schemas.auth import (
 from app.services import auth_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-REFRESH_COOKIE_NAME = "refresh_token"
-REFRESH_COOKIE_PATH = "/api/v1/auth"
 
 
 def _set_refresh_cookie(response: Response, raw_token: str) -> None:
@@ -48,6 +46,21 @@ def _set_refresh_cookie(response: Response, raw_token: str) -> None:
 
 def _client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
+
+
+def _validate_refresh_origin(request: Request) -> None:
+    """
+    CSRF defense-in-depth for the one cookie-authenticated endpoint
+    (14_Security.md CSRF stance): SameSite=Lax already blocks the
+    cookie from being sent on most cross-site requests, but browsers
+    still attach it on some same-site-adjacent navigations. A present
+    but mismatched Origin header is rejected outright; a same-origin or
+    browser-omitted Origin (non-browser clients don't always send one)
+    is allowed through.
+    """
+    origin = request.headers.get("origin")
+    if origin is not None and origin != settings.FRONTEND_ORIGIN:
+        raise auth_service.REFRESH_INVALID
 
 
 @router.post("/signup", response_model=SignupResponse, status_code=201)
@@ -92,6 +105,7 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
     Reuse of an already-rotated token revokes every session belonging
     to that user (14_Security.md §Token design).
     """
+    _validate_refresh_origin(request)
     access_token, new_refresh_token, user = auth_service.refresh(
         db,
         request.cookies.get(REFRESH_COOKIE_NAME),

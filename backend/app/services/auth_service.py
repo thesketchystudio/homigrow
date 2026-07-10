@@ -24,7 +24,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.exceptions import AuthError, ConflictError, ExpiredError, LockedError
+from app.core.exceptions import AuthError, ConflictError, ExpiredError, ForbiddenError, LockedError
 from app.core.security import (
     create_access_token,
     create_password_reset_token,
@@ -157,7 +157,8 @@ def login(
     Verifies credentials and enforces the lockout policy: 5 consecutive
     failures locks the account for 15 minutes, reset on success.
     Returns an access token, a raw refresh token, and the authenticated
-    user.
+    user. Rejects a soft-deactivated account (is_active=false,
+    P2-T27) so login can't silently undo a deactivation.
     """
     bad_credentials = AuthError("BAD_CREDENTIALS", "Invalid phone/email or password.")
 
@@ -168,6 +169,9 @@ def login(
     )
     if user is None or user.password_hash is None:
         raise bad_credentials
+
+    if not user.is_active:
+        raise ForbiddenError("ACCOUNT_DEACTIVATED", "This account has been deactivated.")
 
     now = datetime.now(timezone.utc)
     if user.locked_until is not None and user.locked_until > now:
