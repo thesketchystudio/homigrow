@@ -375,7 +375,6 @@ A reader should understand the code from the comment alone.
   login) is actually designed
 - P2-T12 OTP-login path — out of current scope 2026-07-14, no
   OTP-login screen exists in the Figma design (password login only)
-- P2-T15+ frontend auth screens (separate `feature/phase_2_frontend` branch)
 - P2-T30 real Resend delivery — signup-verification half now done
   (2026-07-14, shipped with P2-T11); password-reset email template
   still dev-log-only, on hold by explicit choice
@@ -389,6 +388,58 @@ A reader should understand the code from the comment alone.
   headers, and a real end-to-end `POST /auth/signup` from that origin
   succeeds (201, user row created and deleted after verifying). 131/131
   tests still pass.
+- **P2-T17/T18** (API client silent-refresh interceptor + authStore,
+  AuthGuard) — blocked on a login screen existing (see below); the
+  minimal `lib/api/client.ts` shipped with T15/T16 has no auth header
+  or refresh-retry logic yet
+
+### Frontend Phase 2 (on `feature/phase_2_frontend`, cut from `dev`)
+- **P2-T15/T16 shipped 2026-07-14** — signup + email-OTP verification
+  flow, from Figma node `416:155` ("Client - Sign up"): 3-step wizard
+  (`features/auth/SignupWizard.tsx` — role select → form → OTP verify,
+  implemented as local component state, not separate routes, since the
+  design shares one continuous progress bar across all 3 and no step
+  after the first needs to be independently linkable). New
+  `app/(auth)/layout.tsx` shell (distinct from the `(client)` portal's
+  TopNavBar/Footer). New `components/forms/` underline-style field
+  primitives (`AuthTextField`/`AuthPhoneField`/`AuthPasswordField`/
+  `AuthCheckboxField` + a lazy-`zxcvbn`-loaded `PasswordStrengthMeter`)
+  — a different visual language from the boxed `components/ui/input.tsx`
+  shadcn primitive, documented in `04_Frontend_Architecture.md` as
+  shared across auth/post-property/profile forms, so these live in
+  `components/forms/` not `features/auth/`. New `lib/api/client.ts`
+  (minimal fetch wrapper, no auth header/refresh yet — public endpoints
+  only) + `lib/api/endpoints/auth.ts` (typed functions for all `/auth`
+  routes) + `lib/validation/auth.ts` (zod, mirrors
+  `app/schemas/auth.py`) + `app/providers.tsx` (`QueryClientProvider`,
+  first real TanStack Query use, ADR-007). Added `UserRole`/`OTPPurpose`
+  to `lib/enums.ts` (was missing `UserRole` entirely). New deps: zod,
+  @hookform/resolvers, zustand (unused so far, added ahead of T17),
+  @tanstack/react-query, zxcvbn. `tsc`/`eslint` clean (one real issue
+  fixed: a `react-hooks/set-state-in-effect` violation in
+  `PasswordStrengthMeter`). Full writeup:
+  `docs/implementation/frontend/Phase_2_Implementation.md`.
+  **Playwright-verified live 2026-07-14** (once CORS above closed the
+  gap that blocked it): ran `feature/phase_2_backend` and this branch
+  simultaneously (a throwaway `git worktree` for one of them) and drove
+  the actual role-select → form → OTP-verify flow against the real
+  backend and the Supabase dev DB. Screenshots diffed against Figma
+  nodes 416:197, 416:1185, 418:874/878 — close match, including the
+  wrong-OTP error state matching pixel-for-pixel. Real network calls
+  confirmed: `POST /auth/signup` → 201, `POST /auth/otp/verify` → 401
+  (wrong code) then 204 (correct code, read from the backend's dev-mode
+  OTP log), `is_email_verified` flipped true in the DB (row deleted
+  after verifying). Found and fixed two minor text gaps this
+  verification surfaced: `app/layout.tsx`'s metadata title was still
+  the `create-next-app` scaffold default ("Create Next App"), and
+  `AuthProgressBar.tsx`'s eyebrow label read "Onboarding" instead of
+  the Figma copy's "Onboarding Sequence" — both now match.
+  **`/login` still does not exist and 404s** — the Figma link given
+  the T15/T16 session only covered the sign up flow; a `get_metadata`
+  sweep of the file's `Components` canvas didn't surface a `Login`
+  frame (likely an MCP response-size truncation, not confirmed absent).
+  Needs its own Figma node before P2-T17/T18 can be meaningfully built
+  against a real screen.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
