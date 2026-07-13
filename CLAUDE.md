@@ -314,29 +314,69 @@ A reader should understand the code from the comment alone.
   `09_Phase_2.md`'s own "safely deferrable to P4 if time pressure"
   clause; your explicit choice this session, not an oversight. The M2+
   columns and `/auth/2fa/*` endpoints defer with it.
-- **Known gap, deliberately left open (2026-07-09 docs-vs-code pass):**
-  `02_Database_Design.md`'s invariant `password_hash IS NOT NULL OR
-  is_phone_verified` ("deferred to P2 service-level") is not yet enforced.
-  `signup()` allows `password=None` (the OTP-only path the `User` model
-  supports) while `is_phone_verified` defaults false, so a password-less
-  signup currently satisfies neither side — and permanently reserves the
-  phone number (409 on retry) with no verify/expiry path, since OTP-verify
-  (P2-T11) doesn't exist yet. User explicitly chose to leave this open
-  rather than require password now — **P2-T11 (OTP verify) must close this
-  gap** by flipping `is_phone_verified` true on verify; don't mark T11 done
-  without checking this invariant actually holds afterward.
+  · **P2-T11 shipped 2026-07-14, rescoped from phone/SMS to email.**
+  The Figma signup design ("Verify your identity" screen) sends its
+  6-digit verification code by **email**, not phone/SMS — P2-T10
+  (`sms_service.py`/MSG91) is shelved, not needed for signup
+  verification; ADR-011 amended in `15_Decision_Log.md` (MSG91
+  decision stands for any future phone-based flow, just unused right
+  now). New `POST /api/v1/auth/otp/request` (resend) and
+  `POST /api/v1/auth/otp/verify` (`auth_service.py`: `request_otp`/
+  `verify_otp`), keyed by email. Hashed codes (bcrypt), 5-attempt cap,
+  10-min expiry, a new request invalidates any prior unconsumed code
+  for the same `(email, purpose)`. `401 OTP_INVALID` on a wrong code,
+  `410 OTP_EXPIRED` once no valid code remains (never issued, expired,
+  or attempt cap reached) — matches the Figma design's two distinct
+  error states. Success on signup/broker_verification purposes flips
+  `is_email_verified`. New `app/services/email_service.py` (Resend
+  adapter, minimal HTML template) — `_issue_otp` sends for real now,
+  swallowing send failures since the dev-mode console log is still a
+  working fallback. `otp_codes.phone` renamed to `email` (M4
+  migration, verified up/down/up clean — old dev rows truncated,
+  table is documented as transient). `SignupRequest.email` is now
+  required, not Optional, since it's the OTP delivery address.
+  131/131 tests pass (14 new); tests mock `email_service.
+  send_otp_email` (autouse fixture in `conftest.py`) so the suite
+  never makes a real network call. Verified live against the real
+  Supabase dev DB + real Resend API: signup → real email delivered to
+  a real inbox → wrong code rejected (401) → correct code accepted
+  (204, `is_email_verified` flips true) → replay rejected (410);
+  verification user deleted afterward. **P2-T30 partially closed as a
+  side effect** — signup-verification email now sends for real;
+  password-reset email (T07) is still dev-log-only, unchanged, still
+  on hold. Docs amended wherever the phone/SMS assumption appeared —
+  00/01/02/03/05/07/09/12/14/15/18 in `docs/architecture/` — each
+  carries a dated "Amended 2026-07-14" note rather than silently
+  rewriting history.
+- **Known gap, deliberately left open (2026-07-09 docs-vs-code pass;
+  correction 2026-07-14):** `02_Database_Design.md`'s invariant
+  `password_hash IS NOT NULL OR is_phone_verified` is still not
+  enforced — `signup()` allows `password=None` while
+  `is_phone_verified` defaults false. This note originally said
+  "P2-T11 (OTP verify) must close this gap by flipping
+  is_phone_verified" — **that's now wrong**: T11 shipped 2026-07-14,
+  but verifies *email*, not phone (the Figma design never verifies
+  phone at all), so it does not close this gap. The gap remains
+  genuinely open with no planned task addressing it — phone is simply
+  never verified anywhere in the current design. Revisit only if phone
+  verification is actually designed later, or consider closing it a
+  different way (e.g. requiring password at signup, which the Figma
+  form always collects anyway alongside email).
 
 ### ⏳ Pending — Phase 1 (Weeks 1–4)
 - (none) — T20 landed above; T31 (this status update) closes Phase 1
 
 ### ⏳ Pending — Phase 2 (Weeks 5–8)
-- P2-T10–T12 OTP request/verify + MSG91 `sms_service.py` adapter — on
-  hold pending DLT registration
+- P2-T10 `sms_service.py` MSG91 adapter — shelved 2026-07-14, not
+  needed for signup verification (email OTP instead, see P2-T11
+  above); revisit only if a future phone-based flow (2FA, phone
+  login) is actually designed
+- P2-T12 OTP-login path — out of current scope 2026-07-14, no
+  OTP-login screen exists in the Figma design (password login only)
 - P2-T15+ frontend auth screens (separate `feature/phase_2_frontend` branch)
-- P2-T30 real Resend email delivery (signup verification + password
-  reset templates) — password reset logic itself (T07) is done, dev-
-  mode-logged only; on hold by explicit choice this session (kept
-  paired with OTP as the two remaining provider-dependent pieces)
+- P2-T30 real Resend delivery — signup-verification half now done
+  (2026-07-14, shipped with P2-T11); password-reset email template
+  still dev-log-only, on hold by explicit choice
 - P2-T32 2FA (TOTP) backend — explicitly deferred to P4, see T27/T31
   notes above
 - No `CORSMiddleware` configured yet — needed once a browser frontend
@@ -345,7 +385,10 @@ A reader should understand the code from the comment alone.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
-  docs/architecture/15_Decision_Log.md); integrate via `services/sms_service.py` adapter
+  docs/architecture/15_Decision_Log.md); integrate via
+  `services/sms_service.py` adapter if a phone-based flow is ever
+  designed. Not currently in use — signup verification uses email OTP
+  via Resend instead (ADR-011 amendment, 2026-07-14).
 
 ## What NOT to do
 - Don't run `npm audit fix --force` reflexively on scaffold warnings.

@@ -20,6 +20,9 @@ zxcvbn==4.5.0
 # Test tooling (pulled forward from T13 — T10's lifecycle tests need pytest
 # to run; T13 adds the fuller conftest.py/DB-fixture scaffolding on top).
 pytest==8.3.4
+
+# httpx also backs FastAPI's TestClient above, but is now a runtime
+# dependency too: app/services/email_service.py's Resend adapter.
 httpx==0.28.1
 
 # Lint (T14 backend CI)

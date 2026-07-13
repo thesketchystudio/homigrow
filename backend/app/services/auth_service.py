@@ -2,13 +2,15 @@
 app/services/auth_service.py
 
 Password-path signup and login, refresh-token issuance/rotation/
-revocation, and password reset. Signup creates the user (and a
-broker_profile row when role=broker) and issues a phone-verification
-OTP; login checks credentials and enforces the lockout policy, then
-issues a session (access token + refresh token). refresh() rotates a
-presented refresh token and detects reuse of an already-rotated one as
-a theft signal (14_Security.md §Token design). reset_password()
-verifies a signed, stateless reset token and revokes every session.
+revocation, email-OTP request/verify, and password reset. Signup
+creates the user (and a broker_profile row when role=broker) and
+issues an email-verification OTP (Figma "Verify your identity" step;
+MSG91/SMS is shelved, 09_Phase_2.md amendment 2026-07-14); login checks
+credentials and enforces the lockout policy, then issues a session
+(access token + refresh token). refresh() rotates a presented refresh
+token and detects reuse of an already-rotated one as a theft signal
+(14_Security.md §Token design). reset_password() verifies a signed,
+stateless reset token and revokes every session.
 """
 
 import ipaddress
@@ -40,16 +42,25 @@ from app.models.enums import OTPPurpose, UserRole
 from app.models.otp_code import OTPCode
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
+from app.services import email_service
 
 logger = logging.getLogger(__name__)
 
 OTP_EXPIRE_MINUTES = 10
+OTP_MAX_ATTEMPTS = 5
 LOCKOUT_THRESHOLD = 5
 LOCKOUT_MINUTES = 15
 PASSWORD_RESET_TTL_MINUTES = 30
 
 REFRESH_INVALID = AuthError("REFRESH_INVALID", "Session expired or invalid, please log in again.")
 RESET_TOKEN_INVALID = ExpiredError("TOKEN_EXPIRED", "This password reset link is invalid or has expired.")
+OTP_INVALID = AuthError("OTP_INVALID", "Incorrect verification code.")
+OTP_EXPIRED = ExpiredError("OTP_EXPIRED", "This code has expired. Request a new one.")
+
+# Purposes that flip is_email_verified on a successful verify — every
+# purpose currently in use (login-purpose email OTP isn't built; the
+# design uses password login only).
+_EMAIL_VERIFYING_PURPOSES = (OTPPurpose.signup, OTPPurpose.broker_verification)
 
 
 def _safe_ip(host: Optional[str]) -> Optional[str]:
@@ -84,17 +95,28 @@ def _issue_refresh_token(
     return raw_token
 
 
-def _issue_otp(db: Session, phone: str, purpose: OTPPurpose) -> None:
+def _issue_otp(db: Session, email: str, purpose: OTPPurpose) -> None:
     """
-    Generates, hashes, and stores a 6-digit OTP. Real delivery
-    (sms_service.py's MSG91 adapter) lands in P2-T10; until then this
-    logs the code in non-production environments as the interim
-    dev-mode delivery path the docs describe for that task.
+    Generates, hashes, and stores a 6-digit OTP, then delivers it by
+    email via Resend (email_service.py) — the Figma signup design sends
+    this code to email, not phone/SMS. A new request invalidates any
+    still-unconsumed code for the same (email, purpose), so only the
+    latest one is ever valid. Always logs the code in non-production
+    environments too, as a fallback delivery path if the real send
+    fails (e.g. Resend's sandbox restricts sends to non-owner
+    addresses) — a Resend failure here is swallowed, not raised, since
+    signup/resend should still succeed even if the email didn't land.
     """
+    db.query(OTPCode).filter(
+        OTPCode.email == email,
+        OTPCode.purpose == purpose,
+        OTPCode.consumed_at.is_(None),
+    ).update({"consumed_at": datetime.now(timezone.utc)}, synchronize_session=False)
+
     code = f"{secrets.randbelow(1_000_000):06d}"
     db.add(
         OTPCode(
-            phone=phone,
+            email=email,
             code_hash=hash_password(code),
             purpose=purpose,
             expires_at=datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRE_MINUTES),
@@ -102,7 +124,53 @@ def _issue_otp(db: Session, phone: str, purpose: OTPPurpose) -> None:
     )
 
     if settings.ENVIRONMENT != "production":
-        logger.info("OTP for %s (%s): %s", phone, purpose.value, code)
+        logger.info("OTP for %s (%s): %s", email, purpose.value, code)
+
+    try:
+        email_service.send_otp_email(email, code)
+    except Exception:
+        logger.exception("Failed to send OTP email to %s", email)
+
+
+def request_otp(db: Session, email: str, purpose: OTPPurpose) -> None:
+    """(Re)issues an OTP for the given email/purpose — powers the signup-verification 'Resend OTP' action."""
+    _issue_otp(db, email, purpose)
+    db.commit()
+
+
+def verify_otp(db: Session, email: str, code: str, purpose: OTPPurpose) -> None:
+    """
+    Verifies a submitted OTP against the latest unconsumed code issued
+    for (email, purpose). A wrong code counts toward the 5-attempt cap
+    and raises 401 OTP_INVALID; once no valid code remains — none ever
+    issued, expired, or the attempt cap reached — raises 410 OTP_EXPIRED
+    (matches the Figma design's "request a new one" recovery path for
+    all three cases, rather than a distinct error per case). On success
+    for a verifying purpose, flips the matching user's is_email_verified.
+    """
+    row = (
+        db.query(OTPCode)
+        .filter(OTPCode.email == email, OTPCode.purpose == purpose, OTPCode.consumed_at.is_(None))
+        .order_by(OTPCode.created_at.desc())
+        .first()
+    )
+    now = datetime.now(timezone.utc)
+    if row is None or row.expires_at <= now or row.attempts >= OTP_MAX_ATTEMPTS:
+        raise OTP_EXPIRED
+
+    if not verify_password(code, row.code_hash):
+        row.attempts += 1
+        db.commit()
+        raise OTP_INVALID
+
+    row.consumed_at = now
+
+    if purpose in _EMAIL_VERIFYING_PURPOSES:
+        user = db.query(User).filter(User.email == email).first()
+        if user is not None:
+            user.is_email_verified = True
+
+    db.commit()
 
 
 def signup(
@@ -110,13 +178,13 @@ def signup(
     phone: str,
     role: UserRole,
     full_name: Optional[str],
-    email: Optional[str],
+    email: str,
     password: Optional[str],
 ) -> User:
     """
     Creates a user (and a broker_profile row when role=broker), then
-    issues a signup OTP. Raises 409 PHONE_TAKEN if the phone is already
-    registered, 409 EMAIL_TAKEN on a concurrent duplicate email.
+    issues a signup-verification OTP by email. Raises 409 PHONE_TAKEN if
+    the phone is already registered, 409 EMAIL_TAKEN on a duplicate email.
     """
     if db.query(User).filter(User.phone == phone).first() is not None:
         raise ConflictError("PHONE_TAKEN", "This phone number is already registered.")
@@ -134,7 +202,7 @@ def signup(
     if role == UserRole.broker:
         db.add(BrokerProfile(user_id=user.id))
 
-    _issue_otp(db, phone, OTPPurpose.signup)
+    _issue_otp(db, email, OTPPurpose.signup)
 
     try:
         db.commit()

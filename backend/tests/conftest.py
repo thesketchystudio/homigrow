@@ -8,7 +8,9 @@ session via dependency override, so route tests run within the same
 rollback boundary. The rate limiter is a process-wide singleton
 (app/core/middleware.py), so its counters are reset before every test —
 otherwise unrelated tests that happen to call the same auth endpoint
-would accumulate against one another's request budget.
+would accumulate against one another's request budget. Real Resend
+sends are mocked out for every test — otherwise every signup/OTP test
+would make a live network call.
 """
 
 import pytest
@@ -27,6 +29,12 @@ from app.models.user import User
 def _reset_rate_limiter():
     """Clears slowapi's in-memory counters before each test so per-test rate-limit assertions don't leak across the suite."""
     limiter.reset()
+
+
+@pytest.fixture(autouse=True)
+def _mock_send_otp_email(monkeypatch):
+    """Prevents tests from making real Resend API calls — auth_service._issue_otp sends via httpx."""
+    monkeypatch.setattr("app.services.email_service.send_otp_email", lambda *args, **kwargs: None)
 
 
 @pytest.fixture()

@@ -1,13 +1,14 @@
 """
 app/api/v1/routes/auth.py
 
-Auth endpoints: signup, login, refresh, logout, and password
-forgot/reset (password path). Routes only parse/validate input and
-translate the service result into a response schema — no business
-logic here (03_Backend_Architecture.md layering rules). The refresh
-token itself never appears in a JSON body; it travels only as the
-httpOnly cookie described in 14_Security.md §Token design. Every route
-is rate-limited (P2-T08, ADR-010): 5/min/IP, per 03_Backend_Architecture.md.
+Auth endpoints: signup, login, refresh, logout, email-OTP request/
+verify, and password forgot/reset (password path). Routes only parse/
+validate input and translate the service result into a response
+schema — no business logic here (03_Backend_Architecture.md layering
+rules). The refresh token itself never appears in a JSON body; it
+travels only as the httpOnly cookie described in 14_Security.md §Token
+design. Every route is rate-limited (P2-T08, ADR-010): 5/min/IP except
+otp/request at 3/min/IP, per 03_Backend_Architecture.md.
 """
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -20,6 +21,8 @@ from app.db.session import get_db
 from app.schemas.auth import (
     ForgotPasswordRequest,
     LoginRequest,
+    OTPRequestRequest,
+    OTPVerifyRequest,
     ResetPasswordRequest,
     SignupRequest,
     SignupResponse,
@@ -66,7 +69,7 @@ def _validate_refresh_origin(request: Request) -> None:
 @router.post("/signup", response_model=SignupResponse, status_code=201)
 @limiter.limit("5/minute")
 def signup(payload: SignupRequest, request: Request, db: Session = Depends(get_db)) -> SignupResponse:
-    """Creates a client or broker account and triggers a signup OTP."""
+    """Creates a client or broker account and emails a signup-verification OTP."""
     user = auth_service.signup(
         db,
         phone=payload.phone,
@@ -76,6 +79,20 @@ def signup(payload: SignupRequest, request: Request, db: Session = Depends(get_d
         password=payload.password,
     )
     return SignupResponse(user_id=user.id)
+
+
+@router.post("/otp/request", status_code=204)
+@limiter.limit("3/minute")
+def request_otp(payload: OTPRequestRequest, request: Request, db: Session = Depends(get_db)) -> None:
+    """(Re)issues an email OTP for the given purpose — powers the signup screen's 'Resend OTP' action."""
+    auth_service.request_otp(db, payload.email, payload.purpose)
+
+
+@router.post("/otp/verify", status_code=204)
+@limiter.limit("5/minute")
+def verify_otp(payload: OTPVerifyRequest, request: Request, db: Session = Depends(get_db)) -> None:
+    """Verifies a submitted OTP; 401 OTP_INVALID on a wrong code, 410 OTP_EXPIRED once no valid code remains."""
+    auth_service.verify_otp(db, payload.email, payload.code, payload.purpose)
 
 
 @router.post("/login", response_model=TokenResponse)
