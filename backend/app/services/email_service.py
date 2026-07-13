@@ -19,6 +19,21 @@ logger = logging.getLogger(__name__)
 
 RESEND_API_URL = "https://api.resend.com/emails"
 
+_OTP_EMAIL_TEMPLATE = """\
+<div style="font-family:sans-serif;max-width:480px;margin:0 auto;border:1px solid #eee;border-radius:12px;overflow:hidden">
+  <div style="background:#0c0c0c;color:#fff;padding:20px 24px;font-weight:700;letter-spacing:1px">HOMIGROW</div>
+  <div style="padding:32px 24px">
+    <h1 style="font-size:20px;margin:0 0 8px">Verify your identity</h1>
+    <p style="font-size:14px;color:#444;margin:0 0 24px">Enter this code to continue:</p>
+    <div style="font-size:32px;font-weight:700;letter-spacing:8px;text-align:center;padding:16px;background:#f4f4f5;border-radius:8px;margin:0 0 16px">{code}</div>
+    <p style="font-size:13px;color:#888;margin:0">Expires in 10 minutes.</p>
+  </div>
+  <div style="background:#fafafa;padding:16px 24px;font-size:12px;color:#999;border-top:1px solid #eee">
+    &copy; 2026 Homigrow &middot; Help &middot; Privacy
+  </div>
+</div>
+"""
+
 
 def send_otp_email(to: str, code: str) -> None:
     """
@@ -34,7 +49,7 @@ def send_otp_email(to: str, code: str) -> None:
             "from": settings.RESEND_FROM_EMAIL,
             "to": [to],
             "subject": "Your Homigrow verification code",
-            "html": f"<p>Your verification code is <strong>{code}</strong>. It expires in 10 minutes.</p>",
+            "html": _OTP_EMAIL_TEMPLATE.format(code=code),
         },
         timeout=10.0,
     )

@@ -329,9 +329,11 @@ A reader should understand the code from the comment alone.
   or attempt cap reached) — matches the Figma design's two distinct
   error states. Success on signup/broker_verification purposes flips
   `is_email_verified`. New `app/services/email_service.py` (Resend
-  adapter, minimal HTML template) — `_issue_otp` sends for real now,
-  swallowing send failures since the dev-mode console log is still a
-  working fallback. `otp_codes.phone` renamed to `email` (M4
+  adapter) — `_issue_otp` sends for real now, swallowing send failures
+  since the dev-mode console log is still a working fallback. Template
+  upgraded same session from a bare `<p>` tag to a branded card (dark
+  header bar, boxed code, footer) after a quick two-option comparison;
+  visually confirmed via a real send. `otp_codes.phone` renamed to `email` (M4
   migration, verified up/down/up clean — old dev rows truncated,
   table is documented as transient). `SignupRequest.email` is now
   required, not Optional, since it's the OTP delivery address.
