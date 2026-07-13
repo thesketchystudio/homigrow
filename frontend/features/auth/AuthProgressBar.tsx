@@ -13,7 +13,7 @@ export function AuthProgressBar({ step, totalSteps = 3 }: { step: number; totalS
     <div className="flex w-full flex-col gap-3">
       <div className="flex items-center justify-between">
         <span className="font-heading text-[14px] font-medium uppercase tracking-[1.4px] text-brand-primary-100">
-          Onboarding
+          Onboarding Sequence
         </span>
         <span className="font-heading text-[16px] text-brand-primary-400">
           {`Step ${step} `}
