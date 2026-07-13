@@ -3,6 +3,20 @@
 // to the backend enums. Single source of truth for status/role strings on
 // the frontend; import these everywhere instead of writing string literals.
 
+export const UserRole = {
+  client: "client",
+  broker: "broker",
+  admin: "admin",
+} as const;
+export type UserRole = (typeof UserRole)[keyof typeof UserRole];
+
+export const OTPPurpose = {
+  login: "login",
+  signup: "signup",
+  broker_verification: "broker_verification",
+} as const;
+export type OTPPurpose = (typeof OTPPurpose)[keyof typeof OTPPurpose];
+
 export const PropertyStatus = {
   draft: "draft",
   pending: "pending",

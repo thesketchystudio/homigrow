@@ -375,15 +375,57 @@ A reader should understand the code from the comment alone.
   login) is actually designed
 - P2-T12 OTP-login path — out of current scope 2026-07-14, no
   OTP-login screen exists in the Figma design (password login only)
-- P2-T15+ frontend auth screens (separate `feature/phase_2_frontend` branch)
 - P2-T30 real Resend delivery — signup-verification half now done
   (2026-07-14, shipped with P2-T11); password-reset email template
   still dev-log-only, on hold by explicit choice
 - P2-T32 2FA (TOTP) backend — explicitly deferred to P4, see T27/T31
   notes above
-- No `CORSMiddleware` configured yet — needed once a browser frontend
-  actually calls this API cross-origin with credentials (P2-T15+
-  territory, not closed by T31's Origin-header CSRF check alone)
+- No `CORSMiddleware` configured yet — now genuinely blocking:
+  frontend Phase 2 work (below) has a real signup form making real
+  `fetch()` calls, so this needs a small backend-track add
+  (allow `FRONTEND_ORIGIN`, credentials) before the signup flow can
+  be verified end-to-end against a running API
+- **P2-T17/T18** (API client silent-refresh interceptor + authStore,
+  AuthGuard) — blocked on a login screen existing (see below); the
+  minimal `lib/api/client.ts` shipped with T15/T16 has no auth header
+  or refresh-retry logic yet
+
+### Frontend Phase 2 (on `feature/phase_2_frontend`, cut from `dev`)
+- **P2-T15/T16 shipped 2026-07-14** — signup + email-OTP verification
+  flow, from Figma node `416:155` ("Client - Sign up"): 3-step wizard
+  (`features/auth/SignupWizard.tsx` — role select → form → OTP verify,
+  implemented as local component state, not separate routes, since the
+  design shares one continuous progress bar across all 3 and no step
+  after the first needs to be independently linkable). New
+  `app/(auth)/layout.tsx` shell (distinct from the `(client)` portal's
+  TopNavBar/Footer). New `components/forms/` underline-style field
+  primitives (`AuthTextField`/`AuthPhoneField`/`AuthPasswordField`/
+  `AuthCheckboxField` + a lazy-`zxcvbn`-loaded `PasswordStrengthMeter`)
+  — a different visual language from the boxed `components/ui/input.tsx`
+  shadcn primitive, documented in `04_Frontend_Architecture.md` as
+  shared across auth/post-property/profile forms, so these live in
+  `components/forms/` not `features/auth/`. New `lib/api/client.ts`
+  (minimal fetch wrapper, no auth header/refresh yet — public endpoints
+  only) + `lib/api/endpoints/auth.ts` (typed functions for all `/auth`
+  routes) + `lib/validation/auth.ts` (zod, mirrors
+  `app/schemas/auth.py`) + `app/providers.tsx` (`QueryClientProvider`,
+  first real TanStack Query use, ADR-007). Added `UserRole`/`OTPPurpose`
+  to `lib/enums.ts` (was missing `UserRole` entirely). New deps: zod,
+  @hookform/resolvers, zustand (unused so far, added ahead of T17),
+  @tanstack/react-query, zxcvbn. `tsc`/`eslint` clean (one real issue
+  fixed: a `react-hooks/set-state-in-effect` violation in
+  `PasswordStrengthMeter`). Dev server verified to start clean and
+  serve `/signup` with the expected step-1 content; **interactive
+  click-through and a real signup POST were NOT verified this
+  session** — no browser automation tool was available, and the CORS
+  gap above blocks a real end-to-end API call regardless. Full writeup:
+  `docs/implementation/frontend/Phase_2_Implementation.md`.
+  **`/login` does not exist yet and 404s** — the Figma link given this
+  session only covered the sign up flow; a `get_metadata` sweep of the
+  file's `Components` canvas didn't surface a `Login` frame (likely an
+  MCP response-size truncation, not confirmed absent). Needs its own
+  Figma node before P2-T17/T18 can be meaningfully built against a real
+  screen.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
