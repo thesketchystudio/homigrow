@@ -16,6 +16,7 @@ from uuid import UUID, uuid4
 
 import jwt
 from passlib.context import CryptContext
+from zxcvbn import zxcvbn
 
 from app.core.config import settings
 
@@ -23,6 +24,7 @@ _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 JWT_ALGORITHM = "HS256"
 PASSWORD_RESET_PURPOSE = "password_reset"
+MIN_PASSWORD_STRENGTH_SCORE = 3
 
 
 def hash_password(password: str) -> str:
@@ -33,6 +35,19 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, password_hash: str) -> bool:
     """Checks a plaintext password against a stored bcrypt hash."""
     return _pwd_context.verify(password, password_hash)
+
+
+def validate_password_strength(password: str) -> None:
+    """
+    Enforces a minimum zxcvbn strength score of 3 (of 0-4) server-side,
+    per 14_Security.md — independent of whatever a frontend meter shows,
+    since client-side validation can always be bypassed. Raises
+    ValueError (not an AppError) so pydantic field_validators can call
+    this directly and let it fold into the normal 422 validation-error
+    envelope alongside every other field-level check.
+    """
+    if zxcvbn(password)["score"] < MIN_PASSWORD_STRENGTH_SCORE:
+        raise ValueError("Password is too weak. Try a longer, less predictable phrase.")
 
 
 def create_access_token(user_id: UUID, role: str) -> str:

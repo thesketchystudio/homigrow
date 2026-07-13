@@ -46,6 +46,12 @@ jobs:
       # real secret, so a hardcoded value is fine here (same reasoning as
       # DB_PASSWORD above), no GitHub secret needed.
       JWT_SECRET: ci-test-secret-never-used-outside-this-workflow
+      # Settings requires these (no default) but the test suite never
+      # makes a real Resend API call — email_service.send_otp_email is
+      # mocked for every test (tests/conftest.py) — so placeholder
+      # values are fine, same reasoning as JWT_SECRET above.
+      RESEND_API_KEY: ci-test-resend-key-never-used-outside-this-workflow
+      RESEND_FROM_EMAIL: ci@example.com
       # SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
 
     steps:

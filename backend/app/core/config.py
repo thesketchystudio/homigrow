@@ -30,6 +30,19 @@ class Settings(BaseSettings):
     JWT_ACCESS_TTL_MIN: int = 15
     JWT_REFRESH_TTL_DAYS: int = 30
 
+    RESEND_API_KEY: str
+    RESEND_FROM_EMAIL: str
+
+    # Declared now so Settings() doesn't fail on the already-present .env
+    # value (pydantic-settings forbids undeclared env vars by default).
+    # The sms_service.py MSG91 adapter itself is P2-T10, still on hold.
+    MSG91_AUTH_KEY: str = ""
+
+    # Expected browser origin for the frontend SPA; used only to validate
+    # the Origin header on the one cookie-authenticated endpoint
+    # (/auth/refresh) per 14_Security.md's CSRF stance.
+    FRONTEND_ORIGIN: str = "http://localhost:3000"
+
     @computed_field
     @property
     def DATABASE_URL(self) -> str:

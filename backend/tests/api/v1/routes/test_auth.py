@@ -6,15 +6,33 @@ TestClient — status codes and response shape, not business-rule edge
 cases (those live in tests/services/test_auth_service.py).
 """
 
+import re
+
+from app.core.config import settings
 from app.core.security import create_password_reset_token
+from app.models.user import User
 from tests.conftest import make_user
+
+
+def _extract_otp_code(caplog, email: str) -> str:
+    for record in caplog.records:
+        match = re.search(rf"OTP for {re.escape(email)} \(\w+\): (\d{{6}})", record.message)
+        if match:
+            return match.group(1)
+    raise AssertionError(f"No OTP logged for {email}")
 
 
 class TestSignupRoute:
     def test_signup_returns_201_with_user_id(self, client):
         response = client.post(
             "/api/v1/auth/signup",
-            json={"phone": "+919876540001", "role": "client", "full_name": "Test User", "password": "s3cure-pass"},
+            json={
+                "phone": "+919876540001",
+                "role": "client",
+                "full_name": "Test User",
+                "email": "testuser1@example.com",
+                "password": "s3cure-pass",
+            },
         )
 
         assert response.status_code == 201
@@ -23,7 +41,15 @@ class TestSignupRoute:
     def test_signup_rejects_admin_role_with_422(self, client):
         response = client.post(
             "/api/v1/auth/signup",
-            json={"phone": "+919876540002", "role": "admin"},
+            json={"phone": "+919876540002", "role": "admin", "email": "admin2@example.com"},
+        )
+
+        assert response.status_code == 422
+
+    def test_signup_without_email_returns_422(self, client):
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={"phone": "+919876540099", "role": "client"},
         )
 
         assert response.status_code == 422
@@ -33,11 +59,71 @@ class TestSignupRoute:
 
         response = client.post(
             "/api/v1/auth/signup",
-            json={"phone": "+919876540003", "role": "client"},
+            json={"phone": "+919876540003", "role": "client", "email": "dupphone3@example.com"},
         )
 
         assert response.status_code == 409
         assert response.json()["error"]["code"] == "PHONE_TAKEN"
+
+    def test_weak_password_returns_422(self, client):
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={"phone": "+919876540004", "role": "client", "email": "weakpass4@example.com", "password": "whatever"},
+        )
+
+        assert response.status_code == 422
+
+
+class TestOtpRoutes:
+    def test_verify_route_flips_is_email_verified_and_returns_204(self, client, db_session, caplog):
+        with caplog.at_level("INFO"):
+            signup_response = client.post(
+                "/api/v1/auth/signup",
+                json={
+                    "phone": "+919876540060",
+                    "role": "client",
+                    "email": "otproute@example.com",
+                    "password": "s3cure-pass",
+                },
+            )
+        user_id = signup_response.json()["user_id"]
+        code = _extract_otp_code(caplog, "otproute@example.com")
+
+        response = client.post(
+            "/api/v1/auth/otp/verify",
+            json={"email": "otproute@example.com", "code": code, "purpose": "signup"},
+        )
+
+        assert response.status_code == 204
+        user = db_session.query(User).filter(User.id == user_id).first()
+        assert user.is_email_verified is True
+
+    def test_verify_route_wrong_code_returns_401(self, client):
+        client.post(
+            "/api/v1/auth/signup",
+            json={
+                "phone": "+919876540061",
+                "role": "client",
+                "email": "otpwrong@example.com",
+                "password": "s3cure-pass",
+            },
+        )
+
+        response = client.post(
+            "/api/v1/auth/otp/verify",
+            json={"email": "otpwrong@example.com", "code": "000000", "purpose": "signup"},
+        )
+
+        assert response.status_code == 401
+        assert response.json()["error"]["code"] == "OTP_INVALID"
+
+    def test_request_route_returns_204(self, client):
+        response = client.post(
+            "/api/v1/auth/otp/request",
+            json={"email": "otpresend@example.com", "purpose": "signup"},
+        )
+
+        assert response.status_code == 204
 
 
 class TestLoginRoute:
@@ -122,6 +208,29 @@ class TestRefreshRoute:
         assert response.status_code == 401
         assert response.json()["error"]["code"] == "REFRESH_INVALID"
 
+    def test_matching_origin_header_is_allowed(self, client, db_session):
+        make_user(db_session, phone="+919876540023", password="correct-horse-battery-staple")
+        client.post(
+            "/api/v1/auth/login",
+            json={"phone_or_email": "+919876540023", "password": "correct-horse-battery-staple"},
+        )
+
+        response = client.post("/api/v1/auth/refresh", headers={"Origin": settings.FRONTEND_ORIGIN})
+
+        assert response.status_code == 200
+
+    def test_mismatched_origin_header_returns_401(self, client, db_session):
+        make_user(db_session, phone="+919876540024", password="correct-horse-battery-staple")
+        client.post(
+            "/api/v1/auth/login",
+            json={"phone_or_email": "+919876540024", "password": "correct-horse-battery-staple"},
+        )
+
+        response = client.post("/api/v1/auth/refresh", headers={"Origin": "https://evil.example.com"})
+
+        assert response.status_code == 401
+        assert response.json()["error"]["code"] == "REFRESH_INVALID"
+
 
 class TestLogoutRoute:
     def test_logout_clears_the_cookie_and_revokes_the_session(self, client, db_session):
@@ -180,6 +289,17 @@ class TestResetPasswordRoute:
 
         assert response.status_code == 410
         assert response.json()["error"]["code"] == "TOKEN_EXPIRED"
+
+    def test_weak_new_password_returns_422(self, client, db_session):
+        user = make_user(db_session, phone="+919876540042", password="old-password-123")
+        token = create_password_reset_token(user.id, user.password_hash, 30)
+
+        response = client.post(
+            "/api/v1/auth/password/reset",
+            json={"token": token, "new_password": "whatever"},
+        )
+
+        assert response.status_code == 422
 
 
 class TestAuthRateLimiting:

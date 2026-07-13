@@ -24,6 +24,14 @@
 - `ENVIRONMENT` values: `dev` (local/staging) and `production`. This is
   unrelated to the git branch name sharing the same word — don't conflate them.
 
+## docs/ folder
+The entire `docs/` directory (architecture docs, implementation writeups) is
+gitignored — confirmed permanent policy, not a one-off. Keep writing
+`docs/implementation/<area>/PhaseN_Implementation.md` writeups after each
+task/batch as local reference, but don't expect `git add`/`git status` to
+pick them up, and don't re-verify this each session — it won't change
+unless explicitly told otherwise.
+
 ## API Versioning
 All backend routes live under `api/v1/`. This is deliberate — if a response
 shape needs a breaking change later, add `api/v2/` alongside it rather than
@@ -255,32 +263,134 @@ A reader should understand the code from the comment alone.
   authenticates via the refresh cookie alone rather than also requiring
   a Bearer token now that `get_current_user` exists — a deliberate
   choice, not an oversight (see T05/T06 notes in the implementation
-  writeup); revisit once a real protected route exists.
-- **Known gap, deliberately left open (2026-07-09 docs-vs-code pass):**
-  `02_Database_Design.md`'s invariant `password_hash IS NOT NULL OR
-  is_phone_verified` ("deferred to P2 service-level") is not yet enforced.
-  `signup()` allows `password=None` (the OTP-only path the `User` model
-  supports) while `is_phone_verified` defaults false, so a password-less
-  signup currently satisfies neither side — and permanently reserves the
-  phone number (409 on retry) with no verify/expiry path, since OTP-verify
-  (P2-T11) doesn't exist yet. User explicitly chose to leave this open
-  rather than require password now — **P2-T11 (OTP verify) must close this
-  gap** by flipping `is_phone_verified` true on verify; don't mark T11 done
-  without checking this invariant actually holds afterward.
+  writeup); revisit once a real protected route exists (P2-T20, below,
+  is now that route, so this is worth a second look next time this
+  area is touched).
+  · P2-T20 profile CRUD: `GET/PATCH /api/v1/users/me` (first real
+  consumer of `CurrentUser`), `PATCH /api/v1/users/me/password`. New
+  `users.preferences jsonb default '{}'` column (M3 migration,
+  verified up/down/up clean) backs a free-form prefs blob the profile
+  tabs will read later. Changing email resets `is_email_verified`
+  (real verification-send is still P2-T30). New `app/services/
+  user_service.py`, `app/schemas/users.py`, `app/api/v1/routes/
+  users.py`. **Fixed a real boot-blocking bug found while wiring
+  this:** `.env` already had `MSG91_AUTH_KEY` set, but `Settings`
+  never declared it — pydantic-settings rejects undeclared env vars by
+  default, so `Settings()` (and therefore every `alembic` command and
+  the app itself) was failing to start at all. Fixed by declaring
+  `MSG91_AUTH_KEY: str = ""` in `config.py` (the MSG91 adapter itself
+  is still P2-T10, on hold) · P2-T26 sessions API:
+  `GET /api/v1/users/me/sessions` (list active, newest first),
+  `DELETE /api/v1/users/me/sessions/{id}` (404 if not owned),
+  `POST /api/v1/users/me/sessions/revoke-all` (logout-everywhere,
+  reuses T07's bulk-revoke pattern) · P2-T27 account deactivation:
+  `POST /api/v1/users/me/deactivate` — soft (`is_active=false`),
+  revokes every session, 409 `ACTIVE_LISTINGS_EXIST` if a broker has a
+  `status=active` listing. **Closed a gap that made this meaningful:**
+  `login()` never checked `is_active`, so a deactivated account could
+  just log back in; added a `403 ACCOUNT_DEACTIVATED` check ahead of
+  the lockout check. `get_current_user` deliberately still doesn't
+  check `is_active` per request — `14_Security.md` already accepts
+  suspension taking effect within the ≤15-min access-token TTL, not
+  instantly · P2-T31 password strength + closed a real CSRF gap:
+  every password (signup/reset/change) is now scored with `zxcvbn`,
+  rejected below score 3/4 server-side, wired as a pydantic
+  field_validator so it folds into the existing 422 envelope with no
+  new error code. **`14_Security.md`'s CSRF stance claimed `/auth/
+  refresh` was protected by "SameSite=Lax + Origin header check" but
+  only the SameSite half existed in code** — added the Origin check
+  (`_validate_refresh_origin` in `routes/auth.py`): a present but
+  mismatched `Origin` header now gets `401 REFRESH_INVALID`; a missing
+  Origin (non-browser clients) still passes. New `FRONTEND_ORIGIN`
+  config setting (default `http://localhost:3000`) backs the check —
+  no `CORSMiddleware` added, that's real frontend-integration
+  infrastructure for P2-T15+, out of scope here. 117/117 tests pass
+  (33 new). All of T20/T26/T27/T31 verified live against the real
+  Supabase dev DB via curl end-to-end (signup → login → get/patch
+  profile → change password → list/revoke sessions → deactivate →
+  confirm re-login is blocked → confirm cross-origin refresh is
+  rejected); verification user row deleted afterward.
+  **P2-T32 (2FA/TOTP backend) explicitly deferred to P4** — per
+  `09_Phase_2.md`'s own "safely deferrable to P4 if time pressure"
+  clause; your explicit choice this session, not an oversight. The M2+
+  columns and `/auth/2fa/*` endpoints defer with it.
+  · **P2-T11 shipped 2026-07-14, rescoped from phone/SMS to email.**
+  The Figma signup design ("Verify your identity" screen) sends its
+  6-digit verification code by **email**, not phone/SMS — P2-T10
+  (`sms_service.py`/MSG91) is shelved, not needed for signup
+  verification; ADR-011 amended in `15_Decision_Log.md` (MSG91
+  decision stands for any future phone-based flow, just unused right
+  now). New `POST /api/v1/auth/otp/request` (resend) and
+  `POST /api/v1/auth/otp/verify` (`auth_service.py`: `request_otp`/
+  `verify_otp`), keyed by email. Hashed codes (bcrypt), 5-attempt cap,
+  10-min expiry, a new request invalidates any prior unconsumed code
+  for the same `(email, purpose)`. `401 OTP_INVALID` on a wrong code,
+  `410 OTP_EXPIRED` once no valid code remains (never issued, expired,
+  or attempt cap reached) — matches the Figma design's two distinct
+  error states. Success on signup/broker_verification purposes flips
+  `is_email_verified`. New `app/services/email_service.py` (Resend
+  adapter) — `_issue_otp` sends for real now, swallowing send failures
+  since the dev-mode console log is still a working fallback. Template
+  upgraded same session from a bare `<p>` tag to a branded card (dark
+  header bar, boxed code, footer) after a quick two-option comparison;
+  visually confirmed via a real send. `otp_codes.phone` renamed to `email` (M4
+  migration, verified up/down/up clean — old dev rows truncated,
+  table is documented as transient). `SignupRequest.email` is now
+  required, not Optional, since it's the OTP delivery address.
+  131/131 tests pass (14 new); tests mock `email_service.
+  send_otp_email` (autouse fixture in `conftest.py`) so the suite
+  never makes a real network call. Verified live against the real
+  Supabase dev DB + real Resend API: signup → real email delivered to
+  a real inbox → wrong code rejected (401) → correct code accepted
+  (204, `is_email_verified` flips true) → replay rejected (410);
+  verification user deleted afterward. **P2-T30 partially closed as a
+  side effect** — signup-verification email now sends for real;
+  password-reset email (T07) is still dev-log-only, unchanged, still
+  on hold. Docs amended wherever the phone/SMS assumption appeared —
+  00/01/02/03/05/07/09/12/14/15/18 in `docs/architecture/` — each
+  carries a dated "Amended 2026-07-14" note rather than silently
+  rewriting history.
+- **Known gap, deliberately left open (2026-07-09 docs-vs-code pass;
+  correction 2026-07-14):** `02_Database_Design.md`'s invariant
+  `password_hash IS NOT NULL OR is_phone_verified` is still not
+  enforced — `signup()` allows `password=None` while
+  `is_phone_verified` defaults false. This note originally said
+  "P2-T11 (OTP verify) must close this gap by flipping
+  is_phone_verified" — **that's now wrong**: T11 shipped 2026-07-14,
+  but verifies *email*, not phone (the Figma design never verifies
+  phone at all), so it does not close this gap. The gap remains
+  genuinely open with no planned task addressing it — phone is simply
+  never verified anywhere in the current design. Revisit only if phone
+  verification is actually designed later, or consider closing it a
+  different way (e.g. requiring password at signup, which the Figma
+  form always collects anyway alongside email).
 
 ### ⏳ Pending — Phase 1 (Weeks 1–4)
 - (none) — T20 landed above; T31 (this status update) closes Phase 1
 
 ### ⏳ Pending — Phase 2 (Weeks 5–8)
-- P2-T10–T12 OTP request/verify + MSG91 `sms_service.py` adapter
+- P2-T10 `sms_service.py` MSG91 adapter — shelved 2026-07-14, not
+  needed for signup verification (email OTP instead, see P2-T11
+  above); revisit only if a future phone-based flow (2FA, phone
+  login) is actually designed
+- P2-T12 OTP-login path — out of current scope 2026-07-14, no
+  OTP-login screen exists in the Figma design (password login only)
 - P2-T15+ frontend auth screens (separate `feature/phase_2_frontend` branch)
-- P2-T30 real Resend email delivery (signup verification + password
-  reset templates) — password reset logic itself (T07) is done, dev-
-  mode-logged only; blocked on a Resend account existing
+- P2-T30 real Resend delivery — signup-verification half now done
+  (2026-07-14, shipped with P2-T11); password-reset email template
+  still dev-log-only, on hold by explicit choice
+- P2-T32 2FA (TOTP) backend — explicitly deferred to P4, see T27/T31
+  notes above
+- No `CORSMiddleware` configured yet — needed once a browser frontend
+  actually calls this API cross-origin with credentials (P2-T15+
+  territory, not closed by T31's Origin-header CSRF check alone)
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
-  docs/architecture/15_Decision_Log.md); integrate via `services/sms_service.py` adapter
+  docs/architecture/15_Decision_Log.md); integrate via
+  `services/sms_service.py` adapter if a phone-based flow is ever
+  designed. Not currently in use — signup verification uses email OTP
+  via Resend instead (ADR-011 amendment, 2026-07-14).
 
 ## What NOT to do
 - Don't run `npm audit fix --force` reflexively on scaffold warnings.

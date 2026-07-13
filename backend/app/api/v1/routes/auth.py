@@ -1,24 +1,28 @@
 """
 app/api/v1/routes/auth.py
 
-Auth endpoints: signup, login, refresh, logout, and password
-forgot/reset (password path). Routes only parse/validate input and
-translate the service result into a response schema — no business
-logic here (03_Backend_Architecture.md layering rules). The refresh
-token itself never appears in a JSON body; it travels only as the
-httpOnly cookie described in 14_Security.md §Token design. Every route
-is rate-limited (P2-T08, ADR-010): 5/min/IP, per 03_Backend_Architecture.md.
+Auth endpoints: signup, login, refresh, logout, email-OTP request/
+verify, and password forgot/reset (password path). Routes only parse/
+validate input and translate the service result into a response
+schema — no business logic here (03_Backend_Architecture.md layering
+rules). The refresh token itself never appears in a JSON body; it
+travels only as the httpOnly cookie described in 14_Security.md §Token
+design. Every route is rate-limited (P2-T08, ADR-010): 5/min/IP except
+otp/request at 3/min/IP, per 03_Backend_Architecture.md.
 """
 
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.cookies import REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH
 from app.core.middleware import limiter
 from app.db.session import get_db
 from app.schemas.auth import (
     ForgotPasswordRequest,
     LoginRequest,
+    OTPRequestRequest,
+    OTPVerifyRequest,
     ResetPasswordRequest,
     SignupRequest,
     SignupResponse,
@@ -28,9 +32,6 @@ from app.schemas.auth import (
 from app.services import auth_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-REFRESH_COOKIE_NAME = "refresh_token"
-REFRESH_COOKIE_PATH = "/api/v1/auth"
 
 
 def _set_refresh_cookie(response: Response, raw_token: str) -> None:
@@ -50,10 +51,25 @@ def _client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
 
 
+def _validate_refresh_origin(request: Request) -> None:
+    """
+    CSRF defense-in-depth for the one cookie-authenticated endpoint
+    (14_Security.md CSRF stance): SameSite=Lax already blocks the
+    cookie from being sent on most cross-site requests, but browsers
+    still attach it on some same-site-adjacent navigations. A present
+    but mismatched Origin header is rejected outright; a same-origin or
+    browser-omitted Origin (non-browser clients don't always send one)
+    is allowed through.
+    """
+    origin = request.headers.get("origin")
+    if origin is not None and origin != settings.FRONTEND_ORIGIN:
+        raise auth_service.REFRESH_INVALID
+
+
 @router.post("/signup", response_model=SignupResponse, status_code=201)
 @limiter.limit("5/minute")
 def signup(payload: SignupRequest, request: Request, db: Session = Depends(get_db)) -> SignupResponse:
-    """Creates a client or broker account and triggers a signup OTP."""
+    """Creates a client or broker account and emails a signup-verification OTP."""
     user = auth_service.signup(
         db,
         phone=payload.phone,
@@ -63,6 +79,20 @@ def signup(payload: SignupRequest, request: Request, db: Session = Depends(get_d
         password=payload.password,
     )
     return SignupResponse(user_id=user.id)
+
+
+@router.post("/otp/request", status_code=204)
+@limiter.limit("3/minute")
+def request_otp(payload: OTPRequestRequest, request: Request, db: Session = Depends(get_db)) -> None:
+    """(Re)issues an email OTP for the given purpose — powers the signup screen's 'Resend OTP' action."""
+    auth_service.request_otp(db, payload.email, payload.purpose)
+
+
+@router.post("/otp/verify", status_code=204)
+@limiter.limit("5/minute")
+def verify_otp(payload: OTPVerifyRequest, request: Request, db: Session = Depends(get_db)) -> None:
+    """Verifies a submitted OTP; 401 OTP_INVALID on a wrong code, 410 OTP_EXPIRED once no valid code remains."""
+    auth_service.verify_otp(db, payload.email, payload.code, payload.purpose)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -92,6 +122,7 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
     Reuse of an already-rotated token revokes every session belonging
     to that user (14_Security.md §Token design).
     """
+    _validate_refresh_origin(request)
     access_token, new_refresh_token, user = auth_service.refresh(
         db,
         request.cookies.get(REFRESH_COOKIE_NAME),

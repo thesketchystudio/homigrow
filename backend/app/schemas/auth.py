@@ -12,16 +12,22 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from app.models.enums import UserRole
+from app.core.security import validate_password_strength
+from app.models.enums import OTPPurpose, UserRole
 
 
 class SignupRequest(BaseModel):
-    """Password-path signup input."""
+    """
+    Password-path signup input. email is required (not Optional) since
+    it's now the signup-verification OTP's delivery address — the
+    Figma design collects it alongside phone at signup, not later
+    (09_Phase_2.md amendment, 2026-07-14).
+    """
 
     phone: str
     role: UserRole
     full_name: Optional[str] = None
-    email: Optional[str] = None
+    email: str
     password: Optional[str] = None
 
     @field_validator("role")
@@ -33,6 +39,14 @@ class SignupRequest(BaseModel):
         """
         if value == UserRole.admin:
             raise ValueError("role must be client or broker")
+        return value
+
+    @field_validator("password")
+    @classmethod
+    def password_must_be_strong(cls, value: Optional[str]) -> Optional[str]:
+        """Only checked when a password is actually supplied — OTP-only signup passes password=None."""
+        if value is not None:
+            validate_password_strength(value)
         return value
 
 
@@ -78,3 +92,22 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def new_password_must_be_strong(cls, value: str) -> str:
+        validate_password_strength(value)
+        return value
+
+
+class OTPRequestRequest(BaseModel):
+    """Powers signup verification's 'Resend OTP' action — reissues a code for (email, purpose)."""
+
+    email: str
+    purpose: OTPPurpose
+
+
+class OTPVerifyRequest(BaseModel):
+    email: str
+    code: str
+    purpose: OTPPurpose

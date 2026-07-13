@@ -18,7 +18,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import ENUM as PGEnum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base, TimestampMixin
@@ -65,6 +65,11 @@ class User(Base, TimestampMixin):
     locked_until = Column(DateTime(timezone=True), nullable=True)
 
     avatar_url = Column(Text, nullable=True)
+
+    # Notification/privacy/display prefs read by the profile tabs
+    # (02_Database_Design.md M2 note); an opaque bag the API layer
+    # merges shallowly rather than validating field-by-field here.
+    preferences = Column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
 
     # uselist=False: a user has at most one broker profile, lazily
     # loaded — never joined implicitly on every user query.
