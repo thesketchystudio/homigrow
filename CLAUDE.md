@@ -380,11 +380,14 @@ A reader should understand the code from the comment alone.
   still dev-log-only, on hold by explicit choice
 - P2-T32 2FA (TOTP) backend — explicitly deferred to P4, see T27/T31
   notes above
-- No `CORSMiddleware` configured yet — now genuinely blocking:
-  frontend Phase 2 work (below) has a real signup form making real
-  `fetch()` calls, so this needs a small backend-track add
-  (allow `FRONTEND_ORIGIN`, credentials) before the signup flow can
-  be verified end-to-end against a running API
+- **CORS closed 2026-07-14** — `CORSMiddleware` added in `app/main.py`
+  (`allow_origins=[settings.FRONTEND_ORIGIN]`, `allow_credentials=True`),
+  needed once frontend Phase 2's real signup form started making real
+  cross-origin `fetch()` calls. Verified live: an OPTIONS preflight from
+  `Origin: http://localhost:3000` returns the right `access-control-*`
+  headers, and a real end-to-end `POST /auth/signup` from that origin
+  succeeds (201, user row created and deleted after verifying). 131/131
+  tests still pass.
 - **P2-T17/T18** (API client silent-refresh interceptor + authStore,
   AuthGuard) — blocked on a login screen existing (see below); the
   minimal `lib/api/client.ts` shipped with T15/T16 has no auth header
@@ -414,18 +417,29 @@ A reader should understand the code from the comment alone.
   @hookform/resolvers, zustand (unused so far, added ahead of T17),
   @tanstack/react-query, zxcvbn. `tsc`/`eslint` clean (one real issue
   fixed: a `react-hooks/set-state-in-effect` violation in
-  `PasswordStrengthMeter`). Dev server verified to start clean and
-  serve `/signup` with the expected step-1 content; **interactive
-  click-through and a real signup POST were NOT verified this
-  session** — no browser automation tool was available, and the CORS
-  gap above blocks a real end-to-end API call regardless. Full writeup:
+  `PasswordStrengthMeter`). Full writeup:
   `docs/implementation/frontend/Phase_2_Implementation.md`.
-  **`/login` does not exist yet and 404s** — the Figma link given this
-  session only covered the sign up flow; a `get_metadata` sweep of the
-  file's `Components` canvas didn't surface a `Login` frame (likely an
-  MCP response-size truncation, not confirmed absent). Needs its own
-  Figma node before P2-T17/T18 can be meaningfully built against a real
-  screen.
+  **Playwright-verified live 2026-07-14** (once CORS above closed the
+  gap that blocked it): ran `feature/phase_2_backend` and this branch
+  simultaneously (a throwaway `git worktree` for one of them) and drove
+  the actual role-select → form → OTP-verify flow against the real
+  backend and the Supabase dev DB. Screenshots diffed against Figma
+  nodes 416:197, 416:1185, 418:874/878 — close match, including the
+  wrong-OTP error state matching pixel-for-pixel. Real network calls
+  confirmed: `POST /auth/signup` → 201, `POST /auth/otp/verify` → 401
+  (wrong code) then 204 (correct code, read from the backend's dev-mode
+  OTP log), `is_email_verified` flipped true in the DB (row deleted
+  after verifying). Found and fixed two minor text gaps this
+  verification surfaced: `app/layout.tsx`'s metadata title was still
+  the `create-next-app` scaffold default ("Create Next App"), and
+  `AuthProgressBar.tsx`'s eyebrow label read "Onboarding" instead of
+  the Figma copy's "Onboarding Sequence" — both now match.
+  **`/login` still does not exist and 404s** — the Figma link given
+  the T15/T16 session only covered the sign up flow; a `get_metadata`
+  sweep of the file's `Components` canvas didn't surface a `Login`
+  frame (likely an MCP response-size truncation, not confirmed absent).
+  Needs its own Figma node before P2-T17/T18 can be meaningfully built
+  against a real screen.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
