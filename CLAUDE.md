@@ -381,9 +381,14 @@ A reader should understand the code from the comment alone.
   still dev-log-only, on hold by explicit choice
 - P2-T32 2FA (TOTP) backend — explicitly deferred to P4, see T27/T31
   notes above
-- No `CORSMiddleware` configured yet — needed once a browser frontend
-  actually calls this API cross-origin with credentials (P2-T15+
-  territory, not closed by T31's Origin-header CSRF check alone)
+- **CORS closed 2026-07-14** — `CORSMiddleware` added in `app/main.py`
+  (`allow_origins=[settings.FRONTEND_ORIGIN]`, `allow_credentials=True`),
+  needed once frontend Phase 2's real signup form started making real
+  cross-origin `fetch()` calls. Verified live: an OPTIONS preflight from
+  `Origin: http://localhost:3000` returns the right `access-control-*`
+  headers, and a real end-to-end `POST /auth/signup` from that origin
+  succeeds (201, user row created and deleted after verifying). 131/131
+  tests still pass.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
