@@ -43,3 +43,9 @@ export const otpVerifySchema = z.object({
   code: z.string().length(6, "Enter the 6-digit code"),
 });
 export type OtpVerifyValues = z.infer<typeof otpVerifySchema>;
+
+export const loginFormSchema = z.object({
+  email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+export type LoginFormValues = z.infer<typeof loginFormSchema>;

@@ -5,12 +5,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import svgPaths from "@/lib/homepage-svg-paths";
 
 const sg = "'Space Grotesk', sans-serif";
 
 export default function TopNavBar() {
+  const router = useRouter();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -92,6 +94,7 @@ export default function TopNavBar() {
             List Property
           </button>
           <button
+            onClick={() => router.push("/welcome")}
             style={{
               background: "none",
               border: "none",
