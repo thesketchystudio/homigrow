@@ -388,11 +388,7 @@ A reader should understand the code from the comment alone.
   headers, and a real end-to-end `POST /auth/signup` from that origin
   succeeds (201, user row created and deleted after verifying). 131/131
   tests still pass.
-- **P2-T17/T18** (API client silent-refresh interceptor + authStore,
-  AuthGuard) — no longer blocked on a login screen existing (one now
-  ships, see Frontend Phase 2 below), but T17/T18 itself is still not
-  implemented; the minimal `lib/api/client.ts` shipped with T15/T16 has
-  no auth header or refresh-retry logic yet
+- **P2-T17/T18 shipped 2026-07-15** — see Frontend Phase 2 below.
 
 ### Frontend Phase 2 (on `feature/phase_2_frontend`, cut from `dev`)
 - **P2-T15/T16 shipped 2026-07-14** — signup + email-OTP verification
@@ -480,6 +476,47 @@ A reader should understand the code from the comment alone.
   signup→OTP-verify→login round trip against the real backend (wrong
   password shows the correct inline error, correct password redirects
   to `/`) — test user and screenshots cleaned up afterward.
+- **P2-T17/T18 shipped 2026-07-15** — silent-refresh interceptor,
+  authStore, and AuthGuard, closing the last piece before Profile UI
+  work (T21+) can assume reliable "logged in" state. New
+  **`lib/stores/auth.ts`** (zustand, ADR-007): `user`/`accessToken`/
+  `status` (`idle`/`loading`/`authenticated`/`unauthenticated`) — the
+  access token is memory-only, never persisted (14_Security.md), so a
+  full page reload always resets to `idle`. New **`lib/auth/
+  session.ts`**: `ensureAuthResolved()` restores the session from the
+  httpOnly refresh cookie on first load (calls `/auth/refresh`),
+  deduped across concurrent `AuthGuard` mounts via a module-level
+  promise. **`lib/api/client.ts`** now attaches `Authorization: Bearer`
+  from the store to every request and, on a 401 from a non-`/auth/*`
+  endpoint, silently retries once via the same refresh dance, clearing
+  the store (logout-everywhere) if the cookie itself is invalid; `/auth/*`
+  requests are deliberately excluded from the retry (they carry no
+  token, and a bad-login 401 isn't a token-expiry signal) — this also
+  avoids a real import cycle (`client.ts` reads the store directly
+  rather than importing `endpoints/auth.ts`'s `refresh()`, and only
+  takes a type-only import from it for `TokenResponse`). New
+  **`components/shared/AuthGuard.tsx`** (Tier 2, `06_Component_Library.md`):
+  renders a skeleton while `ensureAuthResolved` resolves, redirects an
+  unauthenticated visitor to `/login?returnTo=<path>`, and redirects an
+  authenticated visitor whose role isn't allowed for the portal home.
+  Wired into `app/(broker)/broker/layout.tsx` (`allowedRoles: [broker]`)
+  and `app/(admin)/admin/layout.tsx` (`allowedRoles: [admin]`) — both
+  layouts previously had a literal "Auth guard added in Phase 2"
+  placeholder comment, now resolved. **`LoginForm.tsx`** updated to
+  actually call `setAuth()` on success (it previously redirected to `/`
+  without ever populating the store — a real gap this closed) and to
+  honor `?returnTo=` via `useSearchParams` (wrapped in `<Suspense>` in
+  `app/login/page.tsx` per Next.js's static-render requirement for that
+  hook). `tsc`/`eslint`/`next build` all clean. **Live-verified with
+  Playwright against the real backend + Supabase dev DB** (two
+  throwaway users, one broker one client, created via real signup +
+  dev-logged email OTP, deleted afterward): logged-out visit to
+  `/broker/dashboard` → redirected to `/login?returnTo=%2Fbroker%2Fdashboard`
+  → login → landed back on `/broker/dashboard` exactly; a full hard
+  page reload while authenticated correctly rehydrated the session from
+  the cookie with no bounce to login (confirming `ensureAuthResolved`
+  actually works, not just compiles); a client-role login visiting
+  `/broker/dashboard` was correctly redirected to `/`.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

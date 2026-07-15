@@ -8,12 +8,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api/client";
 import { login } from "@/lib/api/endpoints/auth";
+import { useAuthStore } from "@/lib/stores/auth";
 import { toast } from "@/lib/toast";
 import { UserRole } from "@/lib/enums";
 import { AuthTextField } from "@/components/forms/AuthTextField";
@@ -26,6 +27,8 @@ type LoginRole = Exclude<UserRole, "admin">;
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const setAuth = useAuthStore((state) => state.setAuth);
   const [role, setRole] = useState<LoginRole>(UserRole.client);
   const [rememberMe, setRememberMe] = useState(false);
 
@@ -41,8 +44,9 @@ export function LoginForm() {
   const loginMutation = useMutation({
     mutationFn: (values: LoginFormValues) => login({ phone_or_email: values.email, password: values.password }),
     onSuccess: (data) => {
+      setAuth(data.user, data.access_token);
       toast.success(data.user.full_name ? `Welcome back, ${data.user.full_name}!` : "Welcome back!");
-      router.push("/");
+      router.push(searchParams.get("returnTo") || "/");
     },
     onError: (error: ApiError) => {
       if (error.fields) {
