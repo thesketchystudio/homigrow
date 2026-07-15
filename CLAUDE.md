@@ -389,9 +389,10 @@ A reader should understand the code from the comment alone.
   succeeds (201, user row created and deleted after verifying). 131/131
   tests still pass.
 - **P2-T17/T18** (API client silent-refresh interceptor + authStore,
-  AuthGuard) — blocked on a login screen existing (see below); the
-  minimal `lib/api/client.ts` shipped with T15/T16 has no auth header
-  or refresh-retry logic yet
+  AuthGuard) — no longer blocked on a login screen existing (one now
+  ships, see Frontend Phase 2 below), but T17/T18 itself is still not
+  implemented; the minimal `lib/api/client.ts` shipped with T15/T16 has
+  no auth header or refresh-retry logic yet
 
 ### Frontend Phase 2 (on `feature/phase_2_frontend`, cut from `dev`)
 - **P2-T15/T16 shipped 2026-07-14** — signup + email-OTP verification
@@ -434,12 +435,51 @@ A reader should understand the code from the comment alone.
   the `create-next-app` scaffold default ("Create Next App"), and
   `AuthProgressBar.tsx`'s eyebrow label read "Onboarding" instead of
   the Figma copy's "Onboarding Sequence" — both now match.
-  **`/login` still does not exist and 404s** — the Figma link given
-  the T15/T16 session only covered the sign up flow; a `get_metadata`
-  sweep of the file's `Components` canvas didn't surface a `Login`
-  frame (likely an MCP response-size truncation, not confirmed absent).
-  Needs its own Figma node before P2-T17/T18 can be meaningfully built
-  against a real screen.
+  **`/login` shipped 2026-07-15** — see the entry directly below; the
+  earlier `/login` 404 gap and its blocking of P2-T17/T18 no longer
+  applies.
+- **Login screen + welcome/chooser screen shipped 2026-07-15** — from
+  Figma nodes `423:3651` ("Client - Log in") and `423:3792` (the
+  pre-signup/login "landing" chooser frame, found via the `use_figma`
+  Plugin API route documented in memory `figma-metadata-canvas-truncation`).
+  New **`features/auth/AuthSplitShell.tsx`** — the dark-hero split-screen
+  shell Figma actually uses for these two screens (distinct from the
+  `(auth)` route group's plain layout, which correctly matches signup's
+  own, hero-less Figma frames and is unchanged). Hero image downloaded
+  locally to `public/auth/brand-panel.png` since Figma asset URLs expire
+  after 7 days. New **`app/login/page.tsx`** (moved out of the `(auth)`
+  group — the split shell replaces that group's header/footer chrome
+  rather than nesting inside it) and **`app/welcome/page.tsx`**, both
+  thin wrappers around `AuthSplitShell`. New
+  **`features/auth/LoginForm.tsx`** (email/password via
+  `react-hook-form`/zod, calls the already-typed `login()` from T15/T16
+  — its first real caller; role toggle and remember-me are display-only,
+  no backend support for either; "Forgot password?" shows a
+  `toast.info(...)`, no reset-password screen exists yet) and
+  **`features/auth/WelcomeScreen.tsx`** ("Get started" → `/signup`,
+  "Log in" → `/login`). `components/shared/TopNavBar.tsx`'s "Sign In"
+  button (previously a dead `<button>`, pre-dating any auth wiring) now
+  routes to `/welcome`. Google sign-in remains deliberately deferred on
+  both screens, per explicit choice. Full writeup:
+  `docs/implementation/frontend/Phase_2_Implementation.md`.
+  **Two real bugs found and fixed only because this was verified with an
+  actual browser (Playwright), not `curl`:** (1) the CORS gap above was
+  independently, byte-identically fixed on `dev` around the same time —
+  merged in rather than duplicated; (2) `globals.css` had a leftover
+  `create-next-app` dark-mode media query silently flipping the login/
+  signup screens to unreadable black-on-black for any user with OS dark
+  mode on — already fixed and merged to `dev` via PR #10
+  (`fix/remove-stray-dark-mode-media-query`), pulled in via merge rather
+  than duplicated. Playwright MCP itself only became available this
+  session via a new project-root `.mcp.json` — the CLI's own
+  `~/.claude.json` project-scoped MCP config isn't read by this IDE
+  surface, `.mcp.json` is (mirrors `playwright`/`context7`/`supabase`/
+  `sentry`, all already configured for this project via the CLI).
+  Live-verified: screenshot match against both Figma frames, full
+  welcome→signup/login and homepage→welcome navigation loop, and a real
+  signup→OTP-verify→login round trip against the real backend (wrong
+  password shows the correct inline error, correct password redirects
+  to `/`) — test user and screenshots cleaned up afterward.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
