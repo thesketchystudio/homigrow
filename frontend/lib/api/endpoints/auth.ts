@@ -56,8 +56,8 @@ export function requestOtp(payload: OTPRequestPayload): Promise<void> {
   return apiRequest<void>("/auth/otp/request", { method: "POST", body: payload });
 }
 
-export function verifyOtp(payload: OTPVerifyPayload): Promise<void> {
-  return apiRequest<void>("/auth/otp/verify", { method: "POST", body: payload });
+export function verifyOtp(payload: OTPVerifyPayload): Promise<TokenResponse | void> {
+  return apiRequest<TokenResponse | void>("/auth/otp/verify", { method: "POST", body: payload });
 }
 
 export function login(payload: LoginPayload): Promise<TokenResponse> {

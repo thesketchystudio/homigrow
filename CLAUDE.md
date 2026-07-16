@@ -389,6 +389,40 @@ A reader should understand the code from the comment alone.
   succeeds (201, user row created and deleted after verifying). 131/131
   tests still pass.
 - **P2-T17/T18 shipped 2026-07-15** — see Frontend Phase 2 below.
+- **Duplicate-email signup bug fixed 2026-07-16** — `auth_service.signup()`
+  relied on catching `IntegrityError` around `db.commit()` to turn a
+  duplicate email into `409 EMAIL_TAKEN`, but the unique-constraint
+  violation actually fires at the `db.flush()` a few lines earlier
+  (needed to assign `user.id` for the broker_profile FK), outside that
+  try/except — so it fell through to the catch-all handler as a bare
+  `500 INTERNAL_ERROR` instead. Found via manual UI testing, not a test
+  gap that was ever exercised: there was a `test_duplicate_phone_returns_409`
+  but no email equivalent. Fixed by checking `User.email` proactively
+  before any insert, same pattern as the existing phone check; added
+  the missing test. 133/133 tests pass (1 new). New
+  **`backend/scripts/delete_test_user.py`** — deletes a given email's
+  `otp_codes` + `users` row (cascades to `broker_profiles`/
+  `refresh_tokens`) so one real email can be reused repeatedly for
+  manual signup testing, since Resend's sandbox only delivers to one
+  verified address.
+- **Signup now auto-logs in after email verification, 2026-07-16** —
+  previously `POST /auth/otp/verify` always returned a bare 204, so the
+  signup wizard sent a freshly verified user to `/login` to type their
+  password a second time right after supplying it. For
+  `OTPPurpose.signup` specifically, `verify_otp()` now also mints a
+  session (same `_issue_session()` helper `login()` uses) and the route
+  returns the same `TokenResponse` shape as `/login`/`/refresh` (200 +
+  refresh cookie) instead of 204; every other purpose (`broker_verification`)
+  is unchanged and still returns a bare 204, since that fires from an
+  already-logged-in broker's profile, not a fresh signup. Frontend:
+  `SignupWizard.tsx` now calls `setAuth()` with the returned session and
+  redirects straight to `/` instead of `/login`. 133/133 backend tests
+  pass (1 new, covering the broker_verification purpose is unaffected).
+  Live-verified with Playwright: signed up a fresh user, verified the
+  OTP, landed directly on `/` with no login screen — confirmed genuinely
+  authenticated (not just coincidentally on `/`) by visiting
+  `/broker/dashboard` immediately after and getting redirected home for
+  a role mismatch rather than to `/login`.
 
 ### Frontend Phase 2 (on `feature/phase_2_frontend`, cut from `dev`)
 - **P2-T15/T16 shipped 2026-07-14** — signup + email-OTP verification
