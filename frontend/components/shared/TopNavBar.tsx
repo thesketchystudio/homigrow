@@ -7,12 +7,15 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { ensureAuthResolved } from "@/lib/auth/session";
 import svgPaths from "@/lib/homepage-svg-paths";
+import { useAuthStore } from "@/lib/stores/auth";
 
 const sg = "'Space Grotesk', sans-serif";
 
 export default function TopNavBar() {
   const router = useRouter();
+  const { status, user } = useAuthStore();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -20,6 +23,10 @@ export default function TopNavBar() {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    ensureAuthResolved();
   }, []);
 
   return (
@@ -94,7 +101,7 @@ export default function TopNavBar() {
             List Property
           </button>
           <button
-            onClick={() => router.push("/welcome")}
+            onClick={() => router.push(status === "authenticated" ? "/profile/account" : "/welcome")}
             style={{
               background: "none",
               border: "none",
@@ -106,7 +113,7 @@ export default function TopNavBar() {
               whiteSpace: "nowrap",
             }}
           >
-            Sign In
+            {status === "authenticated" ? (user?.full_name?.split(" ")[0] ?? "My Account") : "Sign In"}
           </button>
 
           <button

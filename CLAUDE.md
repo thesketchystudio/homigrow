@@ -551,6 +551,64 @@ A reader should understand the code from the comment alone.
   the cookie with no bounce to login (confirming `ensureAuthResolved`
   actually works, not just compiles); a client-role login visiting
   `/broker/dashboard` was correctly redirected to `/`.
+- **P2-T21 shipped 2026-07-16** — Profile & Settings layout shell, from
+  Figma "Client view" page, "profile and settings" section (node
+  `145:4686`): a 220px sidebar (user card, "Profile" nav group —
+  Account/My Properties/Purchase History/Loan Applications/Documents —
+  and "Settings" nav group — Notifications/Security/Billing — plus a
+  promo card) next to a content area, still inside the normal
+  TopNavBar/Footer chrome (unlike Broker/Admin, which replace that
+  chrome with their own portal shell). Just the shell — all 8 tabs are
+  `EmptyState` placeholders for now, filled in one at a time next. New
+  **`lib/api/endpoints/users.ts`** (`getMe()` against `GET /users/me`,
+  needed for the sidebar's `avatar_url`/`is_email_verified` — richer
+  than the auth endpoints' slim `UserOut`). New
+  **`features/profile/ProfileSidebar.tsx`** — a plain flex column, not
+  a reuse of the shadcn app-shell `Sidebar` primitives Broker/Admin use
+  (those are fixed-position/off-canvas, meant to replace a portal's
+  entire chrome; Client Profile keeps the marketing site's own).
+  Figma's "Premium Member"/star-rating/"Premium Support" card content
+  has no backing field on the `User` model — used the real
+  `is_email_verified` flag instead of fabricating an account tier, and
+  simplified the promo card to a plain "Contact Support" mailto link.
+  **Flag if a real premium-tier concept gets designed later — this is a
+  deliberate simplification, not yet reconciled with Figma.** New
+  **`app/(client)/profile/layout.tsx`** (`AuthGuard` allowing every
+  role, since client/broker/admin all have their own account) +
+  8 placeholder route pages + a bare `/profile` redirect to
+  `/profile/account`. **`TopNavBar.tsx`** is now auth-aware (shows the
+  user's first name → `/profile/account` when logged in), which needed
+  `ensureAuthResolved()` called from `TopNavBar` itself, not just
+  `AuthGuard` — it renders on every page, including ones with no guard.
+  **A real concurrency bug this surfaced, fixed along the way:**
+  `lib/api/client.ts`'s `refreshAccessToken()` and
+  `lib/auth/session.ts`'s `ensureAuthResolved()` were two independent
+  single-flight guards, each calling `POST /auth/refresh` directly with
+  no coordination — calling `ensureAuthResolved()` from `TopNavBar`
+  alongside a real protected query (`getMe()`) on the same page load
+  meant both could fire at once, sending the same one-time-use
+  refresh-token cookie twice; the backend correctly treated the second
+  arrival as a replay (P2-T05's reuse-detection) and revoked the whole
+  session — logging the user out mid-navigation with no attacker
+  involved. Confirmed live (a hard reload of `/profile/security`
+  produced a second `POST /auth/refresh → 401` and a genuinely dead
+  session), fixed by making `ensureAuthResolved()` delegate to the
+  now-exported `refreshAccessToken()` instead of calling `/auth/refresh`
+  itself, so every caller shares one in-flight promise. Re-verified the
+  identical scenario clean afterward. `tsc`/`eslint`/`next build` all
+  clean (all 8 routes + `/profile` in the build's route table).
+  Live-verified with Playwright against the real backend + Supabase dev
+  DB (`hello@thesketchystudio.com`, cleared via
+  `scripts/delete_test_user.py` before and after): full signup → OTP →
+  auto-login → `TopNavBar` showing "Test" → `/profile/account` with real
+  name/initials/verified badge → tab navigation → the concurrency bug →
+  fix → re-login → clean hard reload. **Known gap, not fixed here:**
+  `TopNavBar` is transparent until 40px of scroll (designed for the
+  homepage's dark hero); on a light-background page like Profile the
+  nav is barely legible for that first scroll distance — pre-existing,
+  not introduced here, but this is the first non-hero page to expose
+  it. Worth a real fix (an opaque variant) when the next non-hero
+  `(client)` page is built.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

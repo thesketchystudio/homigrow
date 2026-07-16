@@ -54,7 +54,13 @@ let refreshPromise: Promise<string | null> | null = null;
 
 // Dedupes concurrent 401s into a single /auth/refresh call; clears the
 // authStore (logout everywhere) if the refresh cookie itself is invalid.
-function refreshAccessToken(): Promise<string | null> {
+// Exported so lib/auth/session.ts's first-load session bootstrap shares
+// this exact in-flight promise instead of firing its own separate
+// /auth/refresh call — two concurrent calls each carrying the same
+// one-time-use refresh-token cookie would otherwise trip the backend's
+// reuse-detection (the second one looks like a replayed, already-rotated
+// token) and revoke the whole session.
+export function refreshAccessToken(): Promise<string | null> {
   if (!refreshPromise) {
     refreshPromise = rawFetch(REFRESH_PATH, { method: "POST" }, null)
       .then(async (response) => {
