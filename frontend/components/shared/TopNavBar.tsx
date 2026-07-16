@@ -1,11 +1,15 @@
 // components/shared/TopNavBar.tsx
 // Fixed top navigation bar used across all Client View screens. Becomes
-// opaque with a blurred background once the page scrolls past 40px.
+// opaque with a blurred background once the page scrolls past 40px — but
+// that transparent-until-scroll start state only makes sense over the
+// homepage's dark hero image. Every other (client) page has a light
+// background from the very top, so the nav renders opaque immediately
+// there instead of starting nearly invisible.
 
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { ensureAuthResolved } from "@/lib/auth/session";
 import svgPaths from "@/lib/homepage-svg-paths";
@@ -15,15 +19,20 @@ const sg = "'Space Grotesk', sans-serif";
 
 export default function TopNavBar() {
   const router = useRouter();
+  const pathname = usePathname();
   const { status, user } = useAuthStore();
-  const [scrolled, setScrolled] = useState(false);
+  const [scrolledPast, setScrolledPast] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const isHeroPage = pathname === "/";
+  const scrolled = !isHeroPage || scrolledPast;
+
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
+    if (!isHeroPage) return;
+    const onScroll = () => setScrolledPast(window.scrollY > 40);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [isHeroPage]);
 
   useEffect(() => {
     ensureAuthResolved();

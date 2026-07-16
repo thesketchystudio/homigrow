@@ -607,8 +607,7 @@ A reader should understand the code from the comment alone.
   homepage's dark hero); on a light-background page like Profile the
   nav is barely legible for that first scroll distance — pre-existing,
   not introduced here, but this is the first non-hero page to expose
-  it. Worth a real fix (an opaque variant) when the next non-hero
-  `(client)` page is built.
+  it. **Fixed same day as the T22 visual-accuracy pass below.**
 - **P2-T22 shipped 2026-07-16** — Account tab real content (Figma node
   `145:4686`'s "Account Information" + "Buyer Profile" sections),
   replacing T21's placeholder. Full Name/Email edit via the existing
@@ -692,6 +691,19 @@ A reader should understand the code from the comment alone.
   Flagged as a separate, larger task (implies building search/
   notifications features that don't exist yet), not folded into this
   color-accuracy pass.
+- **TopNavBar opaque-on-non-hero-pages fix, same day** — the flagged
+  gap above (nav text invisible at the top of the Profile page) fixed
+  on your explicit instruction: frontend-only, no backend changes.
+  `TopNavBar.tsx` now checks `usePathname() === "/"` — only the
+  homepage gets the transparent-until-40px-scroll treatment (it has a
+  dark hero image behind it); every other `(client)` page renders the
+  nav in its opaque/dark-text state from the very first frame, no
+  scroll dependency. One conditional, no new props, no other files
+  touched. `tsc`/`eslint`/`next build` clean; live-verified with
+  Playwright — homepage confirmed still transparent-over-hero at the
+  top (unchanged), `/profile/account` confirmed fully legible with zero
+  scroll (logo, nav links, and the user's name all clearly dark-on-light
+  from the first render).
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
