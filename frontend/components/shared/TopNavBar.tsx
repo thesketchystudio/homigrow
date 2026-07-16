@@ -1,25 +1,41 @@
 // components/shared/TopNavBar.tsx
 // Fixed top navigation bar used across all Client View screens. Becomes
-// opaque with a blurred background once the page scrolls past 40px.
+// opaque with a blurred background once the page scrolls past 40px — but
+// that transparent-until-scroll start state only makes sense over the
+// homepage's dark hero image. Every other (client) page has a light
+// background from the very top, so the nav renders opaque immediately
+// there instead of starting nearly invisible.
 
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
+import { ensureAuthResolved } from "@/lib/auth/session";
 import svgPaths from "@/lib/homepage-svg-paths";
+import { useAuthStore } from "@/lib/stores/auth";
 
 const sg = "'Space Grotesk', sans-serif";
 
 export default function TopNavBar() {
   const router = useRouter();
-  const [scrolled, setScrolled] = useState(false);
+  const pathname = usePathname();
+  const { status, user } = useAuthStore();
+  const [scrolledPast, setScrolledPast] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const isHeroPage = pathname === "/";
+  const scrolled = !isHeroPage || scrolledPast;
+
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
+    if (!isHeroPage) return;
+    const onScroll = () => setScrolledPast(window.scrollY > 40);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, [isHeroPage]);
+
+  useEffect(() => {
+    ensureAuthResolved();
   }, []);
 
   return (
@@ -94,7 +110,7 @@ export default function TopNavBar() {
             List Property
           </button>
           <button
-            onClick={() => router.push("/welcome")}
+            onClick={() => router.push(status === "authenticated" ? "/profile/account" : "/welcome")}
             style={{
               background: "none",
               border: "none",
@@ -106,7 +122,7 @@ export default function TopNavBar() {
               whiteSpace: "nowrap",
             }}
           >
-            Sign In
+            {status === "authenticated" ? (user?.full_name?.split(" ")[0] ?? "My Account") : "Sign In"}
           </button>
 
           <button

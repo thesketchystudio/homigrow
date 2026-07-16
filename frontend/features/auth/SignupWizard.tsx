@@ -10,6 +10,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { UserRole } from "@/lib/enums";
 import { toast } from "@/lib/toast";
+import { useAuthStore } from "@/lib/stores/auth";
 import { RoleSelectStep } from "@/features/auth/RoleSelectStep";
 import { SignupFormStep } from "@/features/auth/SignupFormStep";
 import { OtpVerifyStep } from "@/features/auth/OtpVerifyStep";
@@ -18,6 +19,7 @@ type WizardStep = "role" | "form" | "verify";
 
 export function SignupWizard() {
   const router = useRouter();
+  const setAuth = useAuthStore((state) => state.setAuth);
   const [step, setStep] = useState<WizardStep>("role");
   const [role, setRole] = useState<Exclude<UserRole, "admin"> | null>(null);
   const [email, setEmail] = useState("");
@@ -51,9 +53,10 @@ export function SignupWizard() {
   return (
     <OtpVerifyStep
       email={email}
-      onVerified={() => {
-        toast.success("Your identity is verified. Log in to continue.");
-        router.push("/login");
+      onVerified={(session) => {
+        setAuth(session.user, session.access_token);
+        toast.success(session.user.full_name ? `Welcome, ${session.user.full_name}!` : "Welcome to Homigrow!");
+        router.push("/");
       }}
     />
   );

@@ -1,6 +1,7 @@
 // app/(broker)/broker/layout.tsx
-// Sidebar shell for every Broker Portal page. Auth guard (AuthGuard,
-// Tier 2) is added in Phase 2 — this shell only wires navigation.
+// Sidebar shell for every Broker Portal page, gated by AuthGuard: a
+// logged-out visitor is redirected to /login, and a logged-in client
+// visitor is redirected home (P2-T18).
 
 "use client";
 
@@ -9,6 +10,8 @@ import { Building2, LayoutDashboard, MessageSquare, Users2 } from "lucide-react"
 
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import AppSidebar, { type SidebarNavGroup } from "@/components/shared/Sidebar";
+import { AuthGuard } from "@/components/shared/AuthGuard";
+import { UserRole } from "@/lib/enums";
 
 const NAV_GROUPS: SidebarNavGroup[] = [
   {
@@ -25,19 +28,21 @@ export default function BrokerLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname();
 
   return (
-    <SidebarProvider>
-      <AppSidebar
-        groups={NAV_GROUPS}
-        activeRoute={pathname}
-        header={<span className="px-2 text-sm font-semibold">Homigrow Broker</span>}
-      />
-      <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger />
-          <span className="text-sm font-medium">Broker Portal</span>
-        </header>
-        <main className="flex-1 p-6">{children}</main>
-      </SidebarInset>
-    </SidebarProvider>
+    <AuthGuard allowedRoles={[UserRole.broker]}>
+      <SidebarProvider>
+        <AppSidebar
+          groups={NAV_GROUPS}
+          activeRoute={pathname}
+          header={<span className="px-2 text-sm font-semibold">Homigrow Broker</span>}
+        />
+        <SidebarInset>
+          <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+            <SidebarTrigger />
+            <span className="text-sm font-medium">Broker Portal</span>
+          </header>
+          <main className="flex-1 p-6">{children}</main>
+        </SidebarInset>
+      </SidebarProvider>
+    </AuthGuard>
   );
 }
