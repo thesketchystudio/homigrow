@@ -243,4 +243,19 @@ body {
   * {
     @apply border-border outline-ring/50;
   }
+
+  /* Tailwind v3.4+ dropped the old Preflight default that made every
+     <button> show a pointer cursor on hover, reverting to the native
+     browser default (a plain arrow) instead. Restoring it here so every
+     button in the app — the shared shadcn Button, raw <button>s, Radix
+     triggers (Select, Sidebar, etc., all real <button> elements under
+     the hood) — behaves the way users expect, without needing
+     cursor-pointer repeated on every individual button. */
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
 }
