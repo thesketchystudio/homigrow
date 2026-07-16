@@ -609,6 +609,54 @@ A reader should understand the code from the comment alone.
   not introduced here, but this is the first non-hero page to expose
   it. Worth a real fix (an opaque variant) when the next non-hero
   `(client)` page is built.
+- **P2-T22 shipped 2026-07-16** — Account tab real content (Figma node
+  `145:4686`'s "Account Information" + "Buyer Profile" sections),
+  replacing T21's placeholder. Full Name/Email edit via the existing
+  `PATCH /users/me`; Phone Number renders disabled/read-only since
+  `UserUpdateRequest` has no `phone` field at all (`User.phone` is
+  immutable post-signup by design — checked the schema directly rather
+  than assuming); Preferred Language + the whole Buyer Profile section
+  (Budget Range, Preferred Location, Property Type, Buyer Intent) have no
+  dedicated columns and live in the `preferences` JSONB blob T20 built
+  for exactly this. Since `user_service.update_me` fully replaces
+  `preferences` rather than merging, every save spreads the
+  currently-loaded preferences first so a future tab can't silently wipe
+  this one's keys. Dropped Figma's "Last changed 4 months ago" under
+  Password — nothing tracks a password-specific timestamp, and the
+  generic `updated_at` column would be misleading. New
+  **`lib/api/endpoints/users.ts`** additions (`updateMe`,
+  `changePassword`), new **`lib/validation/profile.ts`**, new
+  **`features/profile/AccountTab.tsx`** and
+  **`features/profile/ChangePasswordDialog.tsx`** (reuses the shared
+  `Modal` + existing `PasswordStrengthMeter`). **Two real bugs found and
+  fixed live:** (1) the Preferred Language dropdown showed its
+  placeholder instead of the real saved value after every reload, even
+  though the value was confirmed correct in the database — caused by
+  building the form with react-hook-form's `values` option on a
+  component that conditionally hid the `<form>` (and its
+  `Controller`-bound Select) behind a loading skeleton, racing the
+  Select's field registration against the values-sync effect on first
+  paint; plain `register()`-bound inputs didn't hit this since RHF sets
+  their DOM value imperatively regardless of registration timing. Fixed
+  by splitting into an outer loading-gate and an inner form that only
+  mounts once real data exists, using `defaultValues` (set once) instead
+  of `values` (synced repeatedly) — no race left to have. (2) Confirmed
+  the T21 refresh-concurrency fix generalizes: rapid overlapping
+  password-change submissions produced a `401 → refresh → 401 → 204` log
+  sequence that looked alarming at first, but only one actual
+  `POST /auth/refresh` fired (the shared single-flight guard worked),
+  and a direct login with the new password confirmed the change fully
+  succeeded. `tsc`/`eslint`/`next build` all clean. Live-verified with
+  Playwright + the real Supabase dev DB end-to-end (signup → save
+  profile fields → hard-reload persistence check → wrong/correct
+  password change → real login with the new password); test user
+  deleted afterward. **Tooling note:** `.claude/settings.local.json` was
+  updated this session to pre-approve every Playwright MCP tool (plus a
+  `mcp__playwright__*` wildcard) since only ~10 of ~23 tool names were
+  previously listed — but permission grants load once at session start,
+  so this takes effect next session, not immediately; verification for
+  T22 used `browser_navigate`/`browser_evaluate` instead of
+  `browser_snapshot` to work around that mid-session gap.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

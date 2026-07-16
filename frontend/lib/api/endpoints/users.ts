@@ -1,7 +1,5 @@
 // lib/api/endpoints/users.ts
-// Typed functions for the /users/me resource (05_API_Design.md). Only
-// the read used by the Profile shell so far — update/password-change
-// land alongside the Account tab (P2-T22).
+// Typed functions for the /users/me resource (05_API_Design.md).
 
 import { apiRequest } from "@/lib/api/client";
 import type { UserRole, VerificationStatus } from "@/lib/enums";
@@ -32,4 +30,24 @@ export type UserRead = {
 
 export function getMe(): Promise<UserRead> {
   return apiRequest<UserRead>("/users/me");
+}
+
+export type UserUpdatePayload = {
+  full_name?: string;
+  email?: string;
+  avatar_url?: string;
+  preferences?: Record<string, unknown>;
+};
+
+export function updateMe(payload: UserUpdatePayload): Promise<UserRead> {
+  return apiRequest<UserRead>("/users/me", { method: "PATCH", body: payload });
+}
+
+export type PasswordChangePayload = {
+  current_password: string;
+  new_password: string;
+};
+
+export function changePassword(payload: PasswordChangePayload): Promise<void> {
+  return apiRequest<void>("/users/me/password", { method: "PATCH", body: payload });
 }
