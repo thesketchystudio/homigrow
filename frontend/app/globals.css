@@ -70,6 +70,7 @@
   --brand-secondary-700: #babbbc;
   --brand-secondary-800: #959596;
   --brand-secondary-900: #707070;
+  --brand-green-100: #f4fef1;
   --brand-green-200: #effeea;
   --brand-green-400: #92f574;
   --brand-green-500: #83dd68;
@@ -199,6 +200,7 @@
   --color-brand-secondary-700: var(--brand-secondary-700);
   --color-brand-secondary-800: var(--brand-secondary-800);
   --color-brand-secondary-900: var(--brand-secondary-900);
+  --color-brand-green-100: var(--brand-green-100);
   --color-brand-green-200: var(--brand-green-200);
   --color-brand-green-400: var(--brand-green-400);
   --color-brand-green-500: var(--brand-green-500);

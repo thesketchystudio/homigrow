@@ -657,6 +657,41 @@ A reader should understand the code from the comment alone.
   so this takes effect next session, not immediately; verification for
   T22 used `browser_navigate`/`browser_evaluate` instead of
   `browser_snapshot` to work around that mid-session gap.
+- **P2-T22 visual-accuracy follow-up, same day** — you compared a
+  screenshot of the built Account page directly against the Figma
+  mockup and flagged real mismatches: wrong colors, boxed inputs instead
+  of underlines, no button-color match. Root cause: the first T22 pass
+  used generic shadcn primitives (`Input`/`Button`/`Select` defaults)
+  instead of this screen's actual Figma fills/fonts. Re-pulled
+  `get_design_context` per-node (sidebar, buttons, fields, headings) —
+  the earlier whole-page XML dump only had layout, not colors/fonts.
+  **Key finding: this screen's primary-action color is near-black
+  `#1a1a1a` (`--brand-primary-600`, already in `globals.css` from T20),
+  not the app's green `--primary` token** — matches the signup/login
+  pages' own black CTA buttons; the shadcn scaffold's green default was
+  never this screen's real color. Every field is underline-style
+  (`border-b` only), not boxed. Rebuilt `ProfileSidebar.tsx` and
+  `AccountTab.tsx` with exact colors/fonts/spacing (new `UnderlineField`
+  helper, `Select`'s trigger restyled to match). One color had no brand
+  token yet — Figma's "Accent Green/100" (`#f4fef1`) — added as
+  `--brand-green-100` in `globals.css`, extending T20's existing 100–900
+  scale rather than hardcoding it. Slate grays (`#64748b`/`#94a3b8`/
+  `#f1f5f9`) confirmed as plain Tailwind defaults with no brand
+  equivalent (already used directly elsewhere, e.g. `TopNavBar.tsx`), so
+  used the matching Tailwind slate utilities rather than inventing new
+  tokens. `tsc`/`eslint`/`next build` all clean; live-verified with a
+  fresh Playwright screenshot compared directly against the Figma
+  reference (used the same name, "Arjun Mehta", as the reference
+  screenshot for an apples-to-apples check) — active nav/avatar badge/
+  Save button all correctly near-black, fields underlined, Preferred
+  Language + Save Changes still functioning post-restyle. **Known gap,
+  not addressed:** Figma's logged-in-state top nav is a different design
+  entirely (search icon, notification bell, avatar photo, no "List
+  Property"/name button) — none of which exists yet; `TopNavBar.tsx`
+  still shows the same nav for both logged-in and logged-out visitors.
+  Flagged as a separate, larger task (implies building search/
+  notifications features that don't exist yet), not folded into this
+  color-accuracy pass.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

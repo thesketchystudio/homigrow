@@ -1,12 +1,18 @@
 // features/profile/ProfileSidebar.tsx
 // Left-column navigation for the client Profile & Settings section
 // (Figma node 145:4686: user card, a "Profile" nav group, a "Settings"
-// nav group, a support card). Unlike the Broker/Admin portals, this
-// section keeps the marketing site's TopNavBar/Footer chrome, so it's a
-// plain static column rather than the shadcn app-shell Sidebar
-// primitives those portals compose (components/shared/Sidebar.tsx) —
-// that primitive is a fixed-position, collapsible/off-canvas app shell,
-// which doesn't fit alongside a fixed top nav and a page footer.
+// nav group, a support card). Colors/fonts/spacing pulled directly from
+// Figma's get_design_context output for this node — near-black
+// (brand-primary-600, #1a1a1a) for the active item and avatar badge, not
+// the app's green --primary token, since this specific screen's own
+// design uses black for its primary actions (matching the signup/login
+// pages' black CTA buttons, not the shadcn scaffold's default green).
+// Unlike the Broker/Admin portals, this section keeps the marketing
+// site's TopNavBar/Footer chrome, so it's a plain static column rather
+// than the shadcn app-shell Sidebar primitives those portals compose
+// (components/shared/Sidebar.tsx) — that primitive is a fixed-position,
+// collapsible/off-canvas app shell, which doesn't fit alongside a fixed
+// top nav and a page footer.
 // The Figma card here also shows decorative "Premium Member"/star-rating
 // content with no backing field on the User model — replaced with the
 // real is_email_verified flag instead of fabricating account status.
@@ -17,7 +23,6 @@ import type { ComponentType } from "react";
 import { Bell, Building2, CreditCard, FileText, FolderOpen, History, Shield, User } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { UserRead } from "@/lib/api/endpoints/users";
 
@@ -50,27 +55,32 @@ function initials(name?: string) {
 
 export function ProfileSidebar({ user, activeRoute }: { user: UserRead; activeRoute: string }) {
   return (
-    <aside className="flex w-full shrink-0 flex-col gap-6 md:w-[220px]">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <Avatar className="size-16">
-          <AvatarImage src={user.avatar_url} alt={user.full_name ?? "Profile photo"} />
-          <AvatarFallback>{initials(user.full_name)}</AvatarFallback>
-        </Avatar>
-        <div className="flex flex-col gap-1">
-          <p className="font-medium">{user.full_name ?? user.phone}</p>
-          <Badge variant={user.is_email_verified ? "default" : "secondary"} className="mx-auto w-fit text-[11px]">
-            {user.is_email_verified ? "Verified" : "Unverified"}
-          </Badge>
+    <aside className="flex w-full shrink-0 flex-col gap-8 md:w-[220px]">
+      <div className="flex flex-col items-center gap-4 border-b-[0.8px] border-slate-100 pb-8 text-center">
+        <div className="relative">
+          <Avatar className="size-[72px] border-[1.6px] border-slate-200">
+            <AvatarImage src={user.avatar_url} alt={user.full_name ?? "Profile photo"} />
+            <AvatarFallback className="font-heading text-[16px] font-bold text-brand-primary-600">
+              {initials(user.full_name)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="bg-brand-primary-600 absolute -right-0.5 -bottom-0.5 flex size-5 items-center justify-center rounded-full">
+            <User className="size-2.5 text-background" />
+          </div>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <p className="font-heading text-brand-primary-600 text-[16px] font-bold">{user.full_name ?? user.phone}</p>
+          <p className="font-body text-[12px] text-slate-500">{user.is_email_verified ? "Verified Buyer" : "Unverified"}</p>
         </div>
       </div>
 
       <NavGroup label="Profile" items={PROFILE_ITEMS} activeRoute={activeRoute} />
       <NavGroup label="Settings" items={SETTINGS_ITEMS} activeRoute={activeRoute} />
 
-      <div className="bg-primary/5 border-primary/10 flex flex-col gap-2 rounded-lg border p-4">
-        <p className="text-sm font-semibold">Need help?</p>
-        <p className="text-muted-foreground text-xs">Reach out to our support team for anything account-related.</p>
-        <a href="mailto:support@homigrow.com" className="text-primary text-xs font-semibold">
+      <div className="bg-brand-green-100 flex flex-col gap-1 rounded-lg border border-slate-100 p-[18px]">
+        <p className="font-body text-brand-primary-600 text-[12px] font-medium">Need help?</p>
+        <p className="font-body text-[12px] text-slate-500">Reach out to our support team for anything account-related.</p>
+        <a href="mailto:support@homigrow.com" className="font-body text-brand-primary-600 pt-2 text-[12px] font-medium">
           Contact Support →
         </a>
       </div>
@@ -80,8 +90,8 @@ export function ProfileSidebar({ user, activeRoute }: { user: UserRead; activeRo
 
 function NavGroup({ label, items, activeRoute }: { label: string; items: NavItem[]; activeRoute: string }) {
   return (
-    <div className="flex flex-col gap-1">
-      <p className="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">{label}</p>
+    <div className="flex flex-col gap-0.5">
+      <p className="font-heading px-3.5 text-[10px] tracking-[1px] text-slate-400 uppercase">{label}</p>
       {items.map((item) => {
         const Icon = item.icon;
         const isActive = activeRoute === item.href;
@@ -90,11 +100,11 @@ function NavGroup({ label, items, activeRoute }: { label: string; items: NavItem
             key={item.href}
             href={item.href}
             className={cn(
-              "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              isActive ? "bg-primary text-primary-foreground" : "text-foreground/80 hover:bg-muted",
+              "flex h-10 items-center gap-2.5 rounded-lg pl-3.5 font-heading text-[16px] font-medium transition-colors",
+              isActive ? "bg-brand-primary-600 text-background" : "text-slate-500 hover:bg-slate-50",
             )}
           >
-            <Icon className="size-4" />
+            <Icon className="size-3.5" />
             {item.label}
           </a>
         );
