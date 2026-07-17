@@ -329,9 +329,12 @@ def forgot_password(db: Session, email: str) -> None:
     Always succeeds with no signal about whether the email is
     registered (05_API_Design.md: no enumeration). If a matching
     account exists, generates a signed, 30-minute password-reset token
-    and sends a reset email — real Resend delivery is P2-T30, so for
-    now (like the signup OTP) this only logs the token in non-production
-    environments.
+    and emails a reset link via Resend (email_service.py). Always logs
+    the token in non-production environments too, as a fallback
+    delivery path if the real send fails — same pattern as the signup
+    OTP (_issue_otp), and for the same reason: no frontend
+    reset-password page exists yet to consume the link, so the dev log
+    is the only way to exercise this flow end-to-end right now.
     """
     user = db.query(User).filter(User.email == email).first()
     if user is None:
@@ -341,6 +344,12 @@ def forgot_password(db: Session, email: str) -> None:
 
     if settings.ENVIRONMENT != "production":
         logger.info("Password reset token for %s: %s", email, token)
+
+    reset_url = f"{settings.FRONTEND_ORIGIN}/reset-password?token={token}"
+    try:
+        email_service.send_password_reset_email(email, reset_url)
+    except Exception:
+        logger.exception("Failed to send password reset email to %s", email)
 
 
 def reset_password(db: Session, token: str, new_password: str) -> None:

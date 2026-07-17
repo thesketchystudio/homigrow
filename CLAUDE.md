@@ -350,6 +350,25 @@ A reader should understand the code from the comment alone.
   00/01/02/03/05/07/09/12/14/15/18 in `docs/architecture/` — each
   carries a dated "Amended 2026-07-14" note rather than silently
   rewriting history.
+- **P2-T30 fully closed, 2026-07-17** — `forgot_password()` now sends
+  the real password-reset email via Resend (`email_service.
+  send_password_reset_email`), same pattern as `send_otp_email`,
+  instead of only logging the token. The link is a full JWT, not a
+  typeable code, so the email uses a "Reset password" button pointing
+  to `{FRONTEND_ORIGIN}/reset-password?token=...`; a send failure is
+  caught and logged, never raised. **No `/reset-password` frontend
+  page exists yet — the link 404s until that's built as a separate
+  frontend task**, an explicit backend-only scoping choice, not an
+  oversight. 131→134 tests pass (3 new); new
+  `_mock_send_password_reset_email` autouse fixture in `conftest.py`.
+  Live-verified against the real Supabase dev DB + real Resend API
+  using the standing `hello@thesketchystudio.com` test account (the
+  one `create_test_user.py`/`delete_test_user.py` are built to reuse,
+  since Resend's sandbox only delivers to its one verified address):
+  forgot → confirmed a real `200` from `api.resend.com` in the server
+  log → reset with the logged token → `204` → logged in with the new
+  password → `200`. This changed that standing test account's password
+  as an expected side effect of testing the reset flow.
 - **Known gap, deliberately left open (2026-07-09 docs-vs-code pass;
   correction 2026-07-14):** `02_Database_Design.md`'s invariant
   `password_hash IS NOT NULL OR is_phone_verified` is still not
@@ -375,9 +394,6 @@ A reader should understand the code from the comment alone.
   login) is actually designed
 - P2-T12 OTP-login path — out of current scope 2026-07-14, no
   OTP-login screen exists in the Figma design (password login only)
-- P2-T30 real Resend delivery — signup-verification half now done
-  (2026-07-14, shipped with P2-T11); password-reset email template
-  still dev-log-only, on hold by explicit choice
 - P2-T32 2FA (TOTP) backend — explicitly deferred to P4, see T27/T31
   notes above
 - **CORS closed 2026-07-14** — `CORSMiddleware` added in `app/main.py`
