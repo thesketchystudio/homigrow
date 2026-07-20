@@ -704,6 +704,31 @@ A reader should understand the code from the comment alone.
   top (unchanged), `/profile/account` confirmed fully legible with zero
   scroll (logo, nav links, and the user's name all clearly dark-on-light
   from the first render).
+- **P2-T23 shipped 2026-07-20** — Notifications tab, the first of the
+  7 remaining Profile & Settings tabs to get real content (Account/T22
+  was previously the only one). Picked over Security/Billing after
+  actually checking each tab's Figma design against the real backend:
+  Security's design needs 2FA (deferred to P4) and a privacy/data-export
+  section with no backend at all; Billing's design is a full realized
+  payments/subscription screen (saved cards, invoices), nowhere close
+  to the architecture doc's "placeholder" description and with no
+  payments backend planned. Notifications was the only tab that's just
+  channel toggles with no missing dependency. New
+  `features/profile/NotificationsTab.tsx`: 5 channels (Property Match
+  Alerts / Market Volatility / Private Viewings / Offer Status / EMI
+  Reminders) × Email/Push checkboxes, stored under
+  `preferences.notification_channels` — same free-form JSONB blob T20/T22
+  already use, no backend changes needed. Colors/spacing pulled directly
+  from Figma's `get_design_context` this time, avoiding T22's
+  generic-shadcn-then-fix detour. **Playwright's MCP server was
+  disconnected this session — no real-browser verification was
+  possible.** Verified the API contract instead: logged into a real
+  backend (throwaway `git worktree` on `feature/phase_2_backend`) +
+  the real Supabase dev DB as the standing test account, sent the exact
+  `PATCH /users/me` payload the component produces, confirmed a clean
+  `GET` returns it unchanged. **Visual/interaction verification in an
+  actual browser is still outstanding — do this with Playwright next
+  session.** `tsc`/`eslint`/`next build` all clean.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
