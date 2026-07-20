@@ -178,7 +178,7 @@ function NotificationsForm({ user }: { user: UserRead }) {
                         checked={field.value}
                         onCheckedChange={field.onChange}
                         aria-label={`${title} — Email`}
-                        className="size-[22px] rounded-[4px] border-[rgba(38,38,38,0.3)] data-[state=checked]:border-[#1a1a1a] data-[state=checked]:bg-[#1a1a1a]"
+                        className="size-[22px] rounded-[4px] border-[rgba(38,38,38,0.3)] data-[state=checked]:border-[#1a1a1a] data-[state=checked]:bg-[#1a1a1a] data-[state=checked]:text-background"
                       />
                     )}
                   />
@@ -192,7 +192,7 @@ function NotificationsForm({ user }: { user: UserRead }) {
                         checked={field.value}
                         onCheckedChange={field.onChange}
                         aria-label={`${title} — Push`}
-                        className="size-[22px] rounded-[4px] border-[rgba(38,38,38,0.3)] data-[state=checked]:border-[#1a1a1a] data-[state=checked]:bg-[#1a1a1a]"
+                        className="size-[22px] rounded-[4px] border-[rgba(38,38,38,0.3)] data-[state=checked]:border-[#1a1a1a] data-[state=checked]:bg-[#1a1a1a] data-[state=checked]:text-background"
                       />
                     )}
                   />

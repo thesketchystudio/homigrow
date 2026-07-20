@@ -730,6 +730,17 @@ A reader should understand the code from the comment alone.
   saved (`PATCH → 200`, button correctly re-disabled), and screenshot-
   compared against the Figma reference (close match). `tsc`/`eslint`/
   `next build` all clean.
+- **Checkbox checkmark contrast bugfix, same day** — you compared a
+  screenshot against Figma and flagged the checked boxes looked like
+  plain filled squares. Confirmed via `browser_evaluate` on the live
+  page rather than assuming: the checkmark icon's color resolved to
+  `rgb(9,9,9)` against a `rgb(26,26,26)` box — a near-invisible near-
+  black-on-near-black. Fixed by adding `data-[state=checked]:
+  text-background` to both checkboxes in `NotificationsTab.tsx`
+  (`--background` is `#fefeff`; matches `AccountTab.tsx`'s existing
+  `text-background`-on-dark-bg convention). Re-verified: icon color now
+  `rgb(254,254,255)`, confirmed visibly correct in a zoomed screenshot.
+  `tsc`/`eslint` clean.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
