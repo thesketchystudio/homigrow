@@ -720,15 +720,16 @@ A reader should understand the code from the comment alone.
   `preferences.notification_channels` — same free-form JSONB blob T20/T22
   already use, no backend changes needed. Colors/spacing pulled directly
   from Figma's `get_design_context` this time, avoiding T22's
-  generic-shadcn-then-fix detour. **Playwright's MCP server was
-  disconnected this session — no real-browser verification was
-  possible.** Verified the API contract instead: logged into a real
-  backend (throwaway `git worktree` on `feature/phase_2_backend`) +
-  the real Supabase dev DB as the standing test account, sent the exact
-  `PATCH /users/me` payload the component produces, confirmed a clean
-  `GET` returns it unchanged. **Visual/interaction verification in an
-  actual browser is still outstanding — do this with Playwright next
-  session.** `tsc`/`eslint`/`next build` all clean.
+  generic-shadcn-then-fix detour. Playwright's MCP server was
+  disconnected earlier in the session; once it reconnected, verified
+  both the API contract (backend worktree + real Supabase dev DB via
+  curl: exact `PATCH /users/me` payload → clean unchanged `GET`) and,
+  live in a real browser, the full UI flow — logged in through
+  `/login`, loaded `/profile/notifications`, confirmed rendered
+  checkbox state matched what was just saved, toggled a checkbox,
+  saved (`PATCH → 200`, button correctly re-disabled), and screenshot-
+  compared against the Figma reference (close match). `tsc`/`eslint`/
+  `next build` all clean.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
