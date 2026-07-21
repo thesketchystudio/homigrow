@@ -114,7 +114,7 @@ export function LoginForm() {
             </label>
             <button
               type="button"
-              onClick={() => toast.info("Password reset isn't available yet.")}
+              onClick={() => router.push("/forgot-password")}
               className="font-heading text-[12px] text-brand-secondary-800/65"
             >
               Forgot password?

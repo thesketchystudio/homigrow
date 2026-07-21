@@ -71,3 +71,20 @@ export function refresh(): Promise<TokenResponse> {
 export function logout(): Promise<void> {
   return apiRequest<void>("/auth/logout", { method: "POST" });
 }
+
+export type ForgotPasswordPayload = {
+  email: string;
+};
+
+export type ResetPasswordPayload = {
+  token: string;
+  new_password: string;
+};
+
+export function forgotPassword(payload: ForgotPasswordPayload): Promise<void> {
+  return apiRequest<void>("/auth/password/forgot", { method: "POST", body: payload });
+}
+
+export function resetPassword(payload: ResetPasswordPayload): Promise<void> {
+  return apiRequest<void>("/auth/password/reset", { method: "POST", body: payload });
+}
