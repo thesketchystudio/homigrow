@@ -162,16 +162,17 @@ export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onBack }:
         <button
           type="button"
           onClick={onBack}
-          className="rounded border border-brand-primary-100 bg-background px-12 py-4 font-heading text-[16px] font-bold text-foreground"
+          className="rounded-[4px] border border-brand-primary-100 bg-background p-[17px] font-heading text-[16px] font-bold text-brand-primary-400"
         >
           Back
         </button>
         <button
           type="submit"
           disabled={signupMutation.isPending}
-          className="flex items-center gap-3 rounded-lg bg-brand-primary-500 px-12 py-4 font-heading text-[16px] font-bold text-background disabled:opacity-60"
+          className="rounded-[4px] px-12 py-4 font-heading text-[16px] font-bold text-background disabled:opacity-60"
+          style={{ backgroundImage: "linear-gradient(122.455deg, rgb(0, 0, 0) 0%, rgb(19, 27, 46) 100%)" }}
         >
-          {signupMutation.isPending ? "Creating account…" : "Continue →"}
+          {signupMutation.isPending ? "Creating account…" : "Continue"}
         </button>
       </div>
     </form>
