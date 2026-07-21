@@ -234,6 +234,8 @@ def signup(
     full_name: Optional[str],
     email: str,
     password: Optional[str],
+    city: Optional[str] = None,
+    state: Optional[str] = None,
 ) -> User:
     """
     Creates a user (and a broker_profile row when role=broker), then
@@ -243,6 +245,10 @@ def signup(
     pending INSERT immediately (needed to assign user.id for the
     broker_profile FK), so a unique-constraint violation would otherwise
     surface at flush time, outside any try/except around db.commit().
+    city/state have no dedicated columns (users.city doesn't exist) and
+    land in the same free-form preferences JSONB the profile Account tab
+    reads/writes (P2-T22) — left out entirely, not stored as empty
+    strings, when the signup form didn't send them.
     """
     if db.query(User).filter(User.phone == phone).first() is not None:
         raise ConflictError("PHONE_TAKEN", "This phone number is already registered.")
@@ -250,12 +256,19 @@ def signup(
     if db.query(User).filter(User.email == email).first() is not None:
         raise ConflictError("EMAIL_TAKEN", "This email is already registered.")
 
+    preferences = {}
+    if city:
+        preferences["city"] = city
+    if state:
+        preferences["state"] = state
+
     user = User(
         phone=phone,
         email=email,
         full_name=full_name,
         password_hash=hash_password(password) if password else None,
         role=role,
+        **({"preferences": preferences} if preferences else {}),
     )
     db.add(user)
     db.flush()  # assigns user.id for the broker_profile FK below

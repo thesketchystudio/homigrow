@@ -79,6 +79,8 @@ def signup(payload: SignupRequest, request: Request, db: Session = Depends(get_d
         full_name=payload.full_name,
         email=payload.email,
         password=payload.password,
+        city=payload.city,
+        state=payload.state,
     )
     return SignupResponse(user_id=user.id)
 
