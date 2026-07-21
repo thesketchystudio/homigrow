@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { UserRole } from "@/lib/enums";
 import { toast } from "@/lib/toast";
 import { useAuthStore } from "@/lib/stores/auth";
+import type { TokenResponse } from "@/lib/api/endpoints/auth";
 import { RoleSelectStep } from "@/features/auth/RoleSelectStep";
 import { SignupFormStep } from "@/features/auth/SignupFormStep";
 import { OtpVerifyStep } from "@/features/auth/OtpVerifyStep";
@@ -25,6 +26,12 @@ export function SignupWizard() {
   const [email, setEmail] = useState("");
 
   const goToLogin = () => router.push("/login");
+
+  const handleAuthenticated = (session: TokenResponse) => {
+    setAuth(session.user, session.access_token);
+    toast.success(session.user.full_name ? `Welcome, ${session.user.full_name}!` : "Welcome to Homigrow!");
+    router.push("/");
+  };
 
   if (step === "role") {
     return (
@@ -45,19 +52,11 @@ export function SignupWizard() {
           setEmail(signedUpEmail);
           setStep("verify");
         }}
+        onGoogleAuthSuccess={handleAuthenticated}
         onGoToLogin={goToLogin}
       />
     );
   }
 
-  return (
-    <OtpVerifyStep
-      email={email}
-      onVerified={(session) => {
-        setAuth(session.user, session.access_token);
-        toast.success(session.user.full_name ? `Welcome, ${session.user.full_name}!` : "Welcome to Homigrow!");
-        router.push("/");
-      }}
-    />
-  );
+  return <OtpVerifyStep email={email} onVerified={handleAuthenticated} />;
 }

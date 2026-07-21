@@ -788,6 +788,72 @@ A reader should understand the code from the comment alone.
   old password rejected, new password logs in → replaying the
   consumed token correctly shows "invalid or expired" (fingerprint
   single-use mechanism confirmed). `tsc`/`eslint`/`next build` clean.
+- **Branch split by portal, 2026-07-21** — `feature/phase_2_frontend`/
+  `feature/phase_2_backend` split further into `_client`/`_broker`
+  variants (`feature/phase_2_frontend_client`,
+  `feature/phase_2_backend_client`, and matching `_broker` pointers cut
+  from the same base commit, no broker-specific commits yet). Client
+  work (this session's Google Sign-In) landed on the `_client`
+  branches; the original `_frontend`/`_backend` branches still exist,
+  untouched, not deleted. See [[phase-branch-strategy]] in memory —
+  not yet confirmed whether this split applies beyond Phase 2.
+- **Google Sign-In shipped 2026-07-21** — "Continue with Google" on
+  both the login page and signup Step 2, from a design decided with
+  the user (not pulled from Figma — no Google element exists in either
+  frame). One backend endpoint, `POST /auth/google`
+  (`auth_service.google_auth()`), backs both: verifies a Google
+  Identity Services ID token (`google-auth` + `requests` deps, no
+  client secret needed — this is the ID-token flow, not a redirect/
+  code-exchange). Matching email → logs in, ignoring any `role` sent
+  (an existing account's role never changes via Google). No match +
+  `role` supplied (signup Step 2 only, where it's already known from
+  Step 1) → creates the account on the spot (`is_email_verified=true`,
+  no `password_hash`) and logs in, skipping the manual form and OTP
+  step entirely. No match + no `role` (login page) → `404
+  GOOGLE_ACCOUNT_NOT_FOUND` rather than silently creating an account.
+  **Real schema blocker found and fixed, not worked around:**
+  `users.phone` was `NOT NULL UNIQUE`, but Google supplies no phone
+  number. Rather than fake a placeholder value, migration M5 made
+  `phone` nullable with a partial unique index (`ix_users_phone_unique`,
+  "unique when present" — same pattern `email` already used), decided
+  with the user as the root-cause fix over adding a phone-entry step
+  back into the Google flow. `UserOut`/`UserRead` schemas both had
+  `phone: str` (required) and would have crashed serializing a
+  Google-only account — fixed alongside, caught by the new tests before
+  it ever hit a real user. New frontend: `features/auth/
+  GoogleSignInButton.tsx` (loads Google's own rendered button via
+  Identity Services' JS script, exchanges the credential for a session
+  through the new endpoint), `types/google-identity.d.ts` (minimal
+  ambient types — no official Google types package in use), wired into
+  both `LoginForm.tsx` (no role; a 404 shows a toast rather than
+  auto-redirecting to signup) and `SignupFormStep.tsx` (role = the
+  form's currently-selected role, placed above the manual fields per
+  the user's explicit placement choice, not Step 1). New
+  `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in `frontend/.env.local` (public value,
+  safe to ship in the bundle — this is why no secret is needed
+  frontend-side either). **Real stale-server bug hit again during
+  verification, same class as the forgot-password one above:** the
+  worktree's `uvicorn --reload` process had been running since earlier
+  in the session and silently stopped picking up file changes after a
+  large `git merge` landed 45 files at once — `/auth/google` 404'd
+  against a server that had the route mid-development. Fixed by killing
+  and restarting the process fresh; **if a worktree server has been
+  running across a branch checkout or merge, restart it — don't trust
+  `--reload` to have caught everything.** 150/150 backend tests pass
+  (11 new, incl. route-level tests); `tsc`/`eslint`/`next build` all
+  clean. Live-verified structurally with Playwright against the real
+  backend (fresh server): both screens render the correct divider text
+  and button placement, and `POST /auth/google` with a garbage token
+  correctly returns `401 GOOGLE_TOKEN_INVALID` from a live server.
+  **Not verified end-to-end** — completing Google's real consent popup
+  isn't something Playwright can drive; that first real click-through
+  is still open. Also hit a real external gap, not a code bug: Google
+  Cloud Console's Authorized JavaScript origins change hadn't
+  propagated yet at verification time (`GSI_LOGGER: The given origin is
+  not allowed for the given client ID` — Google documents this can take
+  several minutes after editing a client), so the actual Google popup
+  couldn't be exercised live this session; confirm it clears before
+  trusting a first real click-through.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
