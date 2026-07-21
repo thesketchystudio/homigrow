@@ -911,6 +911,46 @@ A reader should understand the code from the comment alone.
   path directly at 0.14s, so not a backend bottleneck); expected to be
   faster on repeat sign-ins as FedCM's per-origin registration is a
   one-time cost, not yet independently reconfirmed.
+- **Signup City/State fields shipped 2026-07-21** — closes one of two
+  gaps found while inventorying the full 14-frame Figma "Client - Sign
+  up" section this session (previously only 3 frames were on record).
+  The signup form (`416:846`) has City/State dropdowns between the
+  Phone/role row and Password row; built with real design-context colors
+  from that frame, not generic shadcn defaults. New
+  `frontend/lib/data/indian-cities.ts` (93 cities, curated "major
+  cities" list covering every one of India's 28 states + 8 union
+  territories, your explicit call over either the homepage's narrower
+  6-city list or a full town-level dataset) and new
+  `frontend/components/forms/AuthSelectField.tsx` (the `AuthTextField`
+  underline styling adapted for a shadcn `Select`, reusable by future
+  auth/profile dropdowns). Selecting a city auto-fills State as a
+  disabled/derived field. Backend: `SignupRequest` gained optional
+  `city`/`state`; `auth_service.signup()` stores them in
+  `user.preferences` (same free-form JSONB the Account tab already
+  uses, P2-T22) only when supplied, otherwise leaving the column's own
+  `'{}'::jsonb` default untouched. 150→152 backend tests pass.
+  **The 6-screen buyer-preference wizard (budget, property type,
+  investment goal, exit strategy, development stage/amenities, current
+  situation) remains deliberately unbuilt** — you chose to ship
+  City/State now and tackle that wizard screen-by-screen later, not as
+  part of this task.
+  **Real bug found and fixed during live verification, unrelated to the
+  new fields:** the `uvicorn` command on `PATH` resolves to the
+  *original* `homigrow/backend` repo's venv, not the
+  `homigrow-backend-wt` worktree — as a console-script shim it doesn't
+  add the worktree's directory to `sys.path` the way `python -m
+  uvicorn` does, so it was silently serving the wrong (non-worktree)
+  `app` package the entire time, unrelated to any reload staleness.
+  Restarting didn't help at first because `uvicorn --reload`'s
+  `multiprocessing` worker survives its parent's death as an orphan
+  still holding the listening socket. Fixed by killing every orphaned
+  worker on port 8000 and always starting this worktree's server with
+  `python -m uvicorn app.main:app --reload --port 8000` — never the
+  bare `uvicorn` command — going forward. Confirmed via
+  `GET /openapi.json` showing the new fields, then a full Playwright
+  browser signup writing `{"city": "Bengaluru", "state": "Karnataka"}`
+  to the real Supabase dev DB; all test users deleted afterward via
+  `scripts/delete_test_user.py`.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

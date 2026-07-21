@@ -11,6 +11,8 @@ export type SignupPayload = {
   full_name?: string;
   email: string;
   password: string;
+  city?: string;
+  state?: string;
 };
 
 export type SignupResponse = {

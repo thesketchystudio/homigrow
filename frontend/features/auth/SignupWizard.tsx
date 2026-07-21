@@ -53,7 +53,7 @@ export function SignupWizard() {
           setStep("verify");
         }}
         onGoogleAuthSuccess={handleAuthenticated}
-        onGoToLogin={goToLogin}
+        onBack={() => setStep("role")}
       />
     );
   }

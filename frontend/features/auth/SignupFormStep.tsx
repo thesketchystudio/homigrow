@@ -14,21 +14,22 @@ import { signup, type TokenResponse } from "@/lib/api/endpoints/auth";
 import { UserRole } from "@/lib/enums";
 import { AuthTextField } from "@/components/forms/AuthTextField";
 import { AuthPhoneField } from "@/components/forms/AuthPhoneField";
+import { AuthSelectField } from "@/components/forms/AuthSelectField";
 import { AuthPasswordField } from "@/components/forms/AuthPasswordField";
 import { AuthCheckboxField } from "@/components/forms/AuthCheckboxField";
 import { AuthProgressBar } from "@/features/auth/AuthProgressBar";
 import { GoogleSignInButton } from "@/features/auth/GoogleSignInButton";
 import { signupFormSchema, type SignupFormValues } from "@/lib/validation/auth";
-import { cn } from "@/lib/utils";
+import { CITY_NAMES, stateForCity } from "@/lib/data/indian-cities";
 
 type SignupFormStepProps = {
   role: Exclude<UserRole, "admin">;
   onSuccess: (email: string) => void;
   onGoogleAuthSuccess: (session: TokenResponse) => void;
-  onGoToLogin: () => void;
+  onBack: () => void;
 };
 
-export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onGoToLogin }: SignupFormStepProps) {
+export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onBack }: SignupFormStepProps) {
   const {
     register,
     handleSubmit,
@@ -42,8 +43,14 @@ export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onGoToLog
   });
 
   const selectedRole = watch("role");
+  const selectedCity = watch("city");
   const password = watch("password") ?? "";
   const agreeToTerms = watch("agree_to_terms") ?? false;
+
+  const handleCityChange = (city: string) => {
+    setValue("city", city, { shouldValidate: true });
+    setValue("state", stateForCity(city) ?? "", { shouldValidate: true });
+  };
 
   const signupMutation = useMutation({
     mutationFn: signup,
@@ -64,6 +71,8 @@ export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onGoToLog
       full_name: values.full_name,
       email: values.email,
       password: values.password,
+      city: values.city,
+      state: values.state,
     });
   });
 
@@ -98,31 +107,25 @@ export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onGoToLog
             <AuthTextField label="Email" type="email" placeholder="xyz@gmail.com" register={register("email")} error={errors.email?.message} />
           </div>
 
-          <div className="grid grid-cols-1 gap-11 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-11 sm:grid-cols-3">
             <AuthPhoneField label="Phone number" placeholder="9876543210" register={register("phone")} error={errors.phone?.message} />
-
-            <div className="flex flex-col gap-2">
-              <span className="font-heading text-[12px] font-medium uppercase tracking-[1.2px] text-brand-secondary-900">
-                I am a…
-              </span>
-              <div className="flex h-[52px] gap-3">
-                {([UserRole.client, UserRole.broker] as const).map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setValue("role", option, { shouldValidate: true })}
-                    className={cn(
-                      "flex-1 rounded font-heading text-[12px] font-semibold uppercase tracking-[1.4px] transition-colors",
-                      selectedRole === option
-                        ? "border-[1.5px] border-transparent bg-brand-green-400 text-brand-green-800"
-                        : "border-[1.5px] border-black/[0.18] text-brand-secondary-900",
-                    )}
-                  >
-                    {option === UserRole.client ? "Buyer" : "Broker"}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <AuthSelectField
+              label="City"
+              placeholder="Select your city"
+              value={selectedCity}
+              onValueChange={handleCityChange}
+              options={CITY_NAMES}
+              error={errors.city?.message}
+            />
+            <AuthSelectField
+              label="State"
+              placeholder="State"
+              value={watch("state")}
+              onValueChange={() => {}}
+              options={watch("state") ? [watch("state")] : []}
+              disabled
+              error={errors.state?.message}
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-10 sm:grid-cols-2">
@@ -155,19 +158,21 @@ export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onGoToLog
         <p className="text-[14px] text-destructive">{(signupMutation.error as ApiError).message}</p>
       )}
 
-      <div className="flex w-full items-center justify-between">
-        <p className="font-heading text-[16px] text-brand-secondary-800">
-          {"Have an account? "}
-          <button type="button" onClick={onGoToLogin} className="font-bold text-foreground">
-            Log in →
-          </button>
-        </p>
+      <div className="flex w-full items-center gap-[462px]">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex flex-1 items-center justify-center rounded-[4px] border border-brand-primary-100 bg-background p-[17px] font-heading text-[16px] font-bold text-brand-primary-400"
+        >
+          Back
+        </button>
         <button
           type="submit"
           disabled={signupMutation.isPending}
-          className="flex items-center gap-3 rounded-lg bg-brand-primary-500 px-12 py-4 font-heading text-[16px] font-bold text-background disabled:opacity-60"
+          className="flex flex-1 items-center justify-center rounded-[4px] py-4 font-heading text-[16px] font-bold text-background disabled:opacity-60"
+          style={{ backgroundImage: "linear-gradient(122.455deg, rgb(0, 0, 0) 0%, rgb(19, 27, 46) 100%)" }}
         >
-          {signupMutation.isPending ? "Creating account…" : "Continue →"}
+          {signupMutation.isPending ? "Creating account…" : "Continue"}
         </button>
       </div>
     </form>
