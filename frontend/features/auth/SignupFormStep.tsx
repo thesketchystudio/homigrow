@@ -21,7 +21,6 @@ import { AuthProgressBar } from "@/features/auth/AuthProgressBar";
 import { GoogleSignInButton } from "@/features/auth/GoogleSignInButton";
 import { signupFormSchema, type SignupFormValues } from "@/lib/validation/auth";
 import { CITY_NAMES, stateForCity } from "@/lib/data/indian-cities";
-import { cn } from "@/lib/utils";
 
 type SignupFormStepProps = {
   role: Exclude<UserRole, "admin">;
@@ -108,34 +107,8 @@ export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onGoToLog
             <AuthTextField label="Email" type="email" placeholder="xyz@gmail.com" register={register("email")} error={errors.email?.message} />
           </div>
 
-          <div className="grid grid-cols-1 gap-11 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-11 sm:grid-cols-3">
             <AuthPhoneField label="Phone number" placeholder="9876543210" register={register("phone")} error={errors.phone?.message} />
-
-            <div className="flex flex-col gap-2">
-              <span className="font-heading text-[12px] font-medium uppercase tracking-[1.2px] text-brand-secondary-900">
-                I am a…
-              </span>
-              <div className="flex h-[52px] gap-3">
-                {([UserRole.client, UserRole.broker] as const).map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setValue("role", option, { shouldValidate: true })}
-                    className={cn(
-                      "flex-1 rounded font-heading text-[12px] font-semibold uppercase tracking-[1.4px] transition-colors",
-                      selectedRole === option
-                        ? "border-[1.5px] border-transparent bg-brand-green-400 text-brand-green-800"
-                        : "border-[1.5px] border-black/[0.18] text-brand-secondary-900",
-                    )}
-                  >
-                    {option === UserRole.client ? "Buyer" : "Broker"}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-11 sm:grid-cols-2">
             <AuthSelectField
               label="City"
               placeholder="Select your city"
@@ -146,7 +119,7 @@ export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onGoToLog
             />
             <AuthSelectField
               label="State"
-              placeholder="Auto-filled from city"
+              placeholder="State"
               value={watch("state")}
               onValueChange={() => {}}
               options={watch("state") ? [watch("state")] : []}
