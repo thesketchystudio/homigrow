@@ -33,9 +33,14 @@ export type LoginPayload = {
   password: string;
 };
 
+export type GoogleAuthPayload = {
+  id_token: string;
+  role?: Exclude<UserRole, "admin">;
+};
+
 export type UserOut = {
   id: string;
-  phone: string;
+  phone?: string;
   email?: string;
   full_name?: string;
   role: UserRole;
@@ -62,6 +67,10 @@ export function verifyOtp(payload: OTPVerifyPayload): Promise<TokenResponse | vo
 
 export function login(payload: LoginPayload): Promise<TokenResponse> {
   return apiRequest<TokenResponse>("/auth/login", { method: "POST", body: payload });
+}
+
+export function googleAuth(payload: GoogleAuthPayload): Promise<TokenResponse> {
+  return apiRequest<TokenResponse>("/auth/google", { method: "POST", body: payload });
 }
 
 export function refresh(): Promise<TokenResponse> {

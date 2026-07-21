@@ -10,23 +10,25 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api/client";
-import { signup } from "@/lib/api/endpoints/auth";
+import { signup, type TokenResponse } from "@/lib/api/endpoints/auth";
 import { UserRole } from "@/lib/enums";
 import { AuthTextField } from "@/components/forms/AuthTextField";
 import { AuthPhoneField } from "@/components/forms/AuthPhoneField";
 import { AuthPasswordField } from "@/components/forms/AuthPasswordField";
 import { AuthCheckboxField } from "@/components/forms/AuthCheckboxField";
 import { AuthProgressBar } from "@/features/auth/AuthProgressBar";
+import { GoogleSignInButton } from "@/features/auth/GoogleSignInButton";
 import { signupFormSchema, type SignupFormValues } from "@/lib/validation/auth";
 import { cn } from "@/lib/utils";
 
 type SignupFormStepProps = {
   role: Exclude<UserRole, "admin">;
   onSuccess: (email: string) => void;
+  onGoogleAuthSuccess: (session: TokenResponse) => void;
   onGoToLogin: () => void;
 };
 
-export function SignupFormStep({ role, onSuccess, onGoToLogin }: SignupFormStepProps) {
+export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onGoToLogin }: SignupFormStepProps) {
   const {
     register,
     handleSubmit,
@@ -80,6 +82,17 @@ export function SignupFormStep({ role, onSuccess, onGoToLogin }: SignupFormStepP
         </div>
 
         <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-6">
+            <GoogleSignInButton role={selectedRole} onSuccess={onGoogleAuthSuccess} />
+            <div className="flex items-center gap-4">
+              <div className="h-px flex-1 bg-brand-secondary-500" />
+              <span className="font-heading text-[12px] tracking-[0.3px] text-brand-secondary-800/65">
+                OR SIGN UP WITH EMAIL
+              </span>
+              <div className="h-px flex-1 bg-brand-secondary-500" />
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 gap-11 sm:grid-cols-2">
             <AuthTextField label="Full Name" placeholder="Alexander Vance" register={register("full_name")} error={errors.full_name?.message} />
             <AuthTextField label="Email" type="email" placeholder="xyz@gmail.com" register={register("email")} error={errors.email?.message} />

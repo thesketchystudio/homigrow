@@ -835,57 +835,82 @@ A reader should understand the code from the comment alone.
   work (this session's Google Sign-In) landed on the `_client`
   branches; the original `_frontend`/`_backend` branches still exist,
   untouched, not deleted. See [[phase-branch-strategy]] in memory —
-  not yet confirmed whether this split applies beyond Phase 2. This
-  worktree also had a stale merge gap closed the same session: it was
-  missing `8d31c4d` (duplicate-email 500 fix + auto-login after signup
-  OTP verify), made on `feature/phase_2_frontend` and merged to `dev`
-  but never merged back here — fixed via `git merge origin/dev` before
-  any new work landed, so `_issue_session()` etc. could be reused
-  rather than re-implemented and conflicted later.
+  not yet confirmed whether this split applies beyond Phase 2. The
+  backend worktree also had a stale merge gap closed the same session:
+  it was missing `8d31c4d` (duplicate-email 500 fix + auto-login after
+  signup OTP verify), made on `feature/phase_2_frontend` and merged to
+  `dev` but never merged back to `feature/phase_2_backend` — fixed via
+  `git merge origin/dev` before any new work landed, so
+  `_issue_session()` etc. could be reused rather than re-implemented
+  and conflicted later.
 - **Google Sign-In shipped 2026-07-21** — "Continue with Google" on
-  both the login page and signup Step 2. One endpoint,
-  `POST /auth/google` (`auth_service.google_auth()`), backs both:
-  verifies a Google Identity Services ID token (`google-auth` +
-  `requests` deps, no client secret needed — ID-token flow, not a
-  redirect/code-exchange). Matching email → logs in, ignoring any
-  `role` sent. No match + `role` supplied (signup Step 2 only) →
-  creates the account on the spot (`is_email_verified=true`, no
-  `password_hash`) and logs in, skipping the manual form and OTP step
-  entirely. No match + no `role` (login page) → `404
+  both the login page and signup Step 2, from a design decided with
+  the user (not pulled from Figma — no Google element exists in either
+  frame). One backend endpoint, `POST /auth/google`
+  (`auth_service.google_auth()`), backs both: verifies a Google
+  Identity Services ID token (`google-auth` + `requests` deps, no
+  client secret needed — this is the ID-token flow, not a redirect/
+  code-exchange). Matching email → logs in, ignoring any `role` sent
+  (an existing account's role never changes via Google). No match +
+  `role` supplied (signup Step 2 only, where it's already known from
+  Step 1) → creates the account on the spot (`is_email_verified=true`,
+  no `password_hash`) and logs in, skipping the manual form and OTP
+  step entirely. No match + no `role` (login page) → `404
   GOOGLE_ACCOUNT_NOT_FOUND` rather than silently creating an account.
-  **Real schema blocker found and fixed, not worked around:**
-  `users.phone` was `NOT NULL UNIQUE`, but Google supplies no phone
-  number. Rather than fake a placeholder value, migration M5
-  (`5081b0dee6c7`) made `phone` nullable with a partial unique index
-  (`ix_users_phone_unique`, "unique when present" — same pattern
-  `email` already used), verified upgrade→downgrade→upgrade clean
+  New `GoogleAuthRequest` schema (same admin-blocking `role` validator
+  as `SignupRequest`); new `GOOGLE_TOKEN_INVALID` (401) and
+  `GOOGLE_ACCOUNT_NOT_FOUND` (404) error codes. **Real schema blocker
+  found and fixed, not worked around:** `users.phone` was `NOT NULL
+  UNIQUE`, but Google supplies no phone number. Rather than fake a
+  placeholder value, migration M5 (`5081b0dee6c7`) made `phone`
+  nullable with a partial unique index (`ix_users_phone_unique`,
+  "unique when present" — same pattern `email` already used), decided
+  with the user as the root-cause fix over adding a phone-entry step
+  back into the Google flow; verified upgrade→downgrade→upgrade clean
   against the real dev DB. `UserOut`/`UserRead` schemas both had
   `phone: str` (required) and would have crashed serializing a
   Google-only account — fixed alongside (`Optional[str]`, matching
   `email`'s existing pattern), caught by the new tests before it ever
-  hit a real user. New `GoogleAuthRequest` schema (same admin-blocking
-  `role` validator as `SignupRequest`); new `GOOGLE_TOKEN_INVALID` (401)
-  and `GOOGLE_ACCOUNT_NOT_FOUND` (404) error codes. 150/150 tests pass
+  hit a real user. New frontend: `features/auth/
+  GoogleSignInButton.tsx` (loads Google's own rendered button via
+  Identity Services' JS script, exchanges the credential for a session
+  through the new endpoint), `types/google-identity.d.ts` (minimal
+  ambient types — no official Google types package in use), wired into
+  both `LoginForm.tsx` (no role; a 404 shows a toast rather than
+  auto-redirecting to signup) and `SignupFormStep.tsx` (role = the
+  form's currently-selected role, placed above the manual fields per
+  the user's explicit placement choice, not Step 1). New
+  `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in `frontend/.env.local` (public value,
+  safe to ship in the bundle — this is why no secret is needed
+  frontend-side either). **Real stale-server bug hit twice during
+  verification, same class as the forgot-password one above:** a
+  worktree's `uvicorn --reload` process had been running since earlier
+  in the session and silently stopped picking up file changes after a
+  large `git merge` landed 45 files at once — `/auth/google` 404'd
+  against a server that had the route mid-development. Fixed by killing
+  and restarting the process fresh; **if a worktree server has been
+  running across a branch checkout or merge, restart it — don't trust
+  `--reload` to have caught everything.** 150/150 backend tests pass
   (11 new: token/claim validation, existing-account login ignoring
   role, new-account creation incl. broker_profile, deactivated-account
-  403, route-level status codes). `ruff` clean. **Real stale-server bug
-  hit during live verification, same class as the forgot-password one
-  above:** this worktree's `uvicorn --reload` process had been running
-  since earlier in the session and silently stopped picking up file
-  changes after the `git merge origin/dev` above landed 45 files at
-  once — `/auth/google` 404'd against a server that had the route
-  mid-development. Fixed by killing and restarting the process fresh.
-  **If a worktree server has been running across a branch checkout or
-  merge, restart it — don't trust `--reload` to have caught
-  everything.** Live-verified against a fresh server: a garbage token
-  correctly returns `401 GOOGLE_TOKEN_INVALID`. Frontend wiring
-  (`GoogleSignInButton.tsx`, both call sites) shipped the same session
-  on `feature/phase_2_frontend_client` — see that branch's CLAUDE.md
-  for the frontend-side writeup. **Not verified end-to-end** —
-  completing Google's real consent popup isn't something Playwright can
-  drive, and Google Cloud Console's Authorized JavaScript origins
-  change hadn't propagated yet at verification time, so the first real
-  click-through is still open.
+  403, route-level status codes); `ruff` clean; `tsc`/`eslint`/
+  `next build` all clean. Live-verified structurally with Playwright
+  against the real backend (fresh server): both screens render the
+  correct divider text and button placement, and `POST /auth/google`
+  with a garbage token correctly returns `401 GOOGLE_TOKEN_INVALID`
+  from a live server. Also hit a real external gap, not a code bug:
+  Google Cloud Console's Authorized JavaScript origins change hadn't
+  propagated yet at first verification (`GSI_LOGGER: The given origin
+  is not allowed for the given client ID` — Google documents this can
+  take several minutes after editing a client). **Since resolved and
+  verified end-to-end by the user**: a real signup via the Google
+  popup completed successfully (account created, session issued,
+  landed logged in) — the only remaining oddity is a one-time ~15-20s
+  delay after picking the Google account, isolated to Google's own
+  client-side FedCM negotiation (measured our own token-verification
+  path directly at 0.14s, so not a backend bottleneck); expected to be
+  faster on repeat sign-ins as FedCM's per-origin registration is a
+  one-time cost, not yet independently reconfirmed.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
