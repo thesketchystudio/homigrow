@@ -5,7 +5,11 @@
 // 470:713) — there's no dedicated "enter your email" frame, so the
 // initial email-entry form here is a minimal addition matching the same
 // AuthSplitShell visual language (underline fields, black CTA) rather
-// than a literal Figma pull.
+// than a literal Figma pull. CheckInboxScreen's copy deviates slightly
+// from Figma's exact text ("You would have received a reset password
+// link...") to state the conditionality more plainly, while still
+// preserving no-enumeration — the backend never reveals whether the
+// email is actually registered.
 
 "use client";
 
@@ -93,7 +97,7 @@ function CheckInboxScreen({ email }: { email: string }) {
           Check your inbox!
         </h1>
         <p className="text-center font-heading text-[16px] leading-[24px] text-[#45464d]">
-          You would have received a reset password link on your registered email.
+          If an account exists for {email}, you&apos;ll receive a password reset link shortly.
         </p>
       </div>
 
