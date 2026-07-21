@@ -757,6 +757,53 @@ A reader should understand the code from the comment alone.
   `text-background`-on-dark-bg convention). Re-verified: icon color now
   `rgb(254,254,255)`, confirmed visibly correct in a zoomed screenshot.
   `tsc`/`eslint` clean.
+- **Forgot/reset-password flow shipped 2026-07-21** — from Figma's
+  "password reset" group (Onboarding page, node `470:500`), found via
+  a direct link you supplied (the earlier `143:4685` "reset" node
+  turned out to be an older/alternate design, not this one). Three
+  Figma frames: reused Login, "Check your inbox!" (node `470:603`),
+  and "Reset your password." (node `470:713`) — no "enter your email"
+  frame exists, so `EmailForm` in the new
+  `features/auth/ForgotPasswordFlow.tsx` is a minimal addition matching
+  the same split-shell visual language rather than a literal Figma
+  pull. New `app/forgot-password/page.tsx`,
+  `features/auth/ResetPasswordForm.tsx` (reads `?token=` from the
+  emailed link via `useSearchParams`), `app/reset-password/page.tsx`.
+  New `forgotPassword`/`resetPassword` functions in
+  `lib/api/endpoints/auth.ts` and matching zod schemas in
+  `lib/validation/auth.ts`. `LoginForm.tsx`'s "Forgot password?" link
+  (previously a dead toast) now routes to `/forgot-password`. Backend
+  needed no changes — `POST /auth/password/forgot` /
+  `POST /auth/password/reset` and real Resend delivery for the reset
+  email already existed on `feature/phase_2_backend`
+  (`efb5f9a`, 2026-07-17, a prior session not reflected in memory at
+  the time this task started) by the time this shipped.
+  **Real bug found and fixed during live verification, not a design or
+  delivery problem:** repeatedly switching this local checkout between
+  `feature/phase_2_backend` and `feature/phase_2_frontend` mid-session
+  (to keep backend-only edits off the frontend branch) left the
+  already-running `uvicorn --reload` backend process serving whichever
+  branch happened to be checked out on disk at reload time —
+  `feature/phase_2_frontend`, which still carries the pre-P2-T30
+  `forgot_password()` that only logs the token and never calls Resend.
+  Every "real" reset request during testing returned a correct `204`
+  and logged a token with no exception, so nothing looked wrong until
+  the emails simply never arrived while direct-to-Resend diagnostic
+  curls did. Fixed by adding a permanent
+  **`../homigrow-backend-wt` git worktree** checked out to
+  `feature/phase_2_backend` and running the backend from there instead
+  — confirmed fixed by seeing the previously-invisible
+  `httpx: HTTP Request: POST https://api.resend.com/emails "HTTP/1.1
+  200 OK"` log line appear for the first time, and a real email
+  arriving. **Use this worktree for all future backend-server runs
+  during frontend sessions** rather than switching this checkout's
+  branch, to prevent this recurring. Live-verified end-to-end against
+  the real backend + Supabase dev DB + real Resend inbox (not just
+  dev-log token reads): requested reset → real email received →
+  followed the real link → set new password → redirected to `/login` →
+  old password rejected, new password logs in → replaying the
+  consumed token correctly shows "invalid or expired" (fingerprint
+  single-use mechanism confirmed). `tsc`/`eslint`/`next build` clean.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
