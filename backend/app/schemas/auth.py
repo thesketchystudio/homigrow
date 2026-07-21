@@ -29,6 +29,8 @@ class SignupRequest(BaseModel):
     full_name: Optional[str] = None
     email: str
     password: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
 
     @field_validator("role")
     @classmethod
