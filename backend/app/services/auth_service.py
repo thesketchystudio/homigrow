@@ -1,16 +1,18 @@
 """
 app/services/auth_service.py
 
-Password-path signup and login, refresh-token issuance/rotation/
-revocation, email-OTP request/verify, and password reset. Signup
-creates the user (and a broker_profile row when role=broker) and
-issues an email-verification OTP (Figma "Verify your identity" step;
-MSG91/SMS is shelved, 09_Phase_2.md amendment 2026-07-14); login checks
-credentials and enforces the lockout policy, then issues a session
-(access token + refresh token). refresh() rotates a presented refresh
-token and detects reuse of an already-rotated one as a theft signal
-(14_Security.md §Token design). reset_password() verifies a signed,
-stateless reset token and revokes every session.
+Password-path signup and login, Google Sign-In, refresh-token
+issuance/rotation/revocation, email-OTP request/verify, and password
+reset. Signup creates the user (and a broker_profile row when
+role=broker) and issues an email-verification OTP (Figma "Verify your
+identity" step; MSG91/SMS is shelved, 09_Phase_2.md amendment
+2026-07-14); login checks credentials and enforces the lockout policy,
+then issues a session (access token + refresh token). google_auth()
+verifies a Google ID token and logs in or creates an account from it,
+skipping the password/OTP steps entirely. refresh() rotates a
+presented refresh token and detects reuse of an already-rotated one as
+a theft signal (14_Security.md §Token design). reset_password()
+verifies a signed, stateless reset token and revokes every session.
 """
 
 import ipaddress
@@ -21,11 +23,22 @@ from typing import Optional
 from uuid import UUID
 
 import jwt
+from google.auth.exceptions import GoogleAuthError
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.exceptions import AuthError, ConflictError, ExpiredError, ForbiddenError, LockedError, ValidationFailed
+from app.core.exceptions import (
+    AuthError,
+    ConflictError,
+    ExpiredError,
+    ForbiddenError,
+    LockedError,
+    NotFoundError,
+    ValidationFailed,
+)
 from app.core.security import (
     create_access_token,
     create_password_reset_token,
@@ -60,6 +73,10 @@ SAME_PASSWORD = ValidationFailed(
 )
 OTP_INVALID = AuthError("OTP_INVALID", "Incorrect verification code.")
 OTP_EXPIRED = ExpiredError("OTP_EXPIRED", "This code has expired. Request a new one.")
+GOOGLE_TOKEN_INVALID = AuthError("GOOGLE_TOKEN_INVALID", "Google sign-in failed. Please try again.")
+GOOGLE_ACCOUNT_NOT_FOUND = NotFoundError(
+    "GOOGLE_ACCOUNT_NOT_FOUND", "No account found for this Google email. Please sign up first."
+)
 
 # Purposes that flip is_email_verified on a successful verify — every
 # purpose currently in use (login-purpose email OTP isn't built; the
@@ -292,6 +309,63 @@ def login(
 
     user.failed_login_attempts = 0
     user.locked_until = None
+
+    access_token, refresh_token = _issue_session(db, user, user_agent, ip)
+    db.commit()
+    db.refresh(user)
+
+    return access_token, refresh_token, user
+
+
+def google_auth(
+    db: Session,
+    id_token_str: str,
+    role: Optional[UserRole],
+    user_agent: Optional[str] = None,
+    ip: Optional[str] = None,
+) -> tuple[str, str, User]:
+    """
+    Verifies a Google Identity Services ID token and either logs in an
+    existing account (matched by email; role is ignored — an existing
+    account's role never changes via a Google click) or, only when a
+    role is supplied, creates one. Google's own email verification
+    stands in for both the password and email-OTP steps of the manual
+    signup path, so a brand-new account is fully usable immediately —
+    no phone number is collected (users.phone is nullable since M5).
+
+    role is None on the login page, where an unmatched email is
+    rejected rather than auto-created (404 GOOGLE_ACCOUNT_NOT_FOUND),
+    and supplied on signup Step 2, where it's already known from Step 1.
+    """
+    try:
+        claims = google_id_token.verify_oauth2_token(
+            id_token_str, google_requests.Request(), settings.GOOGLE_CLIENT_ID
+        )
+    except (ValueError, GoogleAuthError):
+        raise GOOGLE_TOKEN_INVALID
+
+    if not claims.get("email_verified"):
+        raise GOOGLE_TOKEN_INVALID
+
+    email = claims["email"]
+    user = db.query(User).filter(User.email == email).first()
+
+    if user is None:
+        if role is None:
+            raise GOOGLE_ACCOUNT_NOT_FOUND
+        user = User(
+            email=email,
+            full_name=claims.get("name"),
+            password_hash=None,
+            role=role,
+            is_email_verified=True,
+        )
+        db.add(user)
+        db.flush()  # assigns user.id for the broker_profile FK below
+        if role == UserRole.broker:
+            db.add(BrokerProfile(user_id=user.id))
+    elif not user.is_active:
+        raise ForbiddenError("ACCOUNT_DEACTIVATED", "This account has been deactivated.")
 
     access_token, refresh_token = _issue_session(db, user, user_agent, ip)
     db.commit()

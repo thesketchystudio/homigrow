@@ -209,6 +209,49 @@ class TestLoginRoute:
         assert client.cookies.get("refresh_token") is not None
 
 
+class TestGoogleAuthRoute:
+    def _mock_claims(self, monkeypatch, email: str, verified: bool = True, name: str = "Test User") -> None:
+        monkeypatch.setattr(
+            "app.services.auth_service.google_id_token.verify_oauth2_token",
+            lambda *args, **kwargs: {"email": email, "email_verified": verified, "name": name},
+        )
+
+    def test_existing_account_logs_in_and_sets_refresh_cookie(self, client, db_session, monkeypatch):
+        make_user(db_session, phone="+919876540030", email="carlos@example.com")
+        self._mock_claims(monkeypatch, "carlos@example.com")
+
+        response = client.post("/api/v1/auth/google", json={"id_token": "fake-id-token"})
+
+        assert response.status_code == 200
+        assert response.json()["user"]["email"] == "carlos@example.com"
+        assert "refresh_token=" in response.headers.get("set-cookie", "")
+
+    def test_no_account_and_no_role_returns_404(self, client, monkeypatch):
+        self._mock_claims(monkeypatch, "brandnew@example.com")
+
+        response = client.post("/api/v1/auth/google", json={"id_token": "fake-id-token"})
+
+        assert response.status_code == 404
+        assert response.json()["error"]["code"] == "GOOGLE_ACCOUNT_NOT_FOUND"
+
+    def test_no_account_with_role_creates_one(self, client, monkeypatch):
+        self._mock_claims(monkeypatch, "brandnewclient@example.com", name="Nina Rao")
+
+        response = client.post("/api/v1/auth/google", json={"id_token": "fake-id-token", "role": "client"})
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["user"]["email"] == "brandnewclient@example.com"
+        assert body["user"]["full_name"] == "Nina Rao"
+
+    def test_admin_role_is_rejected_with_422(self, client, monkeypatch):
+        self._mock_claims(monkeypatch, "wouldbeadmin@example.com")
+
+        response = client.post("/api/v1/auth/google", json={"id_token": "fake-id-token", "role": "admin"})
+
+        assert response.status_code == 422
+
+
 class TestRefreshRoute:
     def test_refresh_rotates_the_cookie_and_returns_a_new_access_token(self, client, db_session):
         make_user(db_session, phone="+919876540020", password="correct-horse-battery-staple")

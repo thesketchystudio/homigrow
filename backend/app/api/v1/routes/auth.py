@@ -1,8 +1,9 @@
 """
 app/api/v1/routes/auth.py
 
-Auth endpoints: signup, login, refresh, logout, email-OTP request/
-verify, and password forgot/reset (password path). Routes only parse/
+Auth endpoints: signup, login, Google Sign-In, refresh, logout,
+email-OTP request/verify, and password forgot/reset (password path).
+Routes only parse/
 validate input and translate the service result into a response
 schema — no business logic here (03_Backend_Architecture.md layering
 rules). The refresh token itself never appears in a JSON body; it
@@ -20,6 +21,7 @@ from app.core.middleware import limiter
 from app.db.session import get_db
 from app.schemas.auth import (
     ForgotPasswordRequest,
+    GoogleAuthRequest,
     LoginRequest,
     OTPRequestRequest,
     OTPVerifyRequest,
@@ -126,6 +128,31 @@ def login(payload: LoginRequest, request: Request, response: Response, db: Sessi
         db,
         payload.phone_or_email,
         payload.password,
+        user_agent=request.headers.get("user-agent"),
+        ip=_client_ip(request),
+    )
+    _set_refresh_cookie(response, refresh_token)
+    return TokenResponse(
+        access_token=access_token,
+        expires_in=settings.JWT_ACCESS_TTL_MIN * 60,
+        user=UserOut.model_validate(user),
+    )
+
+
+@router.post("/google", response_model=TokenResponse)
+@limiter.limit("5/minute")
+def google_auth(payload: GoogleAuthRequest, request: Request, response: Response, db: Session = Depends(get_db)) -> TokenResponse:
+    """
+    Google Sign-In. Verifies the ID token from Google Identity Services;
+    logs in if the email matches an existing account (role is ignored),
+    or creates one if payload.role is supplied (signup Step 2 only —
+    the login page sends no role, so an unmatched email 404s instead of
+    silently creating an account).
+    """
+    access_token, refresh_token, user = auth_service.google_auth(
+        db,
+        payload.id_token,
+        payload.role,
         user_agent=request.headers.get("user-agent"),
         ip=_client_ip(request),
     )

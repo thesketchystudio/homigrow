@@ -59,13 +59,32 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class GoogleAuthRequest(BaseModel):
+    """
+    Input for Google Sign-In (POST /auth/google). role is omitted on the
+    login page (an account must already exist) and supplied on the
+    signup page's Step 2 "Continue with Google" option, where it's
+    already known from Step 1's role select.
+    """
+
+    id_token: str
+    role: Optional[UserRole] = None
+
+    @field_validator("role")
+    @classmethod
+    def role_must_be_signupable(cls, value: Optional[UserRole]) -> Optional[UserRole]:
+        if value == UserRole.admin:
+            raise ValueError("role must be client or broker")
+        return value
+
+
 class UserOut(BaseModel):
     """Public-safe user projection returned alongside auth tokens."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    phone: str
+    phone: Optional[str] = None
     email: Optional[str] = None
     full_name: Optional[str] = None
     role: UserRole
