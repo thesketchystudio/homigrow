@@ -1,16 +1,18 @@
 """
 app/services/auth_service.py
 
-Password-path signup and login, refresh-token issuance/rotation/
-revocation, email-OTP request/verify, and password reset. Signup
-creates the user (and a broker_profile row when role=broker) and
-issues an email-verification OTP (Figma "Verify your identity" step;
-MSG91/SMS is shelved, 09_Phase_2.md amendment 2026-07-14); login checks
-credentials and enforces the lockout policy, then issues a session
-(access token + refresh token). refresh() rotates a presented refresh
-token and detects reuse of an already-rotated one as a theft signal
-(14_Security.md §Token design). reset_password() verifies a signed,
-stateless reset token and revokes every session.
+Password-path signup and login, Google Sign-In, refresh-token
+issuance/rotation/revocation, email-OTP request/verify, and password
+reset. Signup creates the user (and a broker_profile row when
+role=broker) and issues an email-verification OTP (Figma "Verify your
+identity" step; MSG91/SMS is shelved, 09_Phase_2.md amendment
+2026-07-14); login checks credentials and enforces the lockout policy,
+then issues a session (access token + refresh token). google_auth()
+verifies a Google ID token and logs in or creates an account from it,
+skipping the password/OTP steps entirely. refresh() rotates a
+presented refresh token and detects reuse of an already-rotated one as
+a theft signal (14_Security.md §Token design). reset_password()
+verifies a signed, stateless reset token and revokes every session.
 """
 
 import ipaddress
@@ -21,11 +23,22 @@ from typing import Optional
 from uuid import UUID
 
 import jwt
+from google.auth.exceptions import GoogleAuthError
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.exceptions import AuthError, ConflictError, ExpiredError, ForbiddenError, LockedError
+from app.core.exceptions import (
+    AuthError,
+    ConflictError,
+    ExpiredError,
+    ForbiddenError,
+    LockedError,
+    NotFoundError,
+    ValidationFailed,
+)
 from app.core.security import (
     create_access_token,
     create_password_reset_token,
@@ -53,8 +66,17 @@ PASSWORD_RESET_TTL_MINUTES = 30
 
 REFRESH_INVALID = AuthError("REFRESH_INVALID", "Session expired or invalid, please log in again.")
 RESET_TOKEN_INVALID = ExpiredError("TOKEN_EXPIRED", "This password reset link is invalid or has expired.")
+SAME_PASSWORD = ValidationFailed(
+    "SAME_PASSWORD",
+    "New password must be different from your current password.",
+    {"new_password": "New password must be different from your current password."},
+)
 OTP_INVALID = AuthError("OTP_INVALID", "Incorrect verification code.")
 OTP_EXPIRED = ExpiredError("OTP_EXPIRED", "This code has expired. Request a new one.")
+GOOGLE_TOKEN_INVALID = AuthError("GOOGLE_TOKEN_INVALID", "Google sign-in failed. Please try again.")
+GOOGLE_ACCOUNT_NOT_FOUND = NotFoundError(
+    "GOOGLE_ACCOUNT_NOT_FOUND", "No account found for this Google email. Please sign up first."
+)
 
 # Purposes that flip is_email_verified on a successful verify — every
 # purpose currently in use (login-purpose email OTP isn't built; the
@@ -295,6 +317,63 @@ def login(
     return access_token, refresh_token, user
 
 
+def google_auth(
+    db: Session,
+    id_token_str: str,
+    role: Optional[UserRole],
+    user_agent: Optional[str] = None,
+    ip: Optional[str] = None,
+) -> tuple[str, str, User]:
+    """
+    Verifies a Google Identity Services ID token and either logs in an
+    existing account (matched by email; role is ignored — an existing
+    account's role never changes via a Google click) or, only when a
+    role is supplied, creates one. Google's own email verification
+    stands in for both the password and email-OTP steps of the manual
+    signup path, so a brand-new account is fully usable immediately —
+    no phone number is collected (users.phone is nullable since M5).
+
+    role is None on the login page, where an unmatched email is
+    rejected rather than auto-created (404 GOOGLE_ACCOUNT_NOT_FOUND),
+    and supplied on signup Step 2, where it's already known from Step 1.
+    """
+    try:
+        claims = google_id_token.verify_oauth2_token(
+            id_token_str, google_requests.Request(), settings.GOOGLE_CLIENT_ID
+        )
+    except (ValueError, GoogleAuthError):
+        raise GOOGLE_TOKEN_INVALID
+
+    if not claims.get("email_verified"):
+        raise GOOGLE_TOKEN_INVALID
+
+    email = claims["email"]
+    user = db.query(User).filter(User.email == email).first()
+
+    if user is None:
+        if role is None:
+            raise GOOGLE_ACCOUNT_NOT_FOUND
+        user = User(
+            email=email,
+            full_name=claims.get("name"),
+            password_hash=None,
+            role=role,
+            is_email_verified=True,
+        )
+        db.add(user)
+        db.flush()  # assigns user.id for the broker_profile FK below
+        if role == UserRole.broker:
+            db.add(BrokerProfile(user_id=user.id))
+    elif not user.is_active:
+        raise ForbiddenError("ACCOUNT_DEACTIVATED", "This account has been deactivated.")
+
+    access_token, refresh_token = _issue_session(db, user, user_agent, ip)
+    db.commit()
+    db.refresh(user)
+
+    return access_token, refresh_token, user
+
+
 def refresh(
     db: Session,
     raw_token: Optional[str],
@@ -361,9 +440,12 @@ def forgot_password(db: Session, email: str) -> None:
     Always succeeds with no signal about whether the email is
     registered (05_API_Design.md: no enumeration). If a matching
     account exists, generates a signed, 30-minute password-reset token
-    and sends a reset email — real Resend delivery is P2-T30, so for
-    now (like the signup OTP) this only logs the token in non-production
-    environments.
+    and emails a reset link via Resend (email_service.py). Always logs
+    the token in non-production environments too, as a fallback
+    delivery path if the real send fails — same pattern as the signup
+    OTP (_issue_otp), and for the same reason: no frontend
+    reset-password page exists yet to consume the link, so the dev log
+    is the only way to exercise this flow end-to-end right now.
     """
     user = db.query(User).filter(User.email == email).first()
     if user is None:
@@ -374,6 +456,12 @@ def forgot_password(db: Session, email: str) -> None:
     if settings.ENVIRONMENT != "production":
         logger.info("Password reset token for %s: %s", email, token)
 
+    reset_url = f"{settings.FRONTEND_ORIGIN}/reset-password?token={token}"
+    try:
+        email_service.send_password_reset_email(email, reset_url)
+    except Exception:
+        logger.exception("Failed to send password reset email to %s", email)
+
 
 def reset_password(db: Session, token: str, new_password: str) -> None:
     """
@@ -383,7 +471,10 @@ def reset_password(db: Session, token: str, new_password: str) -> None:
     reset. The token embeds a fingerprint of the password_hash it was
     issued against; once this function changes password_hash, replaying
     the same token no longer fingerprint-matches — a stateless
-    single-use mechanism, no reset_tokens table needed.
+    single-use mechanism, no reset_tokens table needed. Also rejects a
+    reset to the same password the account already has (422
+    SAME_PASSWORD) — checked against the current hash only, not a
+    password-history table.
     """
     try:
         payload = decode_password_reset_token(token)
@@ -397,6 +488,9 @@ def reset_password(db: Session, token: str, new_password: str) -> None:
 
     if payload.get("pwd_fp") != password_fingerprint(user.password_hash):
         raise RESET_TOKEN_INVALID
+
+    if user.password_hash is not None and verify_password(new_password, user.password_hash):
+        raise SAME_PASSWORD
 
     user.password_hash = hash_password(new_password)
 

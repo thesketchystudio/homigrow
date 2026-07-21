@@ -350,6 +350,48 @@ A reader should understand the code from the comment alone.
   00/01/02/03/05/07/09/12/14/15/18 in `docs/architecture/` — each
   carries a dated "Amended 2026-07-14" note rather than silently
   rewriting history.
+- **P2-T30 fully closed, 2026-07-17** — `forgot_password()` now sends
+  the real password-reset email via Resend (`email_service.
+  send_password_reset_email`), same pattern as `send_otp_email`,
+  instead of only logging the token. The link is a full JWT, not a
+  typeable code, so the email uses a "Reset password" button pointing
+  to `{FRONTEND_ORIGIN}/reset-password?token=...`; a send failure is
+  caught and logged, never raised. **No `/reset-password` frontend
+  page exists yet — the link 404s until that's built as a separate
+  frontend task**, an explicit backend-only scoping choice, not an
+  oversight. 131→134 tests pass (3 new); new
+  `_mock_send_password_reset_email` autouse fixture in `conftest.py`.
+  Live-verified against the real Supabase dev DB + real Resend API
+  using the standing `hello@thesketchystudio.com` test account (the
+  one `create_test_user.py`/`delete_test_user.py` are built to reuse,
+  since Resend's sandbox only delivers to its one verified address):
+  forgot → confirmed a real `200` from `api.resend.com` in the server
+  log → reset with the logged token → `204` → logged in with the new
+  password → `200`. This changed that standing test account's password
+  as an expected side effect of testing the reset flow.
+- **Same-password reset rejection added, 2026-07-21** — the frontend
+  `/reset-password` page shipped this session (separate
+  `feature/phase_2_frontend` PR) surfaced a real gap while verifying
+  the flow live: `reset_password()` had no check preventing a reset to
+  the same password the account already had. Not required by this
+  project's own `14_Security.md` or current NIST 800-63B guidance
+  (which dropped mandatory password-history checks), but a reasonable,
+  commonly-expected safeguard, so added on request. `reset_password()`
+  now compares `new_password` against the current `password_hash` via
+  `verify_password()` before overwriting it (checked only against the
+  current hash, not a password-history table — no new column/table),
+  raising `422 SAME_PASSWORD` with a `fields: {new_password: ...}`
+  entry that folds into the same field-level error UI the frontend
+  already uses for the zxcvbn strength check. 135/135 tests pass (1
+  new). **Debugging note, not a logic bug:** three rapid sequential
+  edits to `auth_service.py` in one session raced `uvicorn --reload`'s
+  file-watcher — an early reload cycle left a stale process serving a
+  pre-edit version of the file for a few requests, so the same-password
+  check appeared not to fire during live curl testing even though the
+  committed code (and the passing pytest suite) were already correct.
+  Resolved by a clean server restart; re-verified live end-to-end
+  afterward (same password → `422 SAME_PASSWORD`; different password →
+  `204` as before) against the real Supabase dev DB.
 - **Known gap, deliberately left open (2026-07-09 docs-vs-code pass;
   correction 2026-07-14):** `02_Database_Design.md`'s invariant
   `password_hash IS NOT NULL OR is_phone_verified` is still not
@@ -375,9 +417,6 @@ A reader should understand the code from the comment alone.
   login) is actually designed
 - P2-T12 OTP-login path — out of current scope 2026-07-14, no
   OTP-login screen exists in the Figma design (password login only)
-- P2-T30 real Resend delivery — signup-verification half now done
-  (2026-07-14, shipped with P2-T11); password-reset email template
-  still dev-log-only, on hold by explicit choice
 - P2-T32 2FA (TOTP) backend — explicitly deferred to P4, see T27/T31
   notes above
 - **CORS closed 2026-07-14** — `CORSMiddleware` added in `app/main.py`
@@ -796,7 +835,14 @@ A reader should understand the code from the comment alone.
   work (this session's Google Sign-In) landed on the `_client`
   branches; the original `_frontend`/`_backend` branches still exist,
   untouched, not deleted. See [[phase-branch-strategy]] in memory —
-  not yet confirmed whether this split applies beyond Phase 2.
+  not yet confirmed whether this split applies beyond Phase 2. The
+  backend worktree also had a stale merge gap closed the same session:
+  it was missing `8d31c4d` (duplicate-email 500 fix + auto-login after
+  signup OTP verify), made on `feature/phase_2_frontend` and merged to
+  `dev` but never merged back to `feature/phase_2_backend` — fixed via
+  `git merge origin/dev` before any new work landed, so
+  `_issue_session()` etc. could be reused rather than re-implemented
+  and conflicted later.
 - **Google Sign-In shipped 2026-07-21** — "Continue with Google" on
   both the login page and signup Step 2, from a design decided with
   the user (not pulled from Figma — no Google element exists in either
@@ -811,16 +857,21 @@ A reader should understand the code from the comment alone.
   no `password_hash`) and logs in, skipping the manual form and OTP
   step entirely. No match + no `role` (login page) → `404
   GOOGLE_ACCOUNT_NOT_FOUND` rather than silently creating an account.
-  **Real schema blocker found and fixed, not worked around:**
-  `users.phone` was `NOT NULL UNIQUE`, but Google supplies no phone
-  number. Rather than fake a placeholder value, migration M5 made
-  `phone` nullable with a partial unique index (`ix_users_phone_unique`,
+  New `GoogleAuthRequest` schema (same admin-blocking `role` validator
+  as `SignupRequest`); new `GOOGLE_TOKEN_INVALID` (401) and
+  `GOOGLE_ACCOUNT_NOT_FOUND` (404) error codes. **Real schema blocker
+  found and fixed, not worked around:** `users.phone` was `NOT NULL
+  UNIQUE`, but Google supplies no phone number. Rather than fake a
+  placeholder value, migration M5 (`5081b0dee6c7`) made `phone`
+  nullable with a partial unique index (`ix_users_phone_unique`,
   "unique when present" — same pattern `email` already used), decided
   with the user as the root-cause fix over adding a phone-entry step
-  back into the Google flow. `UserOut`/`UserRead` schemas both had
+  back into the Google flow; verified upgrade→downgrade→upgrade clean
+  against the real dev DB. `UserOut`/`UserRead` schemas both had
   `phone: str` (required) and would have crashed serializing a
-  Google-only account — fixed alongside, caught by the new tests before
-  it ever hit a real user. New frontend: `features/auth/
+  Google-only account — fixed alongside (`Optional[str]`, matching
+  `email`'s existing pattern), caught by the new tests before it ever
+  hit a real user. New frontend: `features/auth/
   GoogleSignInButton.tsx` (loads Google's own rendered button via
   Identity Services' JS script, exchanges the credential for a session
   through the new endpoint), `types/google-identity.d.ts` (minimal
@@ -831,8 +882,8 @@ A reader should understand the code from the comment alone.
   the user's explicit placement choice, not Step 1). New
   `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in `frontend/.env.local` (public value,
   safe to ship in the bundle — this is why no secret is needed
-  frontend-side either). **Real stale-server bug hit again during
-  verification, same class as the forgot-password one above:** the
+  frontend-side either). **Real stale-server bug hit twice during
+  verification, same class as the forgot-password one above:** a
   worktree's `uvicorn --reload` process had been running since earlier
   in the session and silently stopped picking up file changes after a
   large `git merge` landed 45 files at once — `/auth/google` 404'd
@@ -840,20 +891,26 @@ A reader should understand the code from the comment alone.
   and restarting the process fresh; **if a worktree server has been
   running across a branch checkout or merge, restart it — don't trust
   `--reload` to have caught everything.** 150/150 backend tests pass
-  (11 new, incl. route-level tests); `tsc`/`eslint`/`next build` all
-  clean. Live-verified structurally with Playwright against the real
-  backend (fresh server): both screens render the correct divider text
-  and button placement, and `POST /auth/google` with a garbage token
-  correctly returns `401 GOOGLE_TOKEN_INVALID` from a live server.
-  **Not verified end-to-end** — completing Google's real consent popup
-  isn't something Playwright can drive; that first real click-through
-  is still open. Also hit a real external gap, not a code bug: Google
-  Cloud Console's Authorized JavaScript origins change hadn't
-  propagated yet at verification time (`GSI_LOGGER: The given origin is
-  not allowed for the given client ID` — Google documents this can take
-  several minutes after editing a client), so the actual Google popup
-  couldn't be exercised live this session; confirm it clears before
-  trusting a first real click-through.
+  (11 new: token/claim validation, existing-account login ignoring
+  role, new-account creation incl. broker_profile, deactivated-account
+  403, route-level status codes); `ruff` clean; `tsc`/`eslint`/
+  `next build` all clean. Live-verified structurally with Playwright
+  against the real backend (fresh server): both screens render the
+  correct divider text and button placement, and `POST /auth/google`
+  with a garbage token correctly returns `401 GOOGLE_TOKEN_INVALID`
+  from a live server. Also hit a real external gap, not a code bug:
+  Google Cloud Console's Authorized JavaScript origins change hadn't
+  propagated yet at first verification (`GSI_LOGGER: The given origin
+  is not allowed for the given client ID` — Google documents this can
+  take several minutes after editing a client). **Since resolved and
+  verified end-to-end by the user**: a real signup via the Google
+  popup completed successfully (account created, session issued,
+  landed logged in) — the only remaining oddity is a one-time ~15-20s
+  delay after picking the Google account, isolated to Google's own
+  client-side FedCM negotiation (measured our own token-verification
+  path directly at 0.14s, so not a backend bottleneck); expected to be
+  faster on repeat sign-ins as FedCM's per-origin registration is a
+  one-time cost, not yet independently reconfirmed.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

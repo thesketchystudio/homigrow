@@ -242,6 +242,44 @@ class TestForgotPassword:
         assert any("Password reset token for asha@example.com" in record.message for record in caplog.records)
         assert user.password_hash is not None  # untouched by forgot_password itself
 
+    def test_known_email_sends_a_reset_link(self, db_session, monkeypatch):
+        make_user(db_session, phone="+919876543246", email="kiran@example.com")
+        sent = {}
+
+        def _fake_send(to, reset_url):
+            sent["to"] = to
+            sent["reset_url"] = reset_url
+
+        monkeypatch.setattr("app.services.email_service.send_password_reset_email", _fake_send)
+
+        auth_service.forgot_password(db_session, "kiran@example.com")
+
+        assert sent["to"] == "kiran@example.com"
+        assert sent["reset_url"].startswith(f"{settings.FRONTEND_ORIGIN}/reset-password?token=")
+
+    def test_unknown_email_does_not_send_a_reset_link(self, db_session, monkeypatch):
+        called = False
+
+        def _fake_send(to, reset_url):
+            nonlocal called
+            called = True
+
+        monkeypatch.setattr("app.services.email_service.send_password_reset_email", _fake_send)
+
+        auth_service.forgot_password(db_session, "nobody@example.com")
+
+        assert called is False
+
+    def test_send_failure_does_not_raise(self, db_session, monkeypatch):
+        make_user(db_session, phone="+919876543247", email="reyansh@example.com")
+
+        def _fake_send(to, reset_url):
+            raise RuntimeError("Resend is down")
+
+        monkeypatch.setattr("app.services.email_service.send_password_reset_email", _fake_send)
+
+        auth_service.forgot_password(db_session, "reyansh@example.com")
+
 
 class TestResetPassword:
     def test_valid_token_changes_the_password_and_revokes_sessions(self, db_session):
@@ -313,3 +351,17 @@ class TestResetPassword:
             auth_service.reset_password(db_session, token, "new-password-456")
 
         assert exc_info.value.status_code == 410
+
+    def test_resetting_to_the_same_password_raises_422(self, db_session):
+        user = make_user(db_session, phone="+919876543245", password="old-password-123")
+        token = create_password_reset_token(user.id, user.password_hash, 30)
+
+        with pytest.raises(AppError) as exc_info:
+            auth_service.reset_password(db_session, token, "old-password-123")
+
+        assert exc_info.value.status_code == 422
+        assert exc_info.value.code == "SAME_PASSWORD"
+        assert exc_info.value.fields == {"new_password": "New password must be different from your current password."}
+
+        db_session.refresh(user)
+        assert verify_password("old-password-123", user.password_hash)

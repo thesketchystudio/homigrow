@@ -37,6 +37,12 @@ def _mock_send_otp_email(monkeypatch):
     monkeypatch.setattr("app.services.email_service.send_otp_email", lambda *args, **kwargs: None)
 
 
+@pytest.fixture(autouse=True)
+def _mock_send_password_reset_email(monkeypatch):
+    """Prevents tests from making real Resend API calls — auth_service.forgot_password sends via httpx."""
+    monkeypatch.setattr("app.services.email_service.send_password_reset_email", lambda *args, **kwargs: None)
+
+
 @pytest.fixture()
 def db_session():
     """Yields a database session bound to a transaction that is rolled back after the test."""
