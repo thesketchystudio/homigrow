@@ -158,18 +158,18 @@ export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onBack }:
         <p className="text-[14px] text-destructive">{(signupMutation.error as ApiError).message}</p>
       )}
 
-      <div className="flex w-full items-center justify-between">
+      <div className="flex w-full items-center gap-[462px]">
         <button
           type="button"
           onClick={onBack}
-          className="rounded-[4px] border border-brand-primary-100 bg-background p-[17px] font-heading text-[16px] font-bold text-brand-primary-400"
+          className="flex flex-1 items-center justify-center rounded-[4px] border border-brand-primary-100 bg-background p-[17px] font-heading text-[16px] font-bold text-brand-primary-400"
         >
           Back
         </button>
         <button
           type="submit"
           disabled={signupMutation.isPending}
-          className="rounded-[4px] px-12 py-4 font-heading text-[16px] font-bold text-background disabled:opacity-60"
+          className="flex flex-1 items-center justify-center rounded-[4px] py-4 font-heading text-[16px] font-bold text-background disabled:opacity-60"
           style={{ backgroundImage: "linear-gradient(122.455deg, rgb(0, 0, 0) 0%, rgb(19, 27, 46) 100%)" }}
         >
           {signupMutation.isPending ? "Creating account…" : "Continue"}
