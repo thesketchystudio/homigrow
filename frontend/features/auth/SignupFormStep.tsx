@@ -26,10 +26,10 @@ type SignupFormStepProps = {
   role: Exclude<UserRole, "admin">;
   onSuccess: (email: string) => void;
   onGoogleAuthSuccess: (session: TokenResponse) => void;
-  onGoToLogin: () => void;
+  onBack: () => void;
 };
 
-export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onGoToLogin }: SignupFormStepProps) {
+export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onBack }: SignupFormStepProps) {
   const {
     register,
     handleSubmit,
@@ -158,17 +158,18 @@ export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onGoToLog
         <p className="text-[14px] text-destructive">{(signupMutation.error as ApiError).message}</p>
       )}
 
-      <div className="flex w-full items-center justify-between">
-        <p className="font-heading text-[16px] text-brand-secondary-800">
-          {"Have an account? "}
-          <button type="button" onClick={onGoToLogin} className="font-bold text-foreground">
-            Log in →
-          </button>
-        </p>
+      <div className="flex w-full items-center gap-4">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex flex-1 items-center justify-center rounded border border-brand-primary-100 bg-background px-12 py-4 font-heading text-[16px] font-bold text-foreground"
+        >
+          Back
+        </button>
         <button
           type="submit"
           disabled={signupMutation.isPending}
-          className="flex items-center gap-3 rounded-lg bg-brand-primary-500 px-12 py-4 font-heading text-[16px] font-bold text-background disabled:opacity-60"
+          className="flex flex-1 items-center justify-center gap-3 rounded-lg bg-brand-primary-500 px-12 py-4 font-heading text-[16px] font-bold text-background disabled:opacity-60"
         >
           {signupMutation.isPending ? "Creating account…" : "Continue →"}
         </button>
