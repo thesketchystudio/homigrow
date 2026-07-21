@@ -369,6 +369,29 @@ A reader should understand the code from the comment alone.
   log → reset with the logged token → `204` → logged in with the new
   password → `200`. This changed that standing test account's password
   as an expected side effect of testing the reset flow.
+- **Same-password reset rejection added, 2026-07-21** — the frontend
+  `/reset-password` page shipped this session (separate
+  `feature/phase_2_frontend` PR) surfaced a real gap while verifying
+  the flow live: `reset_password()` had no check preventing a reset to
+  the same password the account already had. Not required by this
+  project's own `14_Security.md` or current NIST 800-63B guidance
+  (which dropped mandatory password-history checks), but a reasonable,
+  commonly-expected safeguard, so added on request. `reset_password()`
+  now compares `new_password` against the current `password_hash` via
+  `verify_password()` before overwriting it (checked only against the
+  current hash, not a password-history table — no new column/table),
+  raising `422 SAME_PASSWORD` with a `fields: {new_password: ...}`
+  entry that folds into the same field-level error UI the frontend
+  already uses for the zxcvbn strength check. 135/135 tests pass (1
+  new). **Debugging note, not a logic bug:** three rapid sequential
+  edits to `auth_service.py` in one session raced `uvicorn --reload`'s
+  file-watcher — an early reload cycle left a stale process serving a
+  pre-edit version of the file for a few requests, so the same-password
+  check appeared not to fire during live curl testing even though the
+  committed code (and the passing pytest suite) were already correct.
+  Resolved by a clean server restart; re-verified live end-to-end
+  afterward (same password → `422 SAME_PASSWORD`; different password →
+  `204` as before) against the real Supabase dev DB.
 - **Known gap, deliberately left open (2026-07-09 docs-vs-code pass;
   correction 2026-07-14):** `02_Database_Design.md`'s invariant
   `password_hash IS NOT NULL OR is_phone_verified` is still not

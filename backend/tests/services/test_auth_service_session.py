@@ -351,3 +351,17 @@ class TestResetPassword:
             auth_service.reset_password(db_session, token, "new-password-456")
 
         assert exc_info.value.status_code == 410
+
+    def test_resetting_to_the_same_password_raises_422(self, db_session):
+        user = make_user(db_session, phone="+919876543245", password="old-password-123")
+        token = create_password_reset_token(user.id, user.password_hash, 30)
+
+        with pytest.raises(AppError) as exc_info:
+            auth_service.reset_password(db_session, token, "old-password-123")
+
+        assert exc_info.value.status_code == 422
+        assert exc_info.value.code == "SAME_PASSWORD"
+        assert exc_info.value.fields == {"new_password": "New password must be different from your current password."}
+
+        db_session.refresh(user)
+        assert verify_password("old-password-123", user.password_hash)

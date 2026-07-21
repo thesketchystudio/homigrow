@@ -26,7 +26,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.exceptions import AuthError, ConflictError, ExpiredError, ForbiddenError, LockedError
+from app.core.exceptions import AuthError, ConflictError, ExpiredError, ForbiddenError, LockedError, ValidationFailed
 from app.core.security import (
     create_access_token,
     create_password_reset_token,
@@ -54,6 +54,11 @@ PASSWORD_RESET_TTL_MINUTES = 30
 
 REFRESH_INVALID = AuthError("REFRESH_INVALID", "Session expired or invalid, please log in again.")
 RESET_TOKEN_INVALID = ExpiredError("TOKEN_EXPIRED", "This password reset link is invalid or has expired.")
+SAME_PASSWORD = ValidationFailed(
+    "SAME_PASSWORD",
+    "New password must be different from your current password.",
+    {"new_password": "New password must be different from your current password."},
+)
 OTP_INVALID = AuthError("OTP_INVALID", "Incorrect verification code.")
 OTP_EXPIRED = ExpiredError("OTP_EXPIRED", "This code has expired. Request a new one.")
 
@@ -360,7 +365,10 @@ def reset_password(db: Session, token: str, new_password: str) -> None:
     reset. The token embeds a fingerprint of the password_hash it was
     issued against; once this function changes password_hash, replaying
     the same token no longer fingerprint-matches — a stateless
-    single-use mechanism, no reset_tokens table needed.
+    single-use mechanism, no reset_tokens table needed. Also rejects a
+    reset to the same password the account already has (422
+    SAME_PASSWORD) — checked against the current hash only, not a
+    password-history table.
     """
     try:
         payload = decode_password_reset_token(token)
@@ -374,6 +382,9 @@ def reset_password(db: Session, token: str, new_password: str) -> None:
 
     if payload.get("pwd_fp") != password_fingerprint(user.password_hash):
         raise RESET_TOKEN_INVALID
+
+    if user.password_hash is not None and verify_password(new_password, user.password_hash):
+        raise SAME_PASSWORD
 
     user.password_hash = hash_password(new_password)
 
