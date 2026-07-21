@@ -32,9 +32,13 @@ class User(Base, TimestampMixin):
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
 
-    # Phone is the primary identifier (Indian market, OTP-first login).
-    # Email is optional; password_hash is nullable for OTP-only accounts.
-    phone = Column(String(15), nullable=False, unique=True)
+    # Phone was the original primary identifier (Indian market, OTP-first
+    # login); email became the real identifier once signup verification
+    # moved to email OTP (M4). Nullable since M5 — Google Sign-In accounts
+    # have no phone number to store. Uniqueness is enforced by the partial
+    # ix_users_phone_unique index below, not a plain column constraint, so
+    # multiple NULLs are allowed (same pattern email already used).
+    phone = Column(String(15), nullable=True)
     email = Column(String(255), nullable=True)
     password_hash = Column(String(255), nullable=True)
     full_name = Column(String(100), nullable=True)
@@ -80,5 +84,6 @@ class User(Base, TimestampMixin):
         # Postgres; the partial index makes the "optional, unique when
         # present" intent explicit.
         Index("ix_users_email_unique", "email", unique=True, postgresql_where=text("email IS NOT NULL")),
+        Index("ix_users_phone_unique", "phone", unique=True, postgresql_where=text("phone IS NOT NULL")),
         Index("ix_users_role", "role"),
     )

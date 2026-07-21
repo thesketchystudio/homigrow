@@ -35,7 +35,7 @@ class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    phone: str
+    phone: Optional[str] = None
     email: Optional[str] = None
     full_name: Optional[str] = None
     avatar_url: Optional[str] = None

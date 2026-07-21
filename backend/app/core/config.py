@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     # (/auth/refresh) per 14_Security.md's CSRF stance.
     FRONTEND_ORIGIN: str = "http://localhost:3000"
 
+    # OAuth 2.0 web client ID from Google Cloud Console, used to verify
+    # Google Identity Services ID tokens on /auth/google. No client secret
+    # is needed since the ID-token flow never performs a server-side code
+    # exchange.
+    GOOGLE_CLIENT_ID: str = ""
+
     @computed_field
     @property
     def DATABASE_URL(self) -> str:
