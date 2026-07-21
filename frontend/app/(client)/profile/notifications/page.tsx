@@ -1,10 +1,8 @@
 // app/(client)/profile/notifications/page.tsx
-// Notifications tab placeholder — full content lands in a later task.
+// Notifications tab — channel preferences (P2-T23).
 
-import { Bell } from "lucide-react";
-
-import EmptyState from "@/components/shared/EmptyState";
+import { NotificationsTab } from "@/features/profile/NotificationsTab";
 
 export default function NotificationsPage() {
-  return <EmptyState icon={Bell} title="Notifications" body="Notification preferences will live here." />;
+  return <NotificationsTab />;
 }

@@ -720,6 +720,43 @@ A reader should understand the code from the comment alone.
   top (unchanged), `/profile/account` confirmed fully legible with zero
   scroll (logo, nav links, and the user's name all clearly dark-on-light
   from the first render).
+- **P2-T23 shipped 2026-07-20** — Notifications tab, the first of the
+  7 remaining Profile & Settings tabs to get real content (Account/T22
+  was previously the only one). Picked over Security/Billing after
+  actually checking each tab's Figma design against the real backend:
+  Security's design needs 2FA (deferred to P4) and a privacy/data-export
+  section with no backend at all; Billing's design is a full realized
+  payments/subscription screen (saved cards, invoices), nowhere close
+  to the architecture doc's "placeholder" description and with no
+  payments backend planned. Notifications was the only tab that's just
+  channel toggles with no missing dependency. New
+  `features/profile/NotificationsTab.tsx`: 5 channels (Property Match
+  Alerts / Market Volatility / Private Viewings / Offer Status / EMI
+  Reminders) × Email/Push checkboxes, stored under
+  `preferences.notification_channels` — same free-form JSONB blob T20/T22
+  already use, no backend changes needed. Colors/spacing pulled directly
+  from Figma's `get_design_context` this time, avoiding T22's
+  generic-shadcn-then-fix detour. Playwright's MCP server was
+  disconnected earlier in the session; once it reconnected, verified
+  both the API contract (backend worktree + real Supabase dev DB via
+  curl: exact `PATCH /users/me` payload → clean unchanged `GET`) and,
+  live in a real browser, the full UI flow — logged in through
+  `/login`, loaded `/profile/notifications`, confirmed rendered
+  checkbox state matched what was just saved, toggled a checkbox,
+  saved (`PATCH → 200`, button correctly re-disabled), and screenshot-
+  compared against the Figma reference (close match). `tsc`/`eslint`/
+  `next build` all clean.
+- **Checkbox checkmark contrast bugfix, same day** — you compared a
+  screenshot against Figma and flagged the checked boxes looked like
+  plain filled squares. Confirmed via `browser_evaluate` on the live
+  page rather than assuming: the checkmark icon's color resolved to
+  `rgb(9,9,9)` against a `rgb(26,26,26)` box — a near-invisible near-
+  black-on-near-black. Fixed by adding `data-[state=checked]:
+  text-background` to both checkboxes in `NotificationsTab.tsx`
+  (`--background` is `#fefeff`; matches `AccountTab.tsx`'s existing
+  `text-background`-on-dark-bg convention). Re-verified: icon color now
+  `rgb(254,254,255)`, confirmed visibly correct in a zoomed screenshot.
+  `tsc`/`eslint` clean.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

@@ -16,6 +16,20 @@ export const accountFormSchema = z.object({
 });
 export type AccountFormValues = z.infer<typeof accountFormSchema>;
 
+const channelSchema = z.object({
+  email: z.boolean(),
+  push: z.boolean(),
+});
+
+export const notificationsFormSchema = z.object({
+  property_match_alerts: channelSchema,
+  market_volatility: channelSchema,
+  private_viewings: channelSchema,
+  offer_status: channelSchema,
+  emi_reminders: channelSchema,
+});
+export type NotificationsFormValues = z.infer<typeof notificationsFormSchema>;
+
 export const changePasswordSchema = z
   .object({
     current_password: z.string().min(1, "Current password is required"),
