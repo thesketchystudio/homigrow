@@ -29,6 +29,8 @@ export const signupFormSchema = z
     email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
     phone: phoneDigits,
     role: z.enum([UserRole.client, UserRole.broker]),
+    city: z.string().trim().min(1, "City is required"),
+    state: z.string().trim().min(1, "State is required"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirm_password: z.string().min(1, "Confirm your password"),
     agree_to_terms: z.literal(true, { error: "You must agree to continue" }),

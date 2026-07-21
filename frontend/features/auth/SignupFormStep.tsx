@@ -14,11 +14,13 @@ import { signup, type TokenResponse } from "@/lib/api/endpoints/auth";
 import { UserRole } from "@/lib/enums";
 import { AuthTextField } from "@/components/forms/AuthTextField";
 import { AuthPhoneField } from "@/components/forms/AuthPhoneField";
+import { AuthSelectField } from "@/components/forms/AuthSelectField";
 import { AuthPasswordField } from "@/components/forms/AuthPasswordField";
 import { AuthCheckboxField } from "@/components/forms/AuthCheckboxField";
 import { AuthProgressBar } from "@/features/auth/AuthProgressBar";
 import { GoogleSignInButton } from "@/features/auth/GoogleSignInButton";
 import { signupFormSchema, type SignupFormValues } from "@/lib/validation/auth";
+import { CITY_NAMES, stateForCity } from "@/lib/data/indian-cities";
 import { cn } from "@/lib/utils";
 
 type SignupFormStepProps = {
@@ -42,8 +44,14 @@ export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onGoToLog
   });
 
   const selectedRole = watch("role");
+  const selectedCity = watch("city");
   const password = watch("password") ?? "";
   const agreeToTerms = watch("agree_to_terms") ?? false;
+
+  const handleCityChange = (city: string) => {
+    setValue("city", city, { shouldValidate: true });
+    setValue("state", stateForCity(city) ?? "", { shouldValidate: true });
+  };
 
   const signupMutation = useMutation({
     mutationFn: signup,
@@ -64,6 +72,8 @@ export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onGoToLog
       full_name: values.full_name,
       email: values.email,
       password: values.password,
+      city: values.city,
+      state: values.state,
     });
   });
 
@@ -123,6 +133,26 @@ export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onGoToLog
                 ))}
               </div>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-11 sm:grid-cols-2">
+            <AuthSelectField
+              label="City"
+              placeholder="Select your city"
+              value={selectedCity}
+              onValueChange={handleCityChange}
+              options={CITY_NAMES}
+              error={errors.city?.message}
+            />
+            <AuthSelectField
+              label="State"
+              placeholder="Auto-filled from city"
+              value={watch("state")}
+              onValueChange={() => {}}
+              options={watch("state") ? [watch("state")] : []}
+              disabled
+              error={errors.state?.message}
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-10 sm:grid-cols-2">
