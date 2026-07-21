@@ -88,11 +88,34 @@ def request_otp(payload: OTPRequestRequest, request: Request, db: Session = Depe
     auth_service.request_otp(db, payload.email, payload.purpose)
 
 
-@router.post("/otp/verify", status_code=204)
+@router.post("/otp/verify")
 @limiter.limit("5/minute")
-def verify_otp(payload: OTPVerifyRequest, request: Request, db: Session = Depends(get_db)) -> None:
-    """Verifies a submitted OTP; 401 OTP_INVALID on a wrong code, 410 OTP_EXPIRED once no valid code remains."""
-    auth_service.verify_otp(db, payload.email, payload.code, payload.purpose)
+def verify_otp(payload: OTPVerifyRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    """
+    Verifies a submitted OTP; 401 OTP_INVALID on a wrong code, 410
+    OTP_EXPIRED once no valid code remains. For OTPPurpose.signup,
+    returns the same TokenResponse shape as /login (200) and sets the
+    refresh cookie, logging the user straight in; every other purpose
+    still returns 204.
+    """
+    session = auth_service.verify_otp(
+        db,
+        payload.email,
+        payload.code,
+        payload.purpose,
+        user_agent=request.headers.get("user-agent"),
+        ip=_client_ip(request),
+    )
+    if session is None:
+        return Response(status_code=204)
+
+    access_token, refresh_token, user = session
+    _set_refresh_cookie(response, refresh_token)
+    return TokenResponse(
+        access_token=access_token,
+        expires_in=settings.JWT_ACCESS_TTL_MIN * 60,
+        user=UserOut.model_validate(user),
+    )
 
 
 @router.post("/login", response_model=TokenResponse)

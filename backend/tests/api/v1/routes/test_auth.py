@@ -15,7 +15,8 @@ from tests.conftest import make_user
 
 
 def _extract_otp_code(caplog, email: str) -> str:
-    for record in caplog.records:
+    """Returns the most recently logged OTP for the email — matters when a test issues more than one (e.g. signup, then a later otp/request for another purpose)."""
+    for record in reversed(caplog.records):
         match = re.search(rf"OTP for {re.escape(email)} \(\w+\): (\d{{6}})", record.message)
         if match:
             return match.group(1)
@@ -65,6 +66,17 @@ class TestSignupRoute:
         assert response.status_code == 409
         assert response.json()["error"]["code"] == "PHONE_TAKEN"
 
+    def test_duplicate_email_returns_409(self, client, db_session):
+        make_user(db_session, phone="+919876540005", email="dupemail5@example.com")
+
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={"phone": "+919876540006", "role": "client", "email": "dupemail5@example.com"},
+        )
+
+        assert response.status_code == 409
+        assert response.json()["error"]["code"] == "EMAIL_TAKEN"
+
     def test_weak_password_returns_422(self, client):
         response = client.post(
             "/api/v1/auth/signup",
@@ -75,7 +87,7 @@ class TestSignupRoute:
 
 
 class TestOtpRoutes:
-    def test_verify_route_flips_is_email_verified_and_returns_204(self, client, db_session, caplog):
+    def test_verify_route_flips_is_email_verified_and_logs_the_user_in(self, client, db_session, caplog):
         with caplog.at_level("INFO"):
             signup_response = client.post(
                 "/api/v1/auth/signup",
@@ -94,9 +106,38 @@ class TestOtpRoutes:
             json={"email": "otproute@example.com", "code": code, "purpose": "signup"},
         )
 
-        assert response.status_code == 204
+        assert response.status_code == 200
+        body = response.json()
+        assert body["access_token"]
+        assert body["user"]["id"] == user_id
+        assert "refresh_token" in response.cookies
         user = db_session.query(User).filter(User.id == user_id).first()
         assert user.is_email_verified is True
+
+    def test_verify_route_broker_verification_purpose_still_returns_204(self, client, db_session, caplog):
+        """broker_verification also flips is_email_verified but must not mint a session — that purpose fires from an already-logged-in broker's profile, not a fresh signup."""
+        with caplog.at_level("INFO"):
+            client.post(
+                "/api/v1/auth/signup",
+                json={
+                    "phone": "+919876540062",
+                    "role": "broker",
+                    "email": "brokerverifyroute@example.com",
+                    "password": "s3cure-pass",
+                },
+            )
+            client.post(
+                "/api/v1/auth/otp/request",
+                json={"email": "brokerverifyroute@example.com", "purpose": "broker_verification"},
+            )
+        code = _extract_otp_code(caplog, "brokerverifyroute@example.com")
+
+        response = client.post(
+            "/api/v1/auth/otp/verify",
+            json={"email": "brokerverifyroute@example.com", "code": code, "purpose": "broker_verification"},
+        )
+
+        assert response.status_code == 204
 
     def test_verify_route_wrong_code_returns_401(self, client):
         client.post(

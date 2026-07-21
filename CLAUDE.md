@@ -427,10 +427,41 @@ A reader should understand the code from the comment alone.
   headers, and a real end-to-end `POST /auth/signup` from that origin
   succeeds (201, user row created and deleted after verifying). 131/131
   tests still pass.
-- **P2-T17/T18** (API client silent-refresh interceptor + authStore,
-  AuthGuard) — blocked on a login screen existing (see below); the
-  minimal `lib/api/client.ts` shipped with T15/T16 has no auth header
-  or refresh-retry logic yet
+- **P2-T17/T18 shipped 2026-07-15** — see Frontend Phase 2 below.
+- **Duplicate-email signup bug fixed 2026-07-16** — `auth_service.signup()`
+  relied on catching `IntegrityError` around `db.commit()` to turn a
+  duplicate email into `409 EMAIL_TAKEN`, but the unique-constraint
+  violation actually fires at the `db.flush()` a few lines earlier
+  (needed to assign `user.id` for the broker_profile FK), outside that
+  try/except — so it fell through to the catch-all handler as a bare
+  `500 INTERNAL_ERROR` instead. Found via manual UI testing, not a test
+  gap that was ever exercised: there was a `test_duplicate_phone_returns_409`
+  but no email equivalent. Fixed by checking `User.email` proactively
+  before any insert, same pattern as the existing phone check; added
+  the missing test. 133/133 tests pass (1 new). New
+  **`backend/scripts/delete_test_user.py`** — deletes a given email's
+  `otp_codes` + `users` row (cascades to `broker_profiles`/
+  `refresh_tokens`) so one real email can be reused repeatedly for
+  manual signup testing, since Resend's sandbox only delivers to one
+  verified address.
+- **Signup now auto-logs in after email verification, 2026-07-16** —
+  previously `POST /auth/otp/verify` always returned a bare 204, so the
+  signup wizard sent a freshly verified user to `/login` to type their
+  password a second time right after supplying it. For
+  `OTPPurpose.signup` specifically, `verify_otp()` now also mints a
+  session (same `_issue_session()` helper `login()` uses) and the route
+  returns the same `TokenResponse` shape as `/login`/`/refresh` (200 +
+  refresh cookie) instead of 204; every other purpose (`broker_verification`)
+  is unchanged and still returns a bare 204, since that fires from an
+  already-logged-in broker's profile, not a fresh signup. Frontend:
+  `SignupWizard.tsx` now calls `setAuth()` with the returned session and
+  redirects straight to `/` instead of `/login`. 133/133 backend tests
+  pass (1 new, covering the broker_verification purpose is unaffected).
+  Live-verified with Playwright: signed up a fresh user, verified the
+  OTP, landed directly on `/` with no login screen — confirmed genuinely
+  authenticated (not just coincidentally on `/`) by visiting
+  `/broker/dashboard` immediately after and getting redirected home for
+  a role mismatch rather than to `/login`.
 
 ### Frontend Phase 2 (on `feature/phase_2_frontend`, cut from `dev`)
 - **P2-T15/T16 shipped 2026-07-14** — signup + email-OTP verification
@@ -473,12 +504,329 @@ A reader should understand the code from the comment alone.
   the `create-next-app` scaffold default ("Create Next App"), and
   `AuthProgressBar.tsx`'s eyebrow label read "Onboarding" instead of
   the Figma copy's "Onboarding Sequence" — both now match.
-  **`/login` still does not exist and 404s** — the Figma link given
-  the T15/T16 session only covered the sign up flow; a `get_metadata`
-  sweep of the file's `Components` canvas didn't surface a `Login`
-  frame (likely an MCP response-size truncation, not confirmed absent).
-  Needs its own Figma node before P2-T17/T18 can be meaningfully built
-  against a real screen.
+  **`/login` shipped 2026-07-15** — see the entry directly below; the
+  earlier `/login` 404 gap and its blocking of P2-T17/T18 no longer
+  applies.
+- **Login screen + welcome/chooser screen shipped 2026-07-15** — from
+  Figma nodes `423:3651` ("Client - Log in") and `423:3792` (the
+  pre-signup/login "landing" chooser frame, found via the `use_figma`
+  Plugin API route documented in memory `figma-metadata-canvas-truncation`).
+  New **`features/auth/AuthSplitShell.tsx`** — the dark-hero split-screen
+  shell Figma actually uses for these two screens (distinct from the
+  `(auth)` route group's plain layout, which correctly matches signup's
+  own, hero-less Figma frames and is unchanged). Hero image downloaded
+  locally to `public/auth/brand-panel.png` since Figma asset URLs expire
+  after 7 days. New **`app/login/page.tsx`** (moved out of the `(auth)`
+  group — the split shell replaces that group's header/footer chrome
+  rather than nesting inside it) and **`app/welcome/page.tsx`**, both
+  thin wrappers around `AuthSplitShell`. New
+  **`features/auth/LoginForm.tsx`** (email/password via
+  `react-hook-form`/zod, calls the already-typed `login()` from T15/T16
+  — its first real caller; role toggle and remember-me are display-only,
+  no backend support for either; "Forgot password?" shows a
+  `toast.info(...)`, no reset-password screen exists yet) and
+  **`features/auth/WelcomeScreen.tsx`** ("Get started" → `/signup`,
+  "Log in" → `/login`). `components/shared/TopNavBar.tsx`'s "Sign In"
+  button (previously a dead `<button>`, pre-dating any auth wiring) now
+  routes to `/welcome`. Google sign-in remains deliberately deferred on
+  both screens, per explicit choice. Full writeup:
+  `docs/implementation/frontend/Phase_2_Implementation.md`.
+  **Two real bugs found and fixed only because this was verified with an
+  actual browser (Playwright), not `curl`:** (1) the CORS gap above was
+  independently, byte-identically fixed on `dev` around the same time —
+  merged in rather than duplicated; (2) `globals.css` had a leftover
+  `create-next-app` dark-mode media query silently flipping the login/
+  signup screens to unreadable black-on-black for any user with OS dark
+  mode on — already fixed and merged to `dev` via PR #10
+  (`fix/remove-stray-dark-mode-media-query`), pulled in via merge rather
+  than duplicated. Playwright MCP itself only became available this
+  session via a new project-root `.mcp.json` — the CLI's own
+  `~/.claude.json` project-scoped MCP config isn't read by this IDE
+  surface, `.mcp.json` is (mirrors `playwright`/`context7`/`supabase`/
+  `sentry`, all already configured for this project via the CLI).
+  Live-verified: screenshot match against both Figma frames, full
+  welcome→signup/login and homepage→welcome navigation loop, and a real
+  signup→OTP-verify→login round trip against the real backend (wrong
+  password shows the correct inline error, correct password redirects
+  to `/`) — test user and screenshots cleaned up afterward.
+- **P2-T17/T18 shipped 2026-07-15** — silent-refresh interceptor,
+  authStore, and AuthGuard, closing the last piece before Profile UI
+  work (T21+) can assume reliable "logged in" state. New
+  **`lib/stores/auth.ts`** (zustand, ADR-007): `user`/`accessToken`/
+  `status` (`idle`/`loading`/`authenticated`/`unauthenticated`) — the
+  access token is memory-only, never persisted (14_Security.md), so a
+  full page reload always resets to `idle`. New **`lib/auth/
+  session.ts`**: `ensureAuthResolved()` restores the session from the
+  httpOnly refresh cookie on first load (calls `/auth/refresh`),
+  deduped across concurrent `AuthGuard` mounts via a module-level
+  promise. **`lib/api/client.ts`** now attaches `Authorization: Bearer`
+  from the store to every request and, on a 401 from a non-`/auth/*`
+  endpoint, silently retries once via the same refresh dance, clearing
+  the store (logout-everywhere) if the cookie itself is invalid; `/auth/*`
+  requests are deliberately excluded from the retry (they carry no
+  token, and a bad-login 401 isn't a token-expiry signal) — this also
+  avoids a real import cycle (`client.ts` reads the store directly
+  rather than importing `endpoints/auth.ts`'s `refresh()`, and only
+  takes a type-only import from it for `TokenResponse`). New
+  **`components/shared/AuthGuard.tsx`** (Tier 2, `06_Component_Library.md`):
+  renders a skeleton while `ensureAuthResolved` resolves, redirects an
+  unauthenticated visitor to `/login?returnTo=<path>`, and redirects an
+  authenticated visitor whose role isn't allowed for the portal home.
+  Wired into `app/(broker)/broker/layout.tsx` (`allowedRoles: [broker]`)
+  and `app/(admin)/admin/layout.tsx` (`allowedRoles: [admin]`) — both
+  layouts previously had a literal "Auth guard added in Phase 2"
+  placeholder comment, now resolved. **`LoginForm.tsx`** updated to
+  actually call `setAuth()` on success (it previously redirected to `/`
+  without ever populating the store — a real gap this closed) and to
+  honor `?returnTo=` via `useSearchParams` (wrapped in `<Suspense>` in
+  `app/login/page.tsx` per Next.js's static-render requirement for that
+  hook). `tsc`/`eslint`/`next build` all clean. **Live-verified with
+  Playwright against the real backend + Supabase dev DB** (two
+  throwaway users, one broker one client, created via real signup +
+  dev-logged email OTP, deleted afterward): logged-out visit to
+  `/broker/dashboard` → redirected to `/login?returnTo=%2Fbroker%2Fdashboard`
+  → login → landed back on `/broker/dashboard` exactly; a full hard
+  page reload while authenticated correctly rehydrated the session from
+  the cookie with no bounce to login (confirming `ensureAuthResolved`
+  actually works, not just compiles); a client-role login visiting
+  `/broker/dashboard` was correctly redirected to `/`.
+- **P2-T21 shipped 2026-07-16** — Profile & Settings layout shell, from
+  Figma "Client view" page, "profile and settings" section (node
+  `145:4686`): a 220px sidebar (user card, "Profile" nav group —
+  Account/My Properties/Purchase History/Loan Applications/Documents —
+  and "Settings" nav group — Notifications/Security/Billing — plus a
+  promo card) next to a content area, still inside the normal
+  TopNavBar/Footer chrome (unlike Broker/Admin, which replace that
+  chrome with their own portal shell). Just the shell — all 8 tabs are
+  `EmptyState` placeholders for now, filled in one at a time next. New
+  **`lib/api/endpoints/users.ts`** (`getMe()` against `GET /users/me`,
+  needed for the sidebar's `avatar_url`/`is_email_verified` — richer
+  than the auth endpoints' slim `UserOut`). New
+  **`features/profile/ProfileSidebar.tsx`** — a plain flex column, not
+  a reuse of the shadcn app-shell `Sidebar` primitives Broker/Admin use
+  (those are fixed-position/off-canvas, meant to replace a portal's
+  entire chrome; Client Profile keeps the marketing site's own).
+  Figma's "Premium Member"/star-rating/"Premium Support" card content
+  has no backing field on the `User` model — used the real
+  `is_email_verified` flag instead of fabricating an account tier, and
+  simplified the promo card to a plain "Contact Support" mailto link.
+  **Flag if a real premium-tier concept gets designed later — this is a
+  deliberate simplification, not yet reconciled with Figma.** New
+  **`app/(client)/profile/layout.tsx`** (`AuthGuard` allowing every
+  role, since client/broker/admin all have their own account) +
+  8 placeholder route pages + a bare `/profile` redirect to
+  `/profile/account`. **`TopNavBar.tsx`** is now auth-aware (shows the
+  user's first name → `/profile/account` when logged in), which needed
+  `ensureAuthResolved()` called from `TopNavBar` itself, not just
+  `AuthGuard` — it renders on every page, including ones with no guard.
+  **A real concurrency bug this surfaced, fixed along the way:**
+  `lib/api/client.ts`'s `refreshAccessToken()` and
+  `lib/auth/session.ts`'s `ensureAuthResolved()` were two independent
+  single-flight guards, each calling `POST /auth/refresh` directly with
+  no coordination — calling `ensureAuthResolved()` from `TopNavBar`
+  alongside a real protected query (`getMe()`) on the same page load
+  meant both could fire at once, sending the same one-time-use
+  refresh-token cookie twice; the backend correctly treated the second
+  arrival as a replay (P2-T05's reuse-detection) and revoked the whole
+  session — logging the user out mid-navigation with no attacker
+  involved. Confirmed live (a hard reload of `/profile/security`
+  produced a second `POST /auth/refresh → 401` and a genuinely dead
+  session), fixed by making `ensureAuthResolved()` delegate to the
+  now-exported `refreshAccessToken()` instead of calling `/auth/refresh`
+  itself, so every caller shares one in-flight promise. Re-verified the
+  identical scenario clean afterward. `tsc`/`eslint`/`next build` all
+  clean (all 8 routes + `/profile` in the build's route table).
+  Live-verified with Playwright against the real backend + Supabase dev
+  DB (`hello@thesketchystudio.com`, cleared via
+  `scripts/delete_test_user.py` before and after): full signup → OTP →
+  auto-login → `TopNavBar` showing "Test" → `/profile/account` with real
+  name/initials/verified badge → tab navigation → the concurrency bug →
+  fix → re-login → clean hard reload. **Known gap, not fixed here:**
+  `TopNavBar` is transparent until 40px of scroll (designed for the
+  homepage's dark hero); on a light-background page like Profile the
+  nav is barely legible for that first scroll distance — pre-existing,
+  not introduced here, but this is the first non-hero page to expose
+  it. **Fixed same day as the T22 visual-accuracy pass below.**
+- **P2-T22 shipped 2026-07-16** — Account tab real content (Figma node
+  `145:4686`'s "Account Information" + "Buyer Profile" sections),
+  replacing T21's placeholder. Full Name/Email edit via the existing
+  `PATCH /users/me`; Phone Number renders disabled/read-only since
+  `UserUpdateRequest` has no `phone` field at all (`User.phone` is
+  immutable post-signup by design — checked the schema directly rather
+  than assuming); Preferred Language + the whole Buyer Profile section
+  (Budget Range, Preferred Location, Property Type, Buyer Intent) have no
+  dedicated columns and live in the `preferences` JSONB blob T20 built
+  for exactly this. Since `user_service.update_me` fully replaces
+  `preferences` rather than merging, every save spreads the
+  currently-loaded preferences first so a future tab can't silently wipe
+  this one's keys. Dropped Figma's "Last changed 4 months ago" under
+  Password — nothing tracks a password-specific timestamp, and the
+  generic `updated_at` column would be misleading. New
+  **`lib/api/endpoints/users.ts`** additions (`updateMe`,
+  `changePassword`), new **`lib/validation/profile.ts`**, new
+  **`features/profile/AccountTab.tsx`** and
+  **`features/profile/ChangePasswordDialog.tsx`** (reuses the shared
+  `Modal` + existing `PasswordStrengthMeter`). **Two real bugs found and
+  fixed live:** (1) the Preferred Language dropdown showed its
+  placeholder instead of the real saved value after every reload, even
+  though the value was confirmed correct in the database — caused by
+  building the form with react-hook-form's `values` option on a
+  component that conditionally hid the `<form>` (and its
+  `Controller`-bound Select) behind a loading skeleton, racing the
+  Select's field registration against the values-sync effect on first
+  paint; plain `register()`-bound inputs didn't hit this since RHF sets
+  their DOM value imperatively regardless of registration timing. Fixed
+  by splitting into an outer loading-gate and an inner form that only
+  mounts once real data exists, using `defaultValues` (set once) instead
+  of `values` (synced repeatedly) — no race left to have. (2) Confirmed
+  the T21 refresh-concurrency fix generalizes: rapid overlapping
+  password-change submissions produced a `401 → refresh → 401 → 204` log
+  sequence that looked alarming at first, but only one actual
+  `POST /auth/refresh` fired (the shared single-flight guard worked),
+  and a direct login with the new password confirmed the change fully
+  succeeded. `tsc`/`eslint`/`next build` all clean. Live-verified with
+  Playwright + the real Supabase dev DB end-to-end (signup → save
+  profile fields → hard-reload persistence check → wrong/correct
+  password change → real login with the new password); test user
+  deleted afterward. **Tooling note:** `.claude/settings.local.json` was
+  updated this session to pre-approve every Playwright MCP tool (plus a
+  `mcp__playwright__*` wildcard) since only ~10 of ~23 tool names were
+  previously listed — but permission grants load once at session start,
+  so this takes effect next session, not immediately; verification for
+  T22 used `browser_navigate`/`browser_evaluate` instead of
+  `browser_snapshot` to work around that mid-session gap.
+- **P2-T22 visual-accuracy follow-up, same day** — you compared a
+  screenshot of the built Account page directly against the Figma
+  mockup and flagged real mismatches: wrong colors, boxed inputs instead
+  of underlines, no button-color match. Root cause: the first T22 pass
+  used generic shadcn primitives (`Input`/`Button`/`Select` defaults)
+  instead of this screen's actual Figma fills/fonts. Re-pulled
+  `get_design_context` per-node (sidebar, buttons, fields, headings) —
+  the earlier whole-page XML dump only had layout, not colors/fonts.
+  **Key finding: this screen's primary-action color is near-black
+  `#1a1a1a` (`--brand-primary-600`, already in `globals.css` from T20),
+  not the app's green `--primary` token** — matches the signup/login
+  pages' own black CTA buttons; the shadcn scaffold's green default was
+  never this screen's real color. Every field is underline-style
+  (`border-b` only), not boxed. Rebuilt `ProfileSidebar.tsx` and
+  `AccountTab.tsx` with exact colors/fonts/spacing (new `UnderlineField`
+  helper, `Select`'s trigger restyled to match). One color had no brand
+  token yet — Figma's "Accent Green/100" (`#f4fef1`) — added as
+  `--brand-green-100` in `globals.css`, extending T20's existing 100–900
+  scale rather than hardcoding it. Slate grays (`#64748b`/`#94a3b8`/
+  `#f1f5f9`) confirmed as plain Tailwind defaults with no brand
+  equivalent (already used directly elsewhere, e.g. `TopNavBar.tsx`), so
+  used the matching Tailwind slate utilities rather than inventing new
+  tokens. `tsc`/`eslint`/`next build` all clean; live-verified with a
+  fresh Playwright screenshot compared directly against the Figma
+  reference (used the same name, "Arjun Mehta", as the reference
+  screenshot for an apples-to-apples check) — active nav/avatar badge/
+  Save button all correctly near-black, fields underlined, Preferred
+  Language + Save Changes still functioning post-restyle. **Known gap,
+  not addressed:** Figma's logged-in-state top nav is a different design
+  entirely (search icon, notification bell, avatar photo, no "List
+  Property"/name button) — none of which exists yet; `TopNavBar.tsx`
+  still shows the same nav for both logged-in and logged-out visitors.
+  Flagged as a separate, larger task (implies building search/
+  notifications features that don't exist yet), not folded into this
+  color-accuracy pass.
+- **TopNavBar opaque-on-non-hero-pages fix, same day** — the flagged
+  gap above (nav text invisible at the top of the Profile page) fixed
+  on your explicit instruction: frontend-only, no backend changes.
+  `TopNavBar.tsx` now checks `usePathname() === "/"` — only the
+  homepage gets the transparent-until-40px-scroll treatment (it has a
+  dark hero image behind it); every other `(client)` page renders the
+  nav in its opaque/dark-text state from the very first frame, no
+  scroll dependency. One conditional, no new props, no other files
+  touched. `tsc`/`eslint`/`next build` clean; live-verified with
+  Playwright — homepage confirmed still transparent-over-hero at the
+  top (unchanged), `/profile/account` confirmed fully legible with zero
+  scroll (logo, nav links, and the user's name all clearly dark-on-light
+  from the first render).
+- **P2-T23 shipped 2026-07-20** — Notifications tab, the first of the
+  7 remaining Profile & Settings tabs to get real content (Account/T22
+  was previously the only one). Picked over Security/Billing after
+  actually checking each tab's Figma design against the real backend:
+  Security's design needs 2FA (deferred to P4) and a privacy/data-export
+  section with no backend at all; Billing's design is a full realized
+  payments/subscription screen (saved cards, invoices), nowhere close
+  to the architecture doc's "placeholder" description and with no
+  payments backend planned. Notifications was the only tab that's just
+  channel toggles with no missing dependency. New
+  `features/profile/NotificationsTab.tsx`: 5 channels (Property Match
+  Alerts / Market Volatility / Private Viewings / Offer Status / EMI
+  Reminders) × Email/Push checkboxes, stored under
+  `preferences.notification_channels` — same free-form JSONB blob T20/T22
+  already use, no backend changes needed. Colors/spacing pulled directly
+  from Figma's `get_design_context` this time, avoiding T22's
+  generic-shadcn-then-fix detour. Playwright's MCP server was
+  disconnected earlier in the session; once it reconnected, verified
+  both the API contract (backend worktree + real Supabase dev DB via
+  curl: exact `PATCH /users/me` payload → clean unchanged `GET`) and,
+  live in a real browser, the full UI flow — logged in through
+  `/login`, loaded `/profile/notifications`, confirmed rendered
+  checkbox state matched what was just saved, toggled a checkbox,
+  saved (`PATCH → 200`, button correctly re-disabled), and screenshot-
+  compared against the Figma reference (close match). `tsc`/`eslint`/
+  `next build` all clean.
+- **Checkbox checkmark contrast bugfix, same day** — you compared a
+  screenshot against Figma and flagged the checked boxes looked like
+  plain filled squares. Confirmed via `browser_evaluate` on the live
+  page rather than assuming: the checkmark icon's color resolved to
+  `rgb(9,9,9)` against a `rgb(26,26,26)` box — a near-invisible near-
+  black-on-near-black. Fixed by adding `data-[state=checked]:
+  text-background` to both checkboxes in `NotificationsTab.tsx`
+  (`--background` is `#fefeff`; matches `AccountTab.tsx`'s existing
+  `text-background`-on-dark-bg convention). Re-verified: icon color now
+  `rgb(254,254,255)`, confirmed visibly correct in a zoomed screenshot.
+  `tsc`/`eslint` clean.
+- **Forgot/reset-password flow shipped 2026-07-21** — from Figma's
+  "password reset" group (Onboarding page, node `470:500`), found via
+  a direct link you supplied (the earlier `143:4685` "reset" node
+  turned out to be an older/alternate design, not this one). Three
+  Figma frames: reused Login, "Check your inbox!" (node `470:603`),
+  and "Reset your password." (node `470:713`) — no "enter your email"
+  frame exists, so `EmailForm` in the new
+  `features/auth/ForgotPasswordFlow.tsx` is a minimal addition matching
+  the same split-shell visual language rather than a literal Figma
+  pull. New `app/forgot-password/page.tsx`,
+  `features/auth/ResetPasswordForm.tsx` (reads `?token=` from the
+  emailed link via `useSearchParams`), `app/reset-password/page.tsx`.
+  New `forgotPassword`/`resetPassword` functions in
+  `lib/api/endpoints/auth.ts` and matching zod schemas in
+  `lib/validation/auth.ts`. `LoginForm.tsx`'s "Forgot password?" link
+  (previously a dead toast) now routes to `/forgot-password`. Backend
+  needed no changes — `POST /auth/password/forgot` /
+  `POST /auth/password/reset` and real Resend delivery for the reset
+  email already existed on `feature/phase_2_backend`
+  (`efb5f9a`, 2026-07-17, a prior session not reflected in memory at
+  the time this task started) by the time this shipped.
+  **Real bug found and fixed during live verification, not a design or
+  delivery problem:** repeatedly switching this local checkout between
+  `feature/phase_2_backend` and `feature/phase_2_frontend` mid-session
+  (to keep backend-only edits off the frontend branch) left the
+  already-running `uvicorn --reload` backend process serving whichever
+  branch happened to be checked out on disk at reload time —
+  `feature/phase_2_frontend`, which still carries the pre-P2-T30
+  `forgot_password()` that only logs the token and never calls Resend.
+  Every "real" reset request during testing returned a correct `204`
+  and logged a token with no exception, so nothing looked wrong until
+  the emails simply never arrived while direct-to-Resend diagnostic
+  curls did. Fixed by adding a permanent
+  **`../homigrow-backend-wt` git worktree** checked out to
+  `feature/phase_2_backend` and running the backend from there instead
+  — confirmed fixed by seeing the previously-invisible
+  `httpx: HTTP Request: POST https://api.resend.com/emails "HTTP/1.1
+  200 OK"` log line appear for the first time, and a real email
+  arriving. **Use this worktree for all future backend-server runs
+  during frontend sessions** rather than switching this checkout's
+  branch, to prevent this recurring. Live-verified end-to-end against
+  the real backend + Supabase dev DB + real Resend inbox (not just
+  dev-log token reads): requested reset → real email received →
+  followed the real link → set new password → redirected to `/login` →
+  old password rejected, new password logs in → replaying the
+  consumed token correctly shows "invalid or expired" (fingerprint
+  single-use mechanism confirmed). `tsc`/`eslint`/`next build` clean.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

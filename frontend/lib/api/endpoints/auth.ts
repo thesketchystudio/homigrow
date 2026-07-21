@@ -56,8 +56,8 @@ export function requestOtp(payload: OTPRequestPayload): Promise<void> {
   return apiRequest<void>("/auth/otp/request", { method: "POST", body: payload });
 }
 
-export function verifyOtp(payload: OTPVerifyPayload): Promise<void> {
-  return apiRequest<void>("/auth/otp/verify", { method: "POST", body: payload });
+export function verifyOtp(payload: OTPVerifyPayload): Promise<TokenResponse | void> {
+  return apiRequest<TokenResponse | void>("/auth/otp/verify", { method: "POST", body: payload });
 }
 
 export function login(payload: LoginPayload): Promise<TokenResponse> {
@@ -70,4 +70,21 @@ export function refresh(): Promise<TokenResponse> {
 
 export function logout(): Promise<void> {
   return apiRequest<void>("/auth/logout", { method: "POST" });
+}
+
+export type ForgotPasswordPayload = {
+  email: string;
+};
+
+export type ResetPasswordPayload = {
+  token: string;
+  new_password: string;
+};
+
+export function forgotPassword(payload: ForgotPasswordPayload): Promise<void> {
+  return apiRequest<void>("/auth/password/forgot", { method: "POST", body: payload });
+}
+
+export function resetPassword(payload: ResetPasswordPayload): Promise<void> {
+  return apiRequest<void>("/auth/password/reset", { method: "POST", body: payload });
 }

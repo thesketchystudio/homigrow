@@ -22,7 +22,6 @@ from uuid import UUID
 
 import jwt
 from sqlalchemy import or_
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -100,6 +99,15 @@ def _issue_refresh_token(
     return raw_token
 
 
+def _issue_session(
+    db: Session, user: User, user_agent: Optional[str], ip: Optional[str]
+) -> tuple[str, str]:
+    """Mints an access token + refresh token pair for an already-authenticated user (login, and signup-verify)."""
+    access_token = create_access_token(user.id, user.role.value)
+    refresh_token = _issue_refresh_token(db, user, user_agent, ip)
+    return access_token, refresh_token
+
+
 def _issue_otp(db: Session, email: str, purpose: OTPPurpose) -> None:
     """
     Generates, hashes, and stores a 6-digit OTP, then delivers it by
@@ -143,7 +151,14 @@ def request_otp(db: Session, email: str, purpose: OTPPurpose) -> None:
     db.commit()
 
 
-def verify_otp(db: Session, email: str, code: str, purpose: OTPPurpose) -> None:
+def verify_otp(
+    db: Session,
+    email: str,
+    code: str,
+    purpose: OTPPurpose,
+    user_agent: Optional[str] = None,
+    ip: Optional[str] = None,
+) -> Optional[tuple[str, str, User]]:
     """
     Verifies a submitted OTP against the latest unconsumed code issued
     for (email, purpose). A wrong code counts toward the 5-attempt cap
@@ -152,6 +167,13 @@ def verify_otp(db: Session, email: str, code: str, purpose: OTPPurpose) -> None:
     (matches the Figma design's "request a new one" recovery path for
     all three cases, rather than a distinct error per case). On success
     for a verifying purpose, flips the matching user's is_email_verified.
+
+    For OTPPurpose.signup specifically, also mints a full session
+    (access + refresh token), returned so the route can log the user
+    straight in — they already proved both their password (at signup)
+    and control of their email (this code) in the same flow, so sending
+    them to /login to re-enter the password a moment later would just
+    be friction. Every other purpose returns None (no session change).
     """
     row = (
         db.query(OTPCode)
@@ -170,12 +192,22 @@ def verify_otp(db: Session, email: str, code: str, purpose: OTPPurpose) -> None:
 
     row.consumed_at = now
 
+    user = None
     if purpose in _EMAIL_VERIFYING_PURPOSES:
         user = db.query(User).filter(User.email == email).first()
         if user is not None:
             user.is_email_verified = True
 
+    session = None
+    if purpose == OTPPurpose.signup and user is not None:
+        access_token, refresh_token = _issue_session(db, user, user_agent, ip)
+        session = (access_token, refresh_token, user)
+
     db.commit()
+    if session is not None:
+        db.refresh(user)
+
+    return session
 
 
 def signup(
@@ -190,9 +222,16 @@ def signup(
     Creates a user (and a broker_profile row when role=broker), then
     issues a signup-verification OTP by email. Raises 409 PHONE_TAKEN if
     the phone is already registered, 409 EMAIL_TAKEN on a duplicate email.
+    Both checks run before any insert: `db.flush()` below executes the
+    pending INSERT immediately (needed to assign user.id for the
+    broker_profile FK), so a unique-constraint violation would otherwise
+    surface at flush time, outside any try/except around db.commit().
     """
     if db.query(User).filter(User.phone == phone).first() is not None:
         raise ConflictError("PHONE_TAKEN", "This phone number is already registered.")
+
+    if db.query(User).filter(User.email == email).first() is not None:
+        raise ConflictError("EMAIL_TAKEN", "This email is already registered.")
 
     user = User(
         phone=phone,
@@ -208,13 +247,7 @@ def signup(
         db.add(BrokerProfile(user_id=user.id))
 
     _issue_otp(db, email, OTPPurpose.signup)
-
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise ConflictError("EMAIL_TAKEN", "This email is already registered.")
-
+    db.commit()
     db.refresh(user)
     return user
 
@@ -260,8 +293,7 @@ def login(
     user.failed_login_attempts = 0
     user.locked_until = None
 
-    access_token = create_access_token(user.id, user.role.value)
-    refresh_token = _issue_refresh_token(db, user, user_agent, ip)
+    access_token, refresh_token = _issue_session(db, user, user_agent, ip)
     db.commit()
     db.refresh(user)
 

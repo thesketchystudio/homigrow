@@ -10,14 +10,14 @@ import { useMutation } from "@tanstack/react-query";
 import { AlertCircle, RotateCcw } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { ApiError } from "@/lib/api/client";
-import { requestOtp, verifyOtp } from "@/lib/api/endpoints/auth";
+import { requestOtp, verifyOtp, type TokenResponse } from "@/lib/api/endpoints/auth";
 import { OTPPurpose } from "@/lib/enums";
 import { AuthProgressBar } from "@/features/auth/AuthProgressBar";
 import { cn } from "@/lib/utils";
 
 type OtpVerifyStepProps = {
   email: string;
-  onVerified: () => void;
+  onVerified: (session: TokenResponse) => void;
 };
 
 export function OtpVerifyStep({ email, onVerified }: OtpVerifyStepProps) {
@@ -25,7 +25,10 @@ export function OtpVerifyStep({ email, onVerified }: OtpVerifyStepProps) {
 
   const verifyMutation = useMutation({
     mutationFn: () => verifyOtp({ email, code, purpose: OTPPurpose.signup }),
-    onSuccess: onVerified,
+    // This step only ever verifies the signup purpose, which the backend
+    // always answers with a TokenResponse (never the bare 204 other
+    // purposes get) — see auth_service.verify_otp.
+    onSuccess: (data) => onVerified(data as TokenResponse),
   });
 
   const resendMutation = useMutation({
