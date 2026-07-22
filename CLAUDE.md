@@ -951,6 +951,115 @@ A reader should understand the code from the comment alone.
   browser signup writing `{"city": "Bengaluru", "state": "Karnataka"}`
   to the real Supabase dev DB; all test users deleted afterward via
   `scripts/delete_test_user.py`.
+- **Buyer-preference wizard (Phase B of signup) shipped 2026-07-22** —
+  the 6-screen buyer-preference wizard flagged as unbuilt above (budget,
+  property type, investment goal, exit strategy, development
+  stage/amenities, current situation) now runs as steps 4-9 of the
+  signup wizard, immediately after email OTP verify and before landing
+  on `/`. Pulled live from Figma (nodes `418:994`, `457:398`, `457:593`,
+  `457:913`, `457:1113`, `457:1317`). **Backend needed zero changes** —
+  `User.preferences` is an untyped JSONB dict and `PATCH /users/me`
+  already accepts arbitrary nested objects. Answers are namespaced under
+  `preferences.buyer_preferences` (not flat top-level keys) to avoid
+  near-miss collisions with the Account tab's existing `budget_range`/
+  `property_type`/`preferred_location`/`buyer_intent` keys in the same
+  blob, mirroring the `notification_channels` nesting precedent. New
+  `frontend/features/auth/preferences/` subfolder: 6 step components +
+  shared primitives (`PreferenceWizardFooter`, `PillGroup`,
+  `SelectableCardGroup`, `ChecklistGroup`, `ChipMultiSelect`,
+  `CityMultiSelectChips`, `PropertyTypeCardGrid`, `BudgetRangeSlider` —
+  the last wraps the existing shadcn `Slider`, already dual-thumb
+  capable via `value={[min,max]}`, no new dependency). New `formatINR()`
+  helper in `lib/utils.ts`. `SignupWizard.tsx`'s `WizardStep` union grew
+  from 3 to 9 steps; `AuthProgressBar`'s existing `totalSteps` prop +
+  fallback formula handled the new steps with no component change
+  (Figma itself statically labels every Phase B screen "Step 3 of 3" —
+  a design-file gap already noted in memory, not replicated; real
+  incrementing numbers ship instead). **Skip** (on every Phase B screen)
+  abandons the rest of the wizard with no save at all; **Continue on the
+  last screen** does `getMe()` → spread `{...me.preferences,
+  buyer_preferences}` → `updateMe()` → redirect home, `toast.error`-ing
+  but still completing signup on a failed save rather than stranding the
+  user. `tsc`/`eslint`/`next build` all clean. Live-verified with
+  Playwright against the real backend worktree + Supabase dev DB: full
+  signup → OTP verify → selections made on all 6 new screens → Continue
+  → confirmed via a direct DB query that `buyer_preferences` was written
+  correctly **and** the existing `city`/`state` from signup survived
+  untouched (full-replace-not-merge semantics handled correctly);
+  separately verified the Skip path (zero `/users/me` calls, no
+  `buyer_preferences` key written) from a second throwaway account.
+  Screenshot-compared 5 of 6 screens directly against the Figma
+  reference images — close visual match throughout. Both test users
+  deleted afterward via `scripts/delete_test_user.py`. Full writeup:
+  `docs/implementation/frontend/Phase_2_Implementation.md`.
+- **Account tab's Buyer Profile section unified with the wizard's
+  buyer_preferences, 2026-07-22** — after the wizard shipped (above), a
+  live DB check surfaced a real design gap: the Account tab
+  (`AccountTab.tsx`, P2-T22) still had its own 4 flat keys
+  (`budget_range`, `preferred_location`, `property_type`,
+  `buyer_intent`), completely disconnected from the wizard's structured
+  `preferences.buyer_preferences` object — a user who did the wizard
+  then opened their Account tab saw blank fields, and saving there wrote
+  a second, conflicting copy of the same concept (e.g.
+  `property_type: "Residential"` next to `buyer_preferences.
+  property_types: ["modernist_villas"]`), confirmed by inspecting a real
+  test user's row. Your explicit call: replace the flat keys entirely so
+  the Account tab reads from and writes to `buyer_preferences` — one
+  shared dataset, not two. `lib/validation/profile.ts`'s
+  `accountFormSchema` now has a nested `buyer_preferences` object
+  (`budget_min`/`budget_max`/`preferred_cities`/`property_types`/
+  `investment_goals` — the subset editable here) instead of the 4 flat
+  string fields. `AccountTab.tsx` reuses the wizard's own input
+  components for consistency (`BudgetRangeSlider`, `CityMultiSelectChips`,
+  `ChipMultiSelect` with locally-mirrored option lists, since each wizard
+  step file already defines its own options locally rather than a shared
+  export — same convention followed here). Only the 5 fields above are
+  editable on this tab; the rest of `BuyerPreferences` (`bedroom_preference`,
+  `buy_timeline`, `exit_strategies`, `target_hold_period`, `target_roi`,
+  `risk_tolerance`, `development_stage`, `amenities`, `current_situation`)
+  is preserved on save by spreading the existing `buyer_preferences`
+  object before applying the form's edits — a full-object replace would
+  have silently dropped whatever the wizard set for those fields. No
+  backend changes (same JSONB column). `tsc`/`eslint`/`next build` all
+  clean. Live-verified end-to-end with a fresh signup through the actual
+  wizard: DB confirmed `buyer_preferences` written with no old flat keys
+  at all; `/profile/account` then rendered the wizard's own answers
+  pre-filled (budget slider, selected city/property type/investment
+  goal chips all matched); you then manually added a second preferred
+  city on the page and saved — a follow-up DB query confirmed the new
+  city merged into `preferred_cities` while every wizard-only field
+  (`amenities`, `target_roi`, `buy_timeline`, `risk_tolerance`,
+  `exit_strategies`, `current_situation`, `development_stage`,
+  `bedroom_preference`, `target_hold_period`) was untouched, and no
+  stray flat keys reappeared. Test user deleted afterward.
+- **Null-phone React console error fixed, 2026-07-22** — signing in with
+  Google surfaced a real console error on `/profile/account`: `value`
+  prop on `input` should not be null (`AccountTab.tsx:204`, the Phone
+  Number field). Root cause: `User.phone` became nullable on the backend
+  in migration M5 (Google Sign-In accounts have no phone number), but
+  two frontend spots never caught up — `lib/api/endpoints/users.ts`'s
+  `UserRead.phone` type still declared `phone: string` (required), and
+  `AccountTab.tsx` passed `value={user.phone}` straight into a
+  controlled input with no null guard. Fixed: `UserRead.phone` is now
+  `string | null`; the input uses `value={user.phone ?? ""}` with a
+  `placeholder="Not provided"` and switches its helper text to "No phone
+  number on file (signed in with Google)." when null. `tsc`/`eslint`
+  clean. Confirmed live against a real Google-signed-in test account
+  (`phone: null`, `full_name` pulled from the Google profile) — console
+  error gone after the fix.
+- **`create_test_user.py`/`delete_test_user.py` given zero-argument
+  defaults, 2026-07-22** — both scripts previously required typing the
+  full email (and, for create, phone/name/password) every time. Since
+  `hello@thesketchystudio.com` is the only address actually used for
+  manual testing (Resend sandbox constraint), both scripts now default
+  to it with no arguments: `delete_test_user.py` alone deletes
+  `DEFAULT_TEST_EMAIL`; `create_test_user.py` alone creates it with a
+  fixed phone/name/password (`Preetham-test`) and prints the login
+  credentials. Explicit-argument usage is unchanged for anything else.
+  Not a signup+OTP shortcut for the Google-account null-phone scenario
+  specifically — `create_test_user.py` still makes a password-based
+  account; the Google path is only reachable via real Google Sign-In
+  matching the same email once the account exists.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
