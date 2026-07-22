@@ -12,7 +12,7 @@ export type BuyerPreferences = {
   budget_max?: number;
   preferred_cities?: string[];
   property_types?: string[];
-  bedroom_preference?: string;
+  bedroom_preference?: string[];
   investment_goals?: string[];
   buy_timeline?: string;
   exit_strategies?: string[];

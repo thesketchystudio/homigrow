@@ -1,8 +1,13 @@
 // features/auth/preferences/PreferenceWizardFooter.tsx
 // Back / Skip / Continue row repeated identically across all 6 Phase B
 // Figma frames (nodes 418:994-457:1317's "TertiaryButton" + outlined
-// "Skip" + gradient "Continue"). onBack is omitted on the first Phase B
-// screen, matching RoleSelectStep's existing no-back-on-step-1 precedent.
+// "Skip" + gradient "Continue"). onBack is intentionally omitted on the
+// first Phase B screen (nothing useful to go back to — re-showing the
+// already-completed OTP-verify screen wouldn't help the user) — Skip
+// keeps the same fixed width it has everywhere else (169px) but sits
+// flush against the left edge instead of leaving Back's usual space empty.
+
+import { cn } from "@/lib/utils";
 
 type PreferenceWizardFooterProps = {
   onBack?: () => void;
@@ -15,20 +20,21 @@ type PreferenceWizardFooterProps = {
 export function PreferenceWizardFooter({ onBack, onSkip, onContinue, continueLabel = "Continue", isSaving }: PreferenceWizardFooterProps) {
   return (
     <div className="flex w-full items-center justify-between">
-      <div className="flex items-center gap-4">
+      <div className="flex w-[256px] items-center gap-4">
         {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            className="border-b border-brand-secondary-800 font-heading text-[16px] font-bold text-brand-primary-800"
-          >
-            Back
+          <button type="button" onClick={onBack} className="flex h-[33px] shrink-0 items-center justify-center px-[16px]">
+            <span className="w-[39px] border-b border-brand-secondary-800 text-center font-heading text-[16px] font-bold text-brand-primary-800">
+              Back
+            </span>
           </button>
         )}
         <button
           type="button"
           onClick={onSkip}
-          className="rounded border border-brand-primary-100 bg-background p-[17px] font-heading text-[16px] font-bold text-brand-primary-400"
+          className={cn(
+            "flex items-center justify-center rounded border border-brand-primary-100 bg-background p-[17px] font-heading text-[16px] font-bold text-brand-primary-400",
+            onBack ? "flex-1" : "w-[169px]",
+          )}
         >
           Skip
         </button>

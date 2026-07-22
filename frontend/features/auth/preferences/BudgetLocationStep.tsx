@@ -20,7 +20,7 @@ export function BudgetLocationStep({ preferences, onChange, onSkip, onContinue }
   return (
     <div className="flex w-full flex-col gap-16">
       <div className="flex flex-col gap-8">
-        <AuthProgressBar step={4} totalSteps={9} />
+        <AuthProgressBar step={1} totalSteps={6} />
 
         <div className="flex flex-col gap-2">
           <h1 className="font-heading text-[36px] font-medium leading-[44px] text-brand-primary-700">Tell us about your next legacy.</h1>

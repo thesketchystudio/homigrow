@@ -1,14 +1,24 @@
 // features/auth/AuthProgressBar.tsx
-// "Onboarding" eyebrow + "Step X of 3" + progress track, shared by every
+// "Onboarding" eyebrow + "Step X of N" + progress track, shared by every
 // step of the signup wizard (Figma: ProgressBar, node 416:625/416:914).
+// Two independent phases share this component: Phase A (role -> form ->
+// OTP verify, totalSteps=3) and Phase B (the 6-screen buyer-preference
+// wizard, totalSteps=6) — Phase B restarts its own "Step 1 of 6" count
+// rather than continuing Phase A's numbering, so its fill percentage must
+// always come from the step/totalSteps formula, never from Phase A's
+// hardcoded map (which would otherwise collide on steps 1-3).
 
-const STEP_FILL_PERCENT: Record<number, number> = {
+const PHASE_A_TOTAL_STEPS = 3;
+const PHASE_A_FILL_PERCENT: Record<number, number> = {
   1: 27.5,
   2: 72.8,
   3: 100,
 };
 
-export function AuthProgressBar({ step, totalSteps = 3 }: { step: number; totalSteps?: number }) {
+export function AuthProgressBar({ step, totalSteps = PHASE_A_TOTAL_STEPS }: { step: number; totalSteps?: number }) {
+  const fillPercent =
+    totalSteps === PHASE_A_TOTAL_STEPS ? (PHASE_A_FILL_PERCENT[step] ?? (step / totalSteps) * 100) : (step / totalSteps) * 100;
+
   return (
     <div className="flex w-full flex-col gap-3">
       <div className="flex items-center justify-between">
@@ -21,10 +31,7 @@ export function AuthProgressBar({ step, totalSteps = 3 }: { step: number; totalS
         </span>
       </div>
       <div className="h-[2px] w-full bg-black/[0.08]">
-        <div
-          className="h-[2px] bg-foreground transition-[width]"
-          style={{ width: `${STEP_FILL_PERCENT[step] ?? (step / totalSteps) * 100}%` }}
-        />
+        <div className="h-[2px] bg-foreground transition-[width]" style={{ width: `${fillPercent}%` }} />
       </div>
     </div>
   );

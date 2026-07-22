@@ -41,7 +41,7 @@ export function DevelopmentStageStep({ preferences, onChange, onBack, onSkip, on
   return (
     <div className="flex w-full flex-col gap-16">
       <div className="flex flex-col gap-8">
-        <AuthProgressBar step={8} totalSteps={9} />
+        <AuthProgressBar step={5} totalSteps={6} />
 
         <div className="flex flex-col gap-6">
           <h2 className="font-heading text-[20px] text-brand-primary-400">Development Stage</h2>

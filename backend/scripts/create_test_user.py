@@ -11,9 +11,11 @@ Usage:
     python scripts/create_test_user.py <email> <phone> <full_name> <password> [role]
 
     role defaults to "client" if omitted. With no arguments, creates
-    DEFAULT_EMAIL/DEFAULT_PHONE/DEFAULT_FULL_NAME/DEFAULT_PASSWORD so a
-    delete_test_user.py + create_test_user.py round trip always leaves
-    the same login-ready account behind.
+    DEFAULT_EMAIL/DEFAULT_PHONE/DEFAULT_FULL_NAME/DEFAULT_PASSWORD (plus
+    DEFAULT_CITY/DEFAULT_STATE in preferences) so a delete_test_user.py +
+    create_test_user.py round trip always leaves the same login-ready
+    account behind — the one standing test user reused across manual
+    testing and Playwright verification alike.
 """
 
 import sys
@@ -31,15 +33,30 @@ from app.models.user import User  # noqa: E402
 # Matches delete_test_user.py's DEFAULT_TEST_EMAIL, so the two scripts
 # round-trip the same account.
 DEFAULT_EMAIL = "hello@thesketchystudio.com"
-DEFAULT_PHONE = "9876543210"
+DEFAULT_PHONE = "8789241225"
 DEFAULT_FULL_NAME = "Arjun Mehta"
 DEFAULT_PASSWORD = "Preetham-test"
 DEFAULT_ROLE = "client"
+DEFAULT_CITY = "Bengaluru"
+DEFAULT_STATE = "Karnataka"
 
 
-def create_test_user(email: str, phone: str, full_name: str, password: str, role: str = "client") -> None:
+def create_test_user(
+    email: str,
+    phone: str,
+    full_name: str,
+    password: str,
+    role: str = "client",
+    city: str | None = None,
+    state: str | None = None,
+) -> None:
     db = SessionLocal()
     try:
+        preferences = {}
+        if city:
+            preferences["city"] = city
+        if state:
+            preferences["state"] = state
         user = User(
             phone=phone,
             email=email,
@@ -47,6 +64,7 @@ def create_test_user(email: str, phone: str, full_name: str, password: str, role
             full_name=full_name,
             role=UserRole(role),
             is_email_verified=True,
+            preferences=preferences,
         )
         db.add(user)
         db.commit()
@@ -57,7 +75,7 @@ def create_test_user(email: str, phone: str, full_name: str, password: str, role
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
-        create_test_user(DEFAULT_EMAIL, DEFAULT_PHONE, DEFAULT_FULL_NAME, DEFAULT_PASSWORD, DEFAULT_ROLE)
+        create_test_user(DEFAULT_EMAIL, DEFAULT_PHONE, DEFAULT_FULL_NAME, DEFAULT_PASSWORD, DEFAULT_ROLE, DEFAULT_CITY, DEFAULT_STATE)
         print(f"Log in with: {DEFAULT_EMAIL} / {DEFAULT_PASSWORD}")
     elif len(sys.argv) in (5, 6):
         create_test_user(*sys.argv[1:6])
