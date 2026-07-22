@@ -21,7 +21,6 @@ const editableBuyerPreferencesSchema = z.object({
 export const accountFormSchema = z.object({
   full_name: z.string().trim().min(1, "Full name is required"),
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
-  preferred_language: z.string(),
   buyer_preferences: editableBuyerPreferencesSchema,
 });
 export type AccountFormValues = z.infer<typeof accountFormSchema>;

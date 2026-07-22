@@ -53,7 +53,7 @@ export function PropertyTypeCardGrid({ value, onChange }: PropertyTypeCardGridPr
                   {selected ? <Check size={14} className="text-brand-primary-800" /> : <Plus size={12} className="text-background" />}
                 </div>
               </div>
-              <p className="font-heading text-[24px] leading-[30px] tracking-[-0.5px] text-background">{type.label}</p>
+              <p className="text-left font-heading text-[24px] leading-[30px] tracking-[-0.5px] text-background">{type.label}</p>
             </div>
           </button>
         );

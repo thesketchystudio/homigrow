@@ -28,7 +28,7 @@ export function CurrentSituationStep({ preferences, onChange, onBack, onSkip, on
   return (
     <div className="flex w-full flex-col gap-16">
       <div className="flex flex-col gap-6">
-        <AuthProgressBar step={9} totalSteps={9} />
+        <AuthProgressBar step={6} totalSteps={6} />
 
         <h2 className="font-heading text-[20px] text-brand-primary-800">Your current situation</h2>
         <div className="rounded-lg bg-brand-secondary-500 p-6">

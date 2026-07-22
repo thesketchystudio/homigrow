@@ -31,7 +31,7 @@ export function PropertyTypeStep({ preferences, onChange, onBack, onSkip, onCont
   return (
     <div className="flex w-full flex-col gap-16">
       <div className="flex flex-col gap-8">
-        <AuthProgressBar step={5} totalSteps={9} />
+        <AuthProgressBar step={2} totalSteps={6} />
 
         <div className="flex flex-col gap-6">
           <h2 className="font-heading text-[20px] text-brand-primary-700">Preferred Type of Home</h2>
@@ -48,9 +48,10 @@ export function PropertyTypeStep({ preferences, onChange, onBack, onSkip, onCont
         <div className="flex flex-col gap-6">
           <h2 className="font-heading text-[20px] text-brand-primary-700">How many bedrooms?</h2>
           <PillGroup
+            multiple
             variant="compact"
             options={BEDROOM_OPTIONS}
-            value={preferences.bedroom_preference ?? null}
+            value={preferences.bedroom_preference ?? []}
             onChange={(bedroom_preference) => onChange({ bedroom_preference })}
           />
         </div>

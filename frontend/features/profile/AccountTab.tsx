@@ -10,9 +10,11 @@
 //
 // Full Name/Email are real User columns; Phone Number has no update path
 // on the backend (User.phone is immutable post-signup) so it renders
-// read-only; Preferred Language has no dedicated column and is stored in
-// the free-form `preferences` JSONB blob the backend already exposes for
-// exactly this purpose (P2-T20). The Buyer Profile section reads/writes
+// read-only, same as Location — the city/state collected at signup
+// (P2-T21's City/State fields), displayed here as a single combined,
+// non-editable "City, State" string read from `preferences.city`/`.state`
+// (flat top-level keys, see auth_service.signup) rather than exposed as
+// editable fields. The Buyer Profile section reads/writes
 // `preferences.buyer_preferences` directly — the same structured object
 // the signup wizard's 6-screen buyer-preference flow saves
 // (features/auth/preferences/types.ts) — rather than maintaining its own
@@ -34,7 +36,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChangePasswordDialog } from "@/features/profile/ChangePasswordDialog";
 import { BudgetRangeSlider, BUDGET_MIN, BUDGET_MAX } from "@/features/auth/preferences/BudgetRangeSlider";
@@ -46,8 +47,6 @@ import { getMe, updateMe, type UserRead } from "@/lib/api/endpoints/users";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { accountFormSchema, type AccountFormValues } from "@/lib/validation/profile";
-
-const LANGUAGE_OPTIONS = ["English", "Hindi", "Kannada", "Tamil", "Telugu", "Marathi", "Other"];
 
 // Mirrors the option values PropertyTypeCardGrid/InvestmentGoalStep use
 // (features/auth/preferences), as plain chips rather than the wizard's
@@ -82,7 +81,6 @@ function toFormValues(user: UserRead): AccountFormValues {
   return {
     full_name: user.full_name ?? "",
     email: user.email ?? "",
-    preferred_language: typeof prefs.preferred_language === "string" ? prefs.preferred_language : "",
     buyer_preferences: {
       budget_min: buyerPreferences.budget_min,
       budget_max: buyerPreferences.budget_max,
@@ -163,7 +161,6 @@ function AccountForm({ user }: { user: UserRead }) {
       email: values.email,
       preferences: {
         ...user.preferences,
-        preferred_language: values.preferred_language,
         buyer_preferences: {
           ...existingBuyerPreferences,
           ...values.buyer_preferences,
@@ -171,6 +168,10 @@ function AccountForm({ user }: { user: UserRead }) {
       },
     });
   };
+
+  const city = typeof user.preferences?.city === "string" ? user.preferences.city : "";
+  const state = typeof user.preferences?.state === "string" ? user.preferences.state : "";
+  const locationLabel = [city, state].filter(Boolean).join(", ");
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex max-w-3xl flex-col gap-8">
@@ -214,29 +215,16 @@ function AccountForm({ user }: { user: UserRead }) {
             </p>
           </div>
           <div className="flex flex-col gap-2">
-            <label htmlFor="preferred_language" className="font-heading text-brand-primary-400 text-[12px] font-bold tracking-[1.2px] uppercase">
-              Preferred Language
+            <label htmlFor="location" className="font-heading text-brand-primary-400 text-[12px] font-bold tracking-[1.2px] uppercase">
+              Location
             </label>
-            <Controller
-              control={control}
-              name="preferred_language"
-              render={({ field }) => (
-                <Select value={field.value || undefined} onValueChange={field.onChange}>
-                  <SelectTrigger
-                    id="preferred_language"
-                    className="font-body text-brand-primary-400 h-auto w-full rounded-none border-0 border-b-[0.8px] border-[rgba(38,38,38,0.5)] bg-transparent px-4 py-3 text-[16px] leading-[26px] shadow-none focus-visible:ring-0"
-                  >
-                    <SelectValue placeholder="Select a language" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LANGUAGE_OPTIONS.map((language) => (
-                      <SelectItem key={language} value={language}>
-                        {language}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+            <input
+              id="location"
+              value={locationLabel}
+              placeholder="Not provided"
+              disabled
+              readOnly
+              className="font-body text-brand-primary-400/50 border-b-[0.8px] border-[rgba(38,38,38,0.5)] bg-transparent px-4 py-3 text-[16px] leading-[26px] outline-none"
             />
           </div>
         </div>

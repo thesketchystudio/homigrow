@@ -36,7 +36,7 @@ export function InvestmentGoalStep({ preferences, onChange, onBack, onSkip, onCo
   return (
     <div className="flex w-full flex-col gap-16">
       <div className="flex flex-col gap-12">
-        <AuthProgressBar step={6} totalSteps={9} />
+        <AuthProgressBar step={3} totalSteps={6} />
 
         <div className="flex flex-col gap-6">
           <h2 className="font-heading text-[20px] text-brand-primary-700">What is your primary goal?</h2>

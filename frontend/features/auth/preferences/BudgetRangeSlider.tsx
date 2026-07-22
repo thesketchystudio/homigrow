@@ -39,7 +39,7 @@ export function BudgetRangeSlider({ min, max, onChange }: BudgetRangeSliderProps
           <p className="font-body text-[9px] font-semibold uppercase tracking-[2.25px] text-brand-primary-400">Minimum</p>
           <p className="font-body text-[18px] font-semibold text-brand-primary-700">{formatINR(min)}</p>
         </div>
-        <div className="flex flex-1 flex-col gap-2 rounded-lg border-b-2 border-brand-green-400 bg-brand-secondary-500 p-5">
+        <div className="flex flex-1 flex-col gap-2 rounded-lg bg-brand-secondary-500 p-5">
           <p className="font-body text-[9px] font-semibold uppercase tracking-[2.25px] text-brand-primary-400">Target</p>
           <p className="font-body text-[18px] font-semibold text-brand-primary-700">{formatINR(max)}</p>
         </div>

@@ -51,7 +51,7 @@ export function ExitStrategyStep({ preferences, onChange, onBack, onSkip, onCont
   return (
     <div className="flex w-full flex-col gap-16">
       <div className="flex flex-col gap-10">
-        <AuthProgressBar step={7} totalSteps={9} />
+        <AuthProgressBar step={4} totalSteps={6} />
 
         <div className="flex flex-col gap-2">
           <h1 className="font-heading text-[20px] text-brand-primary-700">How do you plan to exit this investment?</h1>
@@ -63,6 +63,11 @@ export function ExitStrategyStep({ preferences, onChange, onBack, onSkip, onCont
         <div className="flex flex-col gap-4">
           <p className="font-body text-[16px] font-medium text-brand-primary-400">Exit Approach — select all that apply</p>
           <SelectableCardGroup
+            showCheckIcon
+            cardPadding="p-[23px]"
+            cardMinHeight="min-h-[89px]"
+            cardGap="gap-[4px]"
+            labelClassName="text-[14px] leading-[20px]"
             options={EXIT_OPTIONS}
             value={preferences.exit_strategies ?? []}
             onChange={(exit_strategies) => onChange({ exit_strategies })}
