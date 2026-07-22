@@ -992,6 +992,46 @@ A reader should understand the code from the comment alone.
   reference images — close visual match throughout. Both test users
   deleted afterward via `scripts/delete_test_user.py`. Full writeup:
   `docs/implementation/frontend/Phase_2_Implementation.md`.
+- **Account tab's Buyer Profile section unified with the wizard's
+  buyer_preferences, 2026-07-22** — after the wizard shipped (above), a
+  live DB check surfaced a real design gap: the Account tab
+  (`AccountTab.tsx`, P2-T22) still had its own 4 flat keys
+  (`budget_range`, `preferred_location`, `property_type`,
+  `buyer_intent`), completely disconnected from the wizard's structured
+  `preferences.buyer_preferences` object — a user who did the wizard
+  then opened their Account tab saw blank fields, and saving there wrote
+  a second, conflicting copy of the same concept (e.g.
+  `property_type: "Residential"` next to `buyer_preferences.
+  property_types: ["modernist_villas"]`), confirmed by inspecting a real
+  test user's row. Your explicit call: replace the flat keys entirely so
+  the Account tab reads from and writes to `buyer_preferences` — one
+  shared dataset, not two. `lib/validation/profile.ts`'s
+  `accountFormSchema` now has a nested `buyer_preferences` object
+  (`budget_min`/`budget_max`/`preferred_cities`/`property_types`/
+  `investment_goals` — the subset editable here) instead of the 4 flat
+  string fields. `AccountTab.tsx` reuses the wizard's own input
+  components for consistency (`BudgetRangeSlider`, `CityMultiSelectChips`,
+  `ChipMultiSelect` with locally-mirrored option lists, since each wizard
+  step file already defines its own options locally rather than a shared
+  export — same convention followed here). Only the 5 fields above are
+  editable on this tab; the rest of `BuyerPreferences` (`bedroom_preference`,
+  `buy_timeline`, `exit_strategies`, `target_hold_period`, `target_roi`,
+  `risk_tolerance`, `development_stage`, `amenities`, `current_situation`)
+  is preserved on save by spreading the existing `buyer_preferences`
+  object before applying the form's edits — a full-object replace would
+  have silently dropped whatever the wizard set for those fields. No
+  backend changes (same JSONB column). `tsc`/`eslint`/`next build` all
+  clean. Live-verified end-to-end with a fresh signup through the actual
+  wizard: DB confirmed `buyer_preferences` written with no old flat keys
+  at all; `/profile/account` then rendered the wizard's own answers
+  pre-filled (budget slider, selected city/property type/investment
+  goal chips all matched); you then manually added a second preferred
+  city on the page and saved — a follow-up DB query confirmed the new
+  city merged into `preferred_cities` while every wizard-only field
+  (`amenities`, `target_roi`, `buy_timeline`, `risk_tolerance`,
+  `exit_strategies`, `current_situation`, `development_stage`,
+  `bedroom_preference`, `target_hold_period`) was untouched, and no
+  stray flat keys reappeared. Test user deleted afterward.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
