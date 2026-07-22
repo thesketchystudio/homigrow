@@ -203,12 +203,15 @@ function AccountForm({ user }: { user: UserRead }) {
             </label>
             <input
               id="phone"
-              value={user.phone}
+              value={user.phone ?? ""}
+              placeholder="Not provided"
               disabled
               readOnly
               className="font-body text-brand-primary-400/50 border-b-[0.8px] border-[rgba(38,38,38,0.5)] bg-transparent px-4 py-3 text-[16px] leading-[26px] outline-none"
             />
-            <p className="font-body text-[12px] text-slate-500">Contact support to change your phone number.</p>
+            <p className="font-body text-[12px] text-slate-500">
+              {user.phone ? "Contact support to change your phone number." : "No phone number on file (signed in with Google)."}
+            </p>
           </div>
           <div className="flex flex-col gap-2">
             <label htmlFor="preferred_language" className="font-heading text-brand-primary-400 text-[12px] font-bold tracking-[1.2px] uppercase">

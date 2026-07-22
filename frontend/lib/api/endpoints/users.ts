@@ -17,7 +17,9 @@ export type BrokerProfileOut = {
 
 export type UserRead = {
   id: string;
-  phone: string;
+  // Nullable since backend migration M5 — Google Sign-In accounts have
+  // no phone number (google-auth-design-2026-07-21).
+  phone: string | null;
   email?: string;
   full_name?: string;
   avatar_url?: string;

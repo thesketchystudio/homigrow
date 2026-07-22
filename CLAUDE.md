@@ -1032,6 +1032,34 @@ A reader should understand the code from the comment alone.
   `exit_strategies`, `current_situation`, `development_stage`,
   `bedroom_preference`, `target_hold_period`) was untouched, and no
   stray flat keys reappeared. Test user deleted afterward.
+- **Null-phone React console error fixed, 2026-07-22** — signing in with
+  Google surfaced a real console error on `/profile/account`: `value`
+  prop on `input` should not be null (`AccountTab.tsx:204`, the Phone
+  Number field). Root cause: `User.phone` became nullable on the backend
+  in migration M5 (Google Sign-In accounts have no phone number), but
+  two frontend spots never caught up — `lib/api/endpoints/users.ts`'s
+  `UserRead.phone` type still declared `phone: string` (required), and
+  `AccountTab.tsx` passed `value={user.phone}` straight into a
+  controlled input with no null guard. Fixed: `UserRead.phone` is now
+  `string | null`; the input uses `value={user.phone ?? ""}` with a
+  `placeholder="Not provided"` and switches its helper text to "No phone
+  number on file (signed in with Google)." when null. `tsc`/`eslint`
+  clean. Confirmed live against a real Google-signed-in test account
+  (`phone: null`, `full_name` pulled from the Google profile) — console
+  error gone after the fix.
+- **`create_test_user.py`/`delete_test_user.py` given zero-argument
+  defaults, 2026-07-22** — both scripts previously required typing the
+  full email (and, for create, phone/name/password) every time. Since
+  `hello@thesketchystudio.com` is the only address actually used for
+  manual testing (Resend sandbox constraint), both scripts now default
+  to it with no arguments: `delete_test_user.py` alone deletes
+  `DEFAULT_TEST_EMAIL`; `create_test_user.py` alone creates it with a
+  fixed phone/name/password (`Preetham-test`) and prints the login
+  credentials. Explicit-argument usage is unchanged for anything else.
+  Not a signup+OTP shortcut for the Google-account null-phone scenario
+  specifically — `create_test_user.py` still makes a password-based
+  account; the Google path is only reachable via real Google Sign-In
+  matching the same email once the account exists.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
