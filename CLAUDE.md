@@ -951,6 +951,47 @@ A reader should understand the code from the comment alone.
   browser signup writing `{"city": "Bengaluru", "state": "Karnataka"}`
   to the real Supabase dev DB; all test users deleted afterward via
   `scripts/delete_test_user.py`.
+- **Buyer-preference wizard (Phase B of signup) shipped 2026-07-22** —
+  the 6-screen buyer-preference wizard flagged as unbuilt above (budget,
+  property type, investment goal, exit strategy, development
+  stage/amenities, current situation) now runs as steps 4-9 of the
+  signup wizard, immediately after email OTP verify and before landing
+  on `/`. Pulled live from Figma (nodes `418:994`, `457:398`, `457:593`,
+  `457:913`, `457:1113`, `457:1317`). **Backend needed zero changes** —
+  `User.preferences` is an untyped JSONB dict and `PATCH /users/me`
+  already accepts arbitrary nested objects. Answers are namespaced under
+  `preferences.buyer_preferences` (not flat top-level keys) to avoid
+  near-miss collisions with the Account tab's existing `budget_range`/
+  `property_type`/`preferred_location`/`buyer_intent` keys in the same
+  blob, mirroring the `notification_channels` nesting precedent. New
+  `frontend/features/auth/preferences/` subfolder: 6 step components +
+  shared primitives (`PreferenceWizardFooter`, `PillGroup`,
+  `SelectableCardGroup`, `ChecklistGroup`, `ChipMultiSelect`,
+  `CityMultiSelectChips`, `PropertyTypeCardGrid`, `BudgetRangeSlider` —
+  the last wraps the existing shadcn `Slider`, already dual-thumb
+  capable via `value={[min,max]}`, no new dependency). New `formatINR()`
+  helper in `lib/utils.ts`. `SignupWizard.tsx`'s `WizardStep` union grew
+  from 3 to 9 steps; `AuthProgressBar`'s existing `totalSteps` prop +
+  fallback formula handled the new steps with no component change
+  (Figma itself statically labels every Phase B screen "Step 3 of 3" —
+  a design-file gap already noted in memory, not replicated; real
+  incrementing numbers ship instead). **Skip** (on every Phase B screen)
+  abandons the rest of the wizard with no save at all; **Continue on the
+  last screen** does `getMe()` → spread `{...me.preferences,
+  buyer_preferences}` → `updateMe()` → redirect home, `toast.error`-ing
+  but still completing signup on a failed save rather than stranding the
+  user. `tsc`/`eslint`/`next build` all clean. Live-verified with
+  Playwright against the real backend worktree + Supabase dev DB: full
+  signup → OTP verify → selections made on all 6 new screens → Continue
+  → confirmed via a direct DB query that `buyer_preferences` was written
+  correctly **and** the existing `city`/`state` from signup survived
+  untouched (full-replace-not-merge semantics handled correctly);
+  separately verified the Skip path (zero `/users/me` calls, no
+  `buyer_preferences` key written) from a second throwaway account.
+  Screenshot-compared 5 of 6 screens directly against the Figma
+  reference images — close visual match throughout. Both test users
+  deleted afterward via `scripts/delete_test_user.py`. Full writeup:
+  `docs/implementation/frontend/Phase_2_Implementation.md`.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
