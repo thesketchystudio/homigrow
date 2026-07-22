@@ -9,7 +9,8 @@ not covered by any cascade) and the users row itself, which cascades to
 broker_profiles and refresh_tokens via each table's ondelete=CASCADE.
 
 Usage:
-    python scripts/delete_test_user.py hello@thesketchystudio.com
+    python scripts/delete_test_user.py                          # deletes DEFAULT_TEST_EMAIL
+    python scripts/delete_test_user.py someone@example.com       # deletes a specific email
 """
 
 import sys
@@ -22,6 +23,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.db.session import SessionLocal  # noqa: E402
 from app.models.otp_code import OTPCode  # noqa: E402
 from app.models.user import User  # noqa: E402
+
+# The one address actually used for manual testing right now (Resend's
+# sandbox only delivers to this verified address; Google Sign-In tests
+# also reuse it). Update if that changes.
+DEFAULT_TEST_EMAIL = "hello@thesketchystudio.com"
 
 
 def delete_test_user(email: str) -> None:
@@ -36,7 +42,7 @@ def delete_test_user(email: str) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python scripts/delete_test_user.py <email>")
+    if len(sys.argv) > 2:
+        print("Usage: python scripts/delete_test_user.py [email]")
         sys.exit(1)
-    delete_test_user(sys.argv[1])
+    delete_test_user(sys.argv[1] if len(sys.argv) == 2 else DEFAULT_TEST_EMAIL)
