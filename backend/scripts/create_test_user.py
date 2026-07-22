@@ -34,7 +34,7 @@ from app.models.user import User  # noqa: E402
 # round-trip the same account.
 DEFAULT_EMAIL = "hello@thesketchystudio.com"
 DEFAULT_PHONE = "8789241225"
-DEFAULT_FULL_NAME = "Preetham Kumar"
+DEFAULT_FULL_NAME = "Arjun Mehta"
 DEFAULT_PASSWORD = "Preetham-test"
 DEFAULT_ROLE = "client"
 DEFAULT_CITY = "Bengaluru"

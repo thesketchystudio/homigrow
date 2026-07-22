@@ -82,6 +82,32 @@ class TestSignup:
         assert otp is not None
         assert otp.purpose.value == "signup"
 
+    def test_city_and_state_land_in_preferences(self, db_session):
+        user = auth_service.signup(
+            db_session,
+            phone="+919876543260",
+            role=UserRole.client,
+            full_name="Meera Nair",
+            email="meera@example.com",
+            password="s3cure-pass",
+            city="Bengaluru",
+            state="Karnataka",
+        )
+
+        assert user.preferences == {"city": "Bengaluru", "state": "Karnataka"}
+
+    def test_omitting_city_and_state_leaves_preferences_empty(self, db_session):
+        user = auth_service.signup(
+            db_session,
+            phone="+919876543261",
+            role=UserRole.client,
+            full_name="No City",
+            email="nocity@example.com",
+            password="s3cure-pass",
+        )
+
+        assert user.preferences == {}
+
     def test_duplicate_phone_raises_409(self, db_session):
         make_user(db_session, phone="+919876543214")
 
