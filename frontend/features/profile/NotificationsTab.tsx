@@ -77,17 +77,70 @@ export function NotificationsTab() {
   const { data: user, isLoading } = useQuery({ queryKey: ["me"], queryFn: getMe });
 
   if (isLoading || !user) {
-    return (
-      <div className="flex flex-col gap-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-96 w-full" />
-      </div>
-    );
+    return <NotificationsTabSkeleton />;
   }
 
   // Keyed + mounted once real data exists, same reasoning as AccountTab:
   // defaultValues baked in at construction rather than synced in later.
   return <NotificationsForm key={user.id} user={user} />;
+}
+
+// Mirrors the real table's header row + 5 channel rows so the loading
+// state keeps the same shape instead of collapsing into generic bars —
+// matches Figma's own skeleton frame for this tab (Components/Section 3).
+function NotificationsTabSkeleton() {
+  return (
+    <div className="flex max-w-3xl flex-col gap-8">
+      <div className="flex flex-col gap-1.5">
+        <Skeleton className="h-9 w-48" />
+        <Skeleton className="h-5 w-72" />
+      </div>
+
+      <section className="flex flex-col gap-6">
+        <div className="flex flex-col gap-0.5">
+          <Skeleton className="h-7 w-56" />
+          <Skeleton className="mt-1 h-3 w-80" />
+        </div>
+
+        <div className="overflow-hidden rounded-xl border-[0.8px] border-[#f1f5f9] bg-[#fefeff]">
+          <div className="flex items-center justify-between border-b-[0.8px] border-[#f1f5f9] bg-[#f8f9fa] px-6 py-3">
+            <Skeleton className="h-3 w-16" />
+            <div className="flex gap-8">
+              <Skeleton className="h-3 w-10" />
+              <Skeleton className="h-3 w-10" />
+            </div>
+          </div>
+
+          {CHANNELS.map(({ key }, index) => (
+            <div
+              key={key}
+              className={cn(
+                "flex items-center justify-between px-6 py-5",
+                index < CHANNELS.length - 1 && "border-b-[0.8px] border-[#f8fafc]",
+              )}
+            >
+              <div className="flex flex-col gap-1.5">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-56" />
+              </div>
+              <div className="flex gap-8">
+                <div className="flex w-[60px] justify-center">
+                  <Skeleton className="size-[22px] rounded-[4px]" />
+                </div>
+                <div className="flex w-[60px] justify-center">
+                  <Skeleton className="size-[22px] rounded-[4px]" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="flex justify-end">
+        <Skeleton className="h-11 w-40 rounded" />
+      </div>
+    </div>
+  );
 }
 
 function NotificationsForm({ user }: { user: UserRead }) {

@@ -16,6 +16,12 @@
 // The Figma card here also shows decorative "Premium Member"/star-rating
 // content with no backing field on the User model — replaced with the
 // real is_email_verified flag instead of fabricating account status.
+//
+// `user` is optional: the nav groups and support card are static (no
+// backing data), so per Figma's own "skeleton" frames for this section
+// (Components/Section 3) they render immediately — only the user card
+// (avatar/name/status) skeletons while `getMe()` is still in flight,
+// instead of the whole sidebar disappearing behind a generic placeholder.
 
 "use client";
 
@@ -23,6 +29,7 @@ import type { ComponentType } from "react";
 import { Bell, Building2, CreditCard, FileText, FolderOpen, History, Shield, User } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { UserRead } from "@/lib/api/endpoints/users";
 
@@ -53,25 +60,36 @@ function initials(name?: string) {
     .toUpperCase();
 }
 
-export function ProfileSidebar({ user, activeRoute }: { user: UserRead; activeRoute: string }) {
+export function ProfileSidebar({ user, activeRoute }: { user?: UserRead; activeRoute: string }) {
   return (
     <aside className="flex w-full shrink-0 flex-col gap-8 md:w-[220px]">
       <div className="flex flex-col items-center gap-4 border-b-[0.8px] border-slate-100 pb-8 text-center">
         <div className="relative">
-          <Avatar className="size-[72px] border-[1.6px] border-slate-200">
-            <AvatarImage src={user.avatar_url} alt={user.full_name ?? "Profile photo"} />
-            <AvatarFallback className="font-heading text-[16px] font-bold text-brand-primary-600">
-              {initials(user.full_name)}
-            </AvatarFallback>
-          </Avatar>
+          {user ? (
+            <Avatar className="size-[72px] border-[1.6px] border-slate-200">
+              <AvatarImage src={user.avatar_url} alt={user.full_name ?? "Profile photo"} />
+              <AvatarFallback className="font-heading text-[16px] font-bold text-brand-primary-600">
+                {initials(user.full_name)}
+              </AvatarFallback>
+            </Avatar>
+          ) : (
+            <Skeleton className="size-[72px] rounded-full border-[1.6px] border-slate-200" />
+          )}
           <div className="bg-brand-primary-600 absolute -right-0.5 -bottom-0.5 flex size-5 items-center justify-center rounded-full">
             <User className="size-2.5 text-background" />
           </div>
         </div>
-        <div className="flex flex-col gap-0.5">
-          <p className="font-heading text-brand-primary-600 text-[16px] font-bold">{user.full_name ?? user.phone}</p>
-          <p className="font-body text-[12px] text-slate-500">{user.is_email_verified ? "Verified Buyer" : "Unverified"}</p>
-        </div>
+        {user ? (
+          <div className="flex flex-col gap-0.5">
+            <p className="font-heading text-brand-primary-600 text-[16px] font-bold">{user.full_name ?? user.phone}</p>
+            <p className="font-body text-[12px] text-slate-500">{user.is_email_verified ? "Verified Buyer" : "Unverified"}</p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-1.5">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        )}
       </div>
 
       <NavGroup label="Profile" items={PROFILE_ITEMS} activeRoute={activeRoute} />
