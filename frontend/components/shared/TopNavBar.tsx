@@ -5,17 +5,38 @@
 // homepage's dark hero image. Every other (client) page has a light
 // background from the very top, so the nav renders opaque immediately
 // there instead of starting nearly invisible.
+//
+// Matches the canonical Figma "TopNavBar" component (Components page,
+// Section 3, node 470:1297 — 4 variants: logged-out/logged-in x
+// without/with search). The search box is a visual-only placeholder for
+// now — no Discover/search feature exists yet to wire it to. The logged-in
+// state shows a bell + initials avatar instead of the user's name, per
+// that component; it has no "List Property" button in any variant, so
+// that's been dropped here too (it wasn't part of the reusable nav design).
 
 "use client";
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { Bell, Search } from "lucide-react";
 
 import { ensureAuthResolved } from "@/lib/auth/session";
 import svgPaths from "@/lib/homepage-svg-paths";
 import { useAuthStore } from "@/lib/stores/auth";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const sg = "'Space Grotesk', sans-serif";
+
+function initials(name?: string) {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
 
 export default function TopNavBar() {
   const router = useRouter();
@@ -90,40 +111,65 @@ export default function TopNavBar() {
           ))}
         </div>
 
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            background: "#f8f9fa",
+            border: "1px solid rgba(171,179,183,0.15)",
+            borderRadius: 8,
+            padding: "9px 14px",
+            width: "clamp(180px, 20vw, 260px)",
+          }}
+          className="desktop-only"
+        >
+          <Search size={16} color="#707070" style={{ flexShrink: 0 }} />
+          <input
+            type="text"
+            placeholder="Search locations..."
+            style={{
+              border: "none",
+              outline: "none",
+              background: "transparent",
+              fontFamily: sg,
+              fontSize: 14,
+              color: "#232323",
+              width: "100%",
+            }}
+          />
+        </div>
+
         <div style={{ display: "flex", gap: "clamp(8px, 2vw, 16px)", alignItems: "center", flexShrink: 0 }}>
-          <button
-            style={{
-              background: scrolled ? "#575e70" : "rgba(87,94,112,0.9)",
-              color: "#f8f9fa",
-              borderRadius: 13,
-              padding: "10px clamp(14px, 3vw, 22px)",
-              fontFamily: sg,
-              fontWeight: 400,
-              fontSize: "clamp(13px, 2vw, 15px)",
-              border: "none",
-              cursor: "pointer",
-              transition: "background 0.2s",
-              whiteSpace: "nowrap",
-            }}
-            className="desktop-only"
-          >
-            List Property
-          </button>
-          <button
-            onClick={() => router.push(status === "authenticated" ? "/profile/account" : "/welcome")}
-            style={{
-              background: "none",
-              border: "none",
-              fontFamily: sg,
-              fontWeight: 700,
-              fontSize: "clamp(13px, 2vw, 15px)",
-              color: scrolled ? "#575e70" : "rgba(254,254,255,0.85)",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {status === "authenticated" ? (user?.full_name?.split(" ")[0] ?? "My Account") : "Sign In"}
-          </button>
+          {status === "authenticated" ? (
+            <button
+              onClick={() => router.push("/profile/account")}
+              style={{ display: "flex", alignItems: "center", gap: 16, background: "none", border: "none", cursor: "pointer" }}
+            >
+              <Bell size={24} color={scrolled ? "#090909" : "#fefeff"} />
+              <Avatar className="size-8">
+                <AvatarFallback className="bg-[#dfe0e1] text-[11px] font-bold text-[#575e70]">
+                  {initials(user?.full_name)}
+                </AvatarFallback>
+              </Avatar>
+            </button>
+          ) : (
+            <button
+              onClick={() => router.push("/welcome")}
+              style={{
+                background: "none",
+                border: "none",
+                fontFamily: sg,
+                fontWeight: 700,
+                fontSize: "clamp(13px, 2vw, 20px)",
+                color: scrolled ? "#232323" : "rgba(254,254,255,0.85)",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Sign In
+            </button>
+          )}
 
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
@@ -169,22 +215,6 @@ export default function TopNavBar() {
                 {link}
               </a>
             ))}
-            <button
-              style={{
-                background: "#575e70",
-                color: "#f8f9fa",
-                borderRadius: 13,
-                padding: "12px 22px",
-                fontFamily: sg,
-                fontWeight: 400,
-                fontSize: 15,
-                border: "none",
-                cursor: "pointer",
-                marginTop: 8,
-              }}
-            >
-              List Property
-            </button>
           </div>
         </div>
       )}
