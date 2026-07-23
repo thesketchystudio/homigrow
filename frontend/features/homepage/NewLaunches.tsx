@@ -106,7 +106,7 @@ export default function NewLaunches() {
               boxShadow: "0 2px 16px rgba(0,0,0,0.06)",
             }}
           >
-            <div style={{ position: "relative", height: 340 }}>
+            <div style={{ position: "relative", height: 340, overflow: "hidden" }}>
               <img
                 src={featured.img}
                 alt={featured.name}

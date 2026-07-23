@@ -95,12 +95,7 @@ export function AccountTab() {
   const { data: user, isLoading } = useQuery({ queryKey: ["me"], queryFn: getMe });
 
   if (isLoading || !user) {
-    return (
-      <div className="flex flex-col gap-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
+    return <AccountTabSkeleton />;
   }
 
   // Keyed on user.id and only mounted once `user` is real: the form's
@@ -319,6 +314,65 @@ function AccountForm({ user }: { user: UserRead }) {
 
       <ChangePasswordDialog open={passwordDialogOpen} onClose={() => setPasswordDialogOpen(false)} />
     </form>
+  );
+}
+
+// Mirrors AccountForm's real section layout (heading, 2x2 field grid,
+// password row, Buyer Profile 2x2 grid, action buttons) so the loading
+// state doesn't collapse into a couple of generic bars — matches Figma's
+// own skeleton frame for this tab (Components/Section 3).
+function AccountTabSkeleton() {
+  return (
+    <div className="flex max-w-3xl flex-col gap-8">
+      <div className="flex flex-col gap-1.5">
+        <Skeleton className="h-9 w-48" />
+        <Skeleton className="h-5 w-72" />
+      </div>
+
+      <section className="flex flex-col gap-6">
+        <Skeleton className="h-7 w-56" />
+        <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="flex flex-col gap-2">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-[26px] w-40" />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="h-px border-t-[0.8px] border-b-[0.8px] border-[#e2e9ec]" />
+
+      <section className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-1.5">
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="h-4 w-56" />
+        </div>
+        <Skeleton className="h-10 w-40 rounded" />
+      </section>
+
+      <div className="h-px border-t-[0.8px] border-b-[0.8px] border-[#e2e9ec]" />
+
+      <section className="flex flex-col gap-8">
+        <div className="flex flex-col gap-1.5">
+          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-3 w-80" />
+        </div>
+        <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="flex flex-col gap-2">
+              <Skeleton className="h-3 w-28" />
+              <Skeleton className="h-[26px] w-32" />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="flex justify-end gap-3">
+        <Skeleton className="h-[45px] w-40 rounded" />
+        <Skeleton className="h-11 w-36 rounded" />
+      </div>
+    </div>
   );
 }
 

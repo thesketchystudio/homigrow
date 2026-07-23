@@ -108,20 +108,23 @@ export default function Testimonials() {
           </span>
 
           <div className="testimonial-feature">
-            <p
-              style={{
-                fontFamily: pj,
-                fontWeight: 300,
-                fontSize: 22,
-                lineHeight: "34px",
-                color: "#1a1a1a",
-                margin: 0,
-                position: "relative",
-                zIndex: 1,
-              }}
-            >
-              &ldquo;{testimonials[0].quote}&rdquo;
-            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <Stars count={testimonials[0].stars} />
+              <p
+                style={{
+                  fontFamily: pj,
+                  fontWeight: 300,
+                  fontSize: 22,
+                  lineHeight: "34px",
+                  color: "#1a1a1a",
+                  margin: 0,
+                  position: "relative",
+                  zIndex: 1,
+                }}
+              >
+                &ldquo;{testimonials[0].quote}&rdquo;
+              </p>
+            </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "center", flexShrink: 0 }}>
               <div
@@ -138,14 +141,13 @@ export default function Testimonials() {
                 )}
               </div>
               <div style={{ textAlign: "center" }}>
-                <Stars count={testimonials[0].stars} />
                 <p
                   style={{
                     fontFamily: sg,
                     fontWeight: 700,
                     fontSize: 15,
                     color: "#1a1a1a",
-                    margin: "6px 0 2px",
+                    margin: "0 0 2px",
                   }}
                 >
                   {testimonials[0].author}
