@@ -320,8 +320,10 @@ function AccountForm({ user }: { user: UserRead }) {
 // Mirrors AccountForm's real section layout (heading, 2x2 field grid,
 // password row, Buyer Profile 2x2 grid, action buttons) so the loading
 // state doesn't collapse into a couple of generic bars — matches Figma's
-// own skeleton frame for this tab (Components/Section 3).
-function AccountTabSkeleton() {
+// own skeleton frame for this tab (Components/Section 3). Exported so
+// ProfileLayout's AuthGuard fallback can show the same shape immediately,
+// instead of swapping from a generic placeholder once auth resolves.
+export function AccountTabSkeleton() {
   return (
     <div className="flex max-w-3xl flex-col gap-8">
       <div className="flex flex-col gap-1.5">
