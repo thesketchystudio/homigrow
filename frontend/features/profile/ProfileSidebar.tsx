@@ -26,6 +26,7 @@
 "use client";
 
 import type { ComponentType } from "react";
+import Link from "next/link";
 import { Bell, Building2, CreditCard, FileText, FolderOpen, History, Shield, User } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -114,7 +115,7 @@ function NavGroup({ label, items, activeRoute }: { label: string; items: NavItem
         const Icon = item.icon;
         const isActive = activeRoute === item.href;
         return (
-          <a
+          <Link
             key={item.href}
             href={item.href}
             className={cn(
@@ -124,7 +125,7 @@ function NavGroup({ label, items, activeRoute }: { label: string; items: NavItem
           >
             <Icon className="size-3.5" />
             {item.label}
-          </a>
+          </Link>
         );
       })}
     </div>

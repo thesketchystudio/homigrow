@@ -332,11 +332,11 @@ export function AccountTabSkeleton() {
       </div>
 
       <section className="flex flex-col gap-6">
-        <Skeleton className="h-7 w-56" />
+        <Skeleton className="h-4 w-full" />
         <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, index) => (
             <div key={index} className="flex flex-col gap-2">
-              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-3 w-full" />
               <Skeleton className="h-[26px] w-40" />
             </div>
           ))}
@@ -357,13 +357,13 @@ export function AccountTabSkeleton() {
 
       <section className="flex flex-col gap-8">
         <div className="flex flex-col gap-1.5">
-          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-4 w-full" />
           <Skeleton className="h-3 w-80" />
         </div>
         <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, index) => (
             <div key={index} className="flex flex-col gap-2">
-              <Skeleton className="h-3 w-28" />
+              <Skeleton className="h-3 w-full" />
               <Skeleton className="h-[26px] w-32" />
             </div>
           ))}

@@ -24,15 +24,38 @@ import { AuthGuard } from "@/components/shared/AuthGuard";
 import { ProfileSidebar } from "@/features/profile/ProfileSidebar";
 import { AccountTabSkeleton } from "@/features/profile/AccountTab";
 import { NotificationsTabSkeleton } from "@/features/profile/NotificationsTab";
+import { MyPropertiesTabSkeleton } from "@/features/profile/MyPropertiesTabSkeleton";
+import { PurchaseHistoryTabSkeleton } from "@/features/profile/PurchaseHistoryTabSkeleton";
+import { LoanApplicationsTabSkeleton } from "@/features/profile/LoanApplicationsTabSkeleton";
+import { DocumentsTabSkeleton } from "@/features/profile/DocumentsTabSkeleton";
+import { SecurityTabSkeleton } from "@/features/profile/SecurityTabSkeleton";
+import { BillingTabSkeleton } from "@/features/profile/BillingTabSkeleton";
 import { getMe } from "@/lib/api/endpoints/users";
 import { UserRole } from "@/lib/enums";
 
 const ALL_ROLES: UserRole[] = [UserRole.client, UserRole.broker, UserRole.admin];
 
 function tabSkeletonFor(pathname: string) {
-  if (pathname === "/profile/account") return <AccountTabSkeleton />;
-  if (pathname === "/profile/notifications") return <NotificationsTabSkeleton />;
-  return null;
+  switch (pathname) {
+    case "/profile/account":
+      return <AccountTabSkeleton />;
+    case "/profile/my-properties":
+      return <MyPropertiesTabSkeleton />;
+    case "/profile/purchase-history":
+      return <PurchaseHistoryTabSkeleton />;
+    case "/profile/loan-applications":
+      return <LoanApplicationsTabSkeleton />;
+    case "/profile/documents":
+      return <DocumentsTabSkeleton />;
+    case "/profile/notifications":
+      return <NotificationsTabSkeleton />;
+    case "/profile/security":
+      return <SecurityTabSkeleton />;
+    case "/profile/billing":
+      return <BillingTabSkeleton />;
+    default:
+      return null;
+  }
 }
 
 export default function ProfileLayout({ children }: { children: React.ReactNode }) {

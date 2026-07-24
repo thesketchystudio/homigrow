@@ -1060,6 +1060,54 @@ A reader should understand the code from the comment alone.
   specifically — `create_test_user.py` still makes a password-based
   account; the Google path is only reachable via real Google Sign-In
   matching the same email once the account exists.
+- **Profile sidebar logout-on-click bug fixed, 2026-07-24** — reported
+  live: clicking almost any Profile sidebar tab bounced straight to
+  `/login`. Root cause: `ProfileSidebar.tsx`'s nav items were plain `<a
+  href>` tags, so every tab switch did a full page reload instead of
+  client-side routing; each reload wiped the in-memory `authStore` and
+  re-ran `ensureAuthResolved()` from scratch, firing a fresh `POST
+  /auth/refresh`. That route is rate-limited to 5/min/IP (P2-T08) — an
+  ordinary sequence of 6+ tab clicks in under a minute burned the
+  budget, and `refreshAccessToken()` treats any non-2xx response
+  (including a transient `429`) as an invalid session and clears the
+  auth store, forcing a real logout. Reproduced with Playwright against
+  the real backend worktree + Supabase dev DB (network log: 5×`200`
+  then `429` on the 6th `/auth/refresh`, immediately followed by the
+  redirect). Fixed at the root cause: nav items now use `next/link`'s
+  `Link` instead of `<a>` (the `mailto:` support link stays a plain
+  `<a>`) — `ensureAuthResolved()` now short-circuits on every
+  subsequent tab switch, so no repeat refresh calls happen at all.
+  `tsc`/`eslint` clean. Re-verified live: clicked through all 8 sidebar
+  tabs in immediate succession — exactly one `/auth/refresh` call for
+  the whole session, no 429, no logout. `TopNavBar.tsx`'s placeholder
+  `<a href="#">` links and `PropertyCard.tsx`'s `<a href={property.href}>`
+  (public, un-gated homepage) use the same plain-`<a>` pattern but don't
+  reproduce this today — flagged as a risk to recheck if either gains a
+  real route behind `AuthGuard`.
+- **Profile tab skeletons verified + completed, 2026-07-24** — pulled
+  exact Figma `get_design_context` for the Account/Notifications
+  skeleton frames and found a precise gap: section-heading and
+  Account-tab field-label skeleton bars should be full-width (Figma
+  draws them spanning the full 736px content column / grid cell), not
+  the short fixed-width bars they were coded as. Fixed in both files.
+  Then built loading-skeleton components for the 6 still-unbuilt tabs
+  (My Properties, Purchase History, Loan Applications, Documents,
+  Security, Billing) — new `features/profile/*TabSkeleton.tsx` files —
+  matching each tab's real Figma shape, and wired all 6 into
+  `ProfileLayout`'s `tabSkeletonFor` so every Profile & Settings route
+  now shows an accurate skeleton during the session-resolution window
+  instead of a blank fallback. **Real content for the 6 tabs is
+  explicitly out of scope this session** — each needs backend that
+  doesn't exist yet (Property ownership data, offers/transactions,
+  loan applications, file storage, 2FA + data export, and a full
+  payments/subscription system respectively); your explicit call to
+  ship skeletons now and build the backend later. `tsc`/`eslint`/
+  `next build` all clean. Live-verified with Playwright: since the
+  loading window is normally too brief to see, delayed
+  `POST /auth/refresh` by 3s via route interception and screenshotted
+  all 8 profile routes mid-flight — every skeleton renders correctly,
+  including the Billing plan card's white-tinted bars over its dark
+  background.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

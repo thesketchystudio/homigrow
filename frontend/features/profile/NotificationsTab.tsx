@@ -101,7 +101,7 @@ export function NotificationsTabSkeleton() {
 
       <section className="flex flex-col gap-6">
         <div className="flex flex-col gap-0.5">
-          <Skeleton className="h-7 w-56" />
+          <Skeleton className="h-4 w-full" />
           <Skeleton className="mt-1 h-3 w-80" />
         </div>
 
