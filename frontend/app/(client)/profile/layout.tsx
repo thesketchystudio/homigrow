@@ -8,6 +8,12 @@
 // ProfileSidebar renders immediately regardless of load state — its nav
 // groups are static, so per Figma's skeleton frames for this section only
 // the user card (avatar/name) needs to skeleton, not the whole sidebar.
+//
+// Passes AuthGuard a fallback shaped like this same shell (sidebar +
+// the active tab's own skeleton) so the brief window while the session
+// resolves from the refresh cookie doesn't flash AuthGuard's generic
+// placeholder first — the accurate skeleton shows immediately and simply
+// keeps showing once `getMe()` starts loading, no visible swap.
 
 "use client";
 
@@ -16,17 +22,56 @@ import { useQuery } from "@tanstack/react-query";
 
 import { AuthGuard } from "@/components/shared/AuthGuard";
 import { ProfileSidebar } from "@/features/profile/ProfileSidebar";
+import { AccountTabSkeleton } from "@/features/profile/AccountTab";
+import { NotificationsTabSkeleton } from "@/features/profile/NotificationsTab";
+import { MyPropertiesTabSkeleton } from "@/features/profile/MyPropertiesTabSkeleton";
+import { PurchaseHistoryTabSkeleton } from "@/features/profile/PurchaseHistoryTabSkeleton";
+import { LoanApplicationsTabSkeleton } from "@/features/profile/LoanApplicationsTabSkeleton";
+import { DocumentsTabSkeleton } from "@/features/profile/DocumentsTabSkeleton";
+import { SecurityTabSkeleton } from "@/features/profile/SecurityTabSkeleton";
+import { BillingTabSkeleton } from "@/features/profile/BillingTabSkeleton";
 import { getMe } from "@/lib/api/endpoints/users";
 import { UserRole } from "@/lib/enums";
 
 const ALL_ROLES: UserRole[] = [UserRole.client, UserRole.broker, UserRole.admin];
+
+function tabSkeletonFor(pathname: string) {
+  switch (pathname) {
+    case "/profile/account":
+      return <AccountTabSkeleton />;
+    case "/profile/my-properties":
+      return <MyPropertiesTabSkeleton />;
+    case "/profile/purchase-history":
+      return <PurchaseHistoryTabSkeleton />;
+    case "/profile/loan-applications":
+      return <LoanApplicationsTabSkeleton />;
+    case "/profile/documents":
+      return <DocumentsTabSkeleton />;
+    case "/profile/notifications":
+      return <NotificationsTabSkeleton />;
+    case "/profile/security":
+      return <SecurityTabSkeleton />;
+    case "/profile/billing":
+      return <BillingTabSkeleton />;
+    default:
+      return null;
+  }
+}
 
 export default function ProfileLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { data: user } = useQuery({ queryKey: ["me"], queryFn: getMe });
 
   return (
-    <AuthGuard allowedRoles={ALL_ROLES}>
+    <AuthGuard
+      allowedRoles={ALL_ROLES}
+      fallback={
+        <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 pt-28 pb-16 md:flex-row md:gap-10">
+          <ProfileSidebar activeRoute={pathname} />
+          <div className="min-w-0 flex-1">{tabSkeletonFor(pathname)}</div>
+        </div>
+      }
+    >
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 pt-28 pb-16 md:flex-row md:gap-10">
         <ProfileSidebar user={user} activeRoute={pathname} />
         <div className="min-w-0 flex-1">{children}</div>

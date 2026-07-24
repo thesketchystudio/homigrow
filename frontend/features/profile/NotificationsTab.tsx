@@ -88,7 +88,10 @@ export function NotificationsTab() {
 // Mirrors the real table's header row + 5 channel rows so the loading
 // state keeps the same shape instead of collapsing into generic bars —
 // matches Figma's own skeleton frame for this tab (Components/Section 3).
-function NotificationsTabSkeleton() {
+// Exported so ProfileLayout's AuthGuard fallback can show the same shape
+// immediately, instead of swapping from a generic placeholder once auth
+// resolves.
+export function NotificationsTabSkeleton() {
   return (
     <div className="flex max-w-3xl flex-col gap-8">
       <div className="flex flex-col gap-1.5">
@@ -98,7 +101,7 @@ function NotificationsTabSkeleton() {
 
       <section className="flex flex-col gap-6">
         <div className="flex flex-col gap-0.5">
-          <Skeleton className="h-7 w-56" />
+          <Skeleton className="h-4 w-full" />
           <Skeleton className="mt-1 h-3 w-80" />
         </div>
 

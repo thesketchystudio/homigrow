@@ -320,8 +320,10 @@ function AccountForm({ user }: { user: UserRead }) {
 // Mirrors AccountForm's real section layout (heading, 2x2 field grid,
 // password row, Buyer Profile 2x2 grid, action buttons) so the loading
 // state doesn't collapse into a couple of generic bars — matches Figma's
-// own skeleton frame for this tab (Components/Section 3).
-function AccountTabSkeleton() {
+// own skeleton frame for this tab (Components/Section 3). Exported so
+// ProfileLayout's AuthGuard fallback can show the same shape immediately,
+// instead of swapping from a generic placeholder once auth resolves.
+export function AccountTabSkeleton() {
   return (
     <div className="flex max-w-3xl flex-col gap-8">
       <div className="flex flex-col gap-1.5">
@@ -330,11 +332,11 @@ function AccountTabSkeleton() {
       </div>
 
       <section className="flex flex-col gap-6">
-        <Skeleton className="h-7 w-56" />
+        <Skeleton className="h-4 w-full" />
         <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, index) => (
             <div key={index} className="flex flex-col gap-2">
-              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-3 w-full" />
               <Skeleton className="h-[26px] w-40" />
             </div>
           ))}
@@ -355,13 +357,13 @@ function AccountTabSkeleton() {
 
       <section className="flex flex-col gap-8">
         <div className="flex flex-col gap-1.5">
-          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-4 w-full" />
           <Skeleton className="h-3 w-80" />
         </div>
         <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, index) => (
             <div key={index} className="flex flex-col gap-2">
-              <Skeleton className="h-3 w-28" />
+              <Skeleton className="h-3 w-full" />
               <Skeleton className="h-[26px] w-32" />
             </div>
           ))}
