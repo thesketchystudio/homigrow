@@ -1109,6 +1109,52 @@ A reader should understand the code from the comment alone.
   including the Billing plan card's white-tinted bars over its dark
   background.
 
+### Backend Phase 3 (on `feature/phase_3_backend_client`, cut from `dev`)
+- **Property Details read API shipped 2026-07-29** — `GET /api/v1/properties/{id}`,
+  the first Property CRUD/read work (P3-T04), built backend-first per this
+  session's explicit ordering (backend → frontend → homepage-linking, each a
+  separate task). Public, no auth — serves the Property Details screen.
+  New `app/schemas/properties.py` (`PropertyRead`/`PropertyMediaRead`/
+  `PropertyBrokerRead`, `metro_distance_km` as a `@computed_field` from
+  `metro_distance_m`, same convention `config.py` uses for `DATABASE_URL`),
+  `app/services/property_service.py` (`get_property_detail`: 404s via the
+  existing `NotFoundError` if missing or `status != active` — no
+  owner-preview-while-pending path, nothing needs it yet), and
+  `app/api/v1/routes/properties.py`, registered in `router.py`.
+  **Migration M6** closes two real gaps found by checking the Figma
+  "property details" screen's Quick Stats against the model: added
+  `parking_slots` (no column existed for parking count at all), and
+  replaced `age_years` with `built_year` — the design shows a fixed
+  "Year Built: 2022", not a relative age, and storing age as an offset
+  would silently go stale every year; `age_years` was referenced only in
+  the M1 migration and the model itself (confirmed via grep), so the
+  swap is a clean replacement, not a breaking change. Upgrade → downgrade
+  → upgrade verified clean against the real dev DB. New
+  **`scripts/create_test_property.py`** / **`delete_test_property.py`**
+  (paired like the existing test-user scripts) seed one real, active
+  demo property ("The Obsidian Estate", matching the Figma content
+  exactly — price, bhk/bathrooms/area, amenities, description, 4 media
+  rows on stable placeholder image URLs since no R2/Stream pipeline
+  exists yet) plus a broker fixture user — broker-side property
+  creation isn't built yet (deferred to a future broker page), so this
+  is the standing way to get real data to develop the frontend screen
+  against. 155/155 tests pass (5 new, `tests/api/v1/routes/
+  test_properties.py`); `ruff` clean. Live-verified end-to-end against
+  the real Supabase dev DB: ran the seed script, confirmed the full
+  response shape via curl (including `parking_slots`/`built_year`/
+  `metro_distance_km` and the nested `broker.broker_profile.
+  verification_status`), confirmed a missing id and a non-active status
+  both return `404 PROPERTY_NOT_FOUND`. **The seeded property is left in
+  the DB on purpose** (not cleaned up like other verification scripts)
+  since the very next task is building the frontend screen against this
+  exact real record.
+  **Deferred, not part of this task:** the Vaastu Compliance checker,
+  "Redesign with AI" button, and Market Context/"Download Market
+  Report" card from the Figma design (node IDs recorded in project
+  memory); `POST /properties/{id}/enquire` (contact-form submission);
+  linking the page in from the homepage/`PropertyCard` — all separate,
+  later tasks (tracked in ClickUp).
+
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
   docs/architecture/15_Decision_Log.md); integrate via
