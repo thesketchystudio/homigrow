@@ -76,7 +76,8 @@ class Property(Base, TimestampMixin):
     floor = Column(SmallInteger, nullable=True)
     total_floors = Column(SmallInteger, nullable=True)
     facing = Column(String(20), nullable=True)
-    age_years = Column(SmallInteger, nullable=True)
+    built_year = Column(SmallInteger, nullable=True)
+    parking_slots = Column(SmallInteger, nullable=True)
     furnishing = Column(_pg_enum(Furnishing, "furnishing"), nullable=True)
 
     amenities = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
