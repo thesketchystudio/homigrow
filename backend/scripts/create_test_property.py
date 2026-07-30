@@ -15,6 +15,7 @@ Usage:
 """
 
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Allows running this script directly (`python scripts/create_test_property.py`)
@@ -128,6 +129,7 @@ def create_test_property() -> None:
             state="Karnataka",
             pincode="560038",
             metro_distance_m=3000,
+            published_at=datetime.now(timezone.utc),
         )
         db.add(property_)
         db.flush()
