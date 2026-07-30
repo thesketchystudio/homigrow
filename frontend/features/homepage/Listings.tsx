@@ -4,6 +4,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 import svgPaths from "@/lib/homepage-svg-paths";
 
@@ -299,15 +300,13 @@ export default function Listings() {
               Trending in Bengaluru
             </h2>
           </div>
-          <button
+          <Link
+            href="/properties"
             style={{
               display: "flex",
               alignItems: "center",
               gap: 9,
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: 0,
+              textDecoration: "none",
             }}
           >
             <span
@@ -321,7 +320,7 @@ export default function Listings() {
               Explore all properties
             </span>
             <ArrowIcon />
-          </button>
+          </Link>
         </div>
 
         <div className="listings-grid">
