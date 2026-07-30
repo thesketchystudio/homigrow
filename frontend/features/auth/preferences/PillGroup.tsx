@@ -1,9 +1,11 @@
 // features/auth/preferences/PillGroup.tsx
-// Single-select pill row, black-fill when selected. Covers 3 visual
-// shapes seen across the Phase B Figma frames: "compact" (bedroom count
+// Single-select pill row, black-fill when selected. Covers 4 visual
+// shapes seen across the Figma frames: "compact" (bedroom count
 // filters, single line, no sublabel), "labeled" (Figma "ChoicePill" —
 // timeline/hold-period/risk-tolerance, left-aligned with a sublabel),
-// and "centered" (Figma "BHKPill" — target ROI, no sublabel, centered).
+// "centered" (Figma "BHKPill" — target ROI, no sublabel, centered), and
+// "filter" (Figma "Filter" component — Listings page sidebar's Lease
+// Type/Amenities pills, rounded-[4px] rather than compact's rounded-[8px]).
 // "labeled"/"centered" turn their label text green on selection (no
 // checkmark — that's reserved for SelectableCardGroup's multi-select
 // cards), matching the black-fill + green-text convention used there.
@@ -19,7 +21,7 @@ export type PillOption = {
 
 type PillGroupBaseProps = {
   options: PillOption[];
-  variant?: "compact" | "labeled" | "centered";
+  variant?: "compact" | "labeled" | "centered" | "filter";
   className?: string;
 };
 
@@ -62,6 +64,24 @@ export function PillGroup(props: PillGroupProps) {
             >
               {option.label}
               {selected && <X size={12} strokeWidth={3} />}
+            </button>
+          );
+        }
+
+        if (variant === "filter") {
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => select(option.value)}
+              className={cn(
+                "rounded px-4 py-2 text-center font-heading text-[16px] font-medium",
+                selected
+                  ? "bg-brand-primary-600 text-brand-secondary-400"
+                  : "border border-brand-secondary-500 bg-background text-brand-primary-600",
+              )}
+            >
+              {option.label}
             </button>
           );
         }

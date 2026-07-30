@@ -1200,6 +1200,61 @@ A reader should understand the code from the comment alone.
   to see the loan calculator render, since the standing demo property is
   a rental; confirmed the 404 path renders `ErrorState` correctly for a
   made-up id.
+- **Property Listings page shipped 2026-07-30** — new `/properties`
+  route (`app/(client)/properties/page.tsx`), built against the
+  backend's new `GET /api/v1/properties` (10_Phase_3.md P3-T10) and the
+  real Figma "Curated Listings" screen (node `28:646`), same scope cut
+  agreed with the user as the backend task — see that entry above and
+  memory `figma-listings-search-screen-2026-07-30` for the full filter
+  inventory and what was deliberately left out (metro-station named
+  search, commercial sub-categories, "founder's property", map view).
+  New `features/properties/listings/`: `FilterSidebar` (price range,
+  bedrooms, listing type — Figma's ambiguous "Residential/Commercial"
+  pills repurposed to Buy/Rent/PG since that's what `listing_type`
+  actually models — property type using real `PropertyType` category
+  names instead of Figma's marketing copy, and amenities),
+  `ListingsToolbar` (heading/count, Grid/"Show on map" toggle — map view
+  shows a "not available yet" toast, same pattern as the Details page's
+  un-built enquiry form — and a sort dropdown limited to the 3 sorts the
+  backend actually supports, relabeled "Newest" instead of Figma's
+  "Featured" since there's no boost/curation system to back that claim),
+  `ListingsGrid` (first real use of the shared `PropertyCard`, previously
+  only exercised in `/dev/components`), `ListingsPagination`. `PillGroup`
+  (features/auth/preferences) gained a new `"filter"` variant matching
+  Figma's exact pill styling, reused for Listing Type/Amenities rather
+  than duplicating a near-identical component. Filter state lives in
+  local component state only, not synced to the URL — a deliberate,
+  smaller first-pass scope, noted as follow-up. **Two real bugs found
+  by actually loading the page, not just reading the code:** (1) the
+  price-range filter defaulted to ₹50L–₹15Cr and was always applied,
+  even before touching the slider — harmless for sale prices but a
+  monthly rent/PG price (e.g. ₹18,000) is nowhere near that range, so
+  the very first page load silently hid most rental/PG listings with no
+  visible filter active; fixed by only sending `price_min`/`price_max`
+  once the slider actually moves off its resting ends. (2) The same
+  null-vs-undefined class of bug fixed on the Account tab months ago:
+  backend `Optional[int]` fields always serialize as an explicit JSON
+  `null`, never an absent key, but the new `PropertyListItem` type
+  declared them as optional (`field?: T`) rather than nullable
+  (`field: T | null`) — so a property with no bedroom count (an office,
+  a plot) rendered a stray, number-less "BHK" label instead of omitting
+  it, since `null !== undefined` in `PropertyCard`'s optional-field
+  check. Fixed by typing those fields to match what the backend
+  actually sends. `tsc`/`eslint`/`next build` all clean. Live-verified
+  with Playwright against the real backend + the 11 seeded demo
+  properties from the backend task: full 11-property grid loads by
+  default; every filter (listing type, property type, amenities)
+  narrows to exactly the right cards, confirmed via both the real
+  network requests and the resulting grid; both price sorts order
+  correctly; Reset All clears everything; a zero-match filter
+  combination renders a real empty state, not a blank page; clicked a
+  listing card through to its real Property Details page and confirmed
+  no console errors, including for a property with no bedroom count —
+  exactly the case bug (2) was hiding. **Not yet done, on purpose:**
+  linking this page in from the homepage/nav (separate task, same
+  pattern as Property Details), a mobile-specific filter drawer (the
+  sidebar is a static column today, not yet responsive), and URL-synced
+  filter state.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
