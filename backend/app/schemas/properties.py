@@ -1,8 +1,8 @@
 """
 app/schemas/properties.py
 
-Pydantic read shapes for the public property details resource
-(05_API_Design.md §properties; 10_Phase_3.md P3-T04).
+Pydantic read shapes for the public property listing resources
+(05_API_Design.md §properties; 10_Phase_3.md P3-T04 detail + P3-T10 search).
 """
 
 from datetime import datetime
@@ -88,3 +88,37 @@ class PropertyRead(BaseModel):
         if self.metro_distance_m is None:
             return None
         return round(self.metro_distance_m / 1000, 1)
+
+
+class PropertyListItem(BaseModel):
+    """One card's worth of data for the /properties search results grid — lighter than PropertyRead, no media gallery or broker detail."""
+
+    id: UUID
+    title: str
+    listing_type: ListingType
+    property_type: PropertyType
+    price: float
+    bhk: Optional[int] = None
+    bathrooms: Optional[int] = None
+    area_sqft: Optional[float] = None
+    furnishing: Optional[Furnishing] = None
+    city: str
+    locality: str
+    cover_image_url: Optional[str] = None
+    published_at: Optional[datetime] = None
+
+
+class PropertyListResponse(BaseModel):
+    """Pagination envelope for GET /properties (05_API_Design.md pagination convention: page/page_size)."""
+
+    items: list[PropertyListItem]
+    page: int
+    page_size: int
+    total: int
+
+    @computed_field
+    @property
+    def total_pages(self) -> int:
+        if self.page_size <= 0:
+            return 0
+        return -(-self.total // self.page_size)

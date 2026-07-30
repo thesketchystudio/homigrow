@@ -1154,6 +1154,66 @@ A reader should understand the code from the comment alone.
   memory); `POST /properties/{id}/enquire` (contact-form submission);
   linking the page in from the homepage/`PropertyCard` — all separate,
   later tasks (tracked in ClickUp).
+- **Property Listings search endpoint shipped 2026-07-30** —
+  `GET /api/v1/properties`, the search/grid endpoint backing the
+  Listings page (10_Phase_3.md P3-T10), built after pulling the real
+  Figma "Curated Listings" screen (`search` frame, node `28:646`,
+  `Client view` page) so frontend work lands on the same real design.
+  That screen's filter sidebar has more filters than real schema
+  supports today (a named metro-station picker, commercial
+  sub-categories like Cafe/Restaurant, a "founder's property" toggle,
+  a map view) — scoped down to what real columns/enums back, same
+  pattern as Property Details' Vaastu/AI/Market-Report deferrals;
+  confirmed with you before building. Filters: `city` (case-
+  insensitive exact match), `listing_type`, `property_type`
+  (repeatable), `price_min`/`price_max`, `bhk_min`, `amenities`
+  (repeatable, matches ANY via Postgres JSONB `?|` — mirrors the
+  sidebar's multi-select checkboxes). Sort: `newest` (default,
+  `published_at desc nullslast`) / `price_asc` / `price_desc` — an
+  invalid `sort` value 422s automatically via a `Literal` type, no
+  custom validation code needed. Pagination: `page`/`page_size`
+  (default 20, max 50, doc's existing convention), response envelope
+  is `{items, page, page_size, total, total_pages}`. New
+  `PropertyListItem`/`PropertyListResponse` in `schemas/properties.py`
+  (lighter than `PropertyRead` — no media gallery/broker detail, just
+  one cover image via a correlated subquery on `PropertyMedia.
+  is_cover`) and `property_service.list_properties()`. **Found and
+  fixed a real gap while building this:** `published_at` was declared
+  on the `Property` model and even has a dedicated partial index
+  (`ix_properties_active_published_at`) but was never actually *set*
+  anywhere — not by the seed script, not by anything else — so
+  "newest first" sorting had nothing real to sort by. Fixed
+  `create_test_property.py` to set it, backfilled the one existing
+  Obsidian Estate row (which predated this fix) directly against the
+  dev DB, and set staggered values in the new seed data below so
+  "newest" sort has a real, distinct order to verify against. New
+  **`scripts/seed_demo_properties.py`**/**`delete_demo_properties.py`**
+  (same create/delete pair convention as `create_test_property.py`) —
+  10 more active demo listings spanning 5 cities (Bengaluru, Mumbai,
+  Delhi, Gurugram, Pune, Hyderabad, Chennai), all 3 `ListingType`
+  values, 6 of the 7 `PropertyType` values, and a price range from
+  ₹18k/mo rent to ₹6.5 Cr sale — enough real variation to exercise
+  every filter combination once the frontend grid exists. 167/167
+  tests pass (12 new, `TestListProperties` in the existing
+  `test_properties.py`); `ruff` clean. **Test isolation note:** these
+  tests run against the real dev DB (`tests/conftest.py`'s
+  transactional rollback only undoes what a test itself inserts, not
+  pre-existing committed rows like the intentionally-left-seeded
+  Obsidian Estate) — every list test scopes its query to a per-test
+  throwaway city name to stay exact regardless of what else is
+  sitting in the shared dev DB. Live-verified end-to-end against the
+  real Supabase dev DB: ran both seed scripts, then curled every
+  filter/sort/pagination combination and confirmed exact matching
+  result sets, plus confirmed `sort=bogus` and `page_size=999` both
+  422. Checked the query plan (`EXPLAIN ANALYZE`) for a representative
+  filtered query — the composite indexes (`ix_properties_status_
+  listing_type`, `ix_properties_city_locality`, `ix_properties_price`)
+  are correctly shaped for this access pattern; at the current ~11-row
+  seed volume Postgres reasonably picks a sequential scan over them
+  (expected at this scale, not a bug) — P3-T10's literal ask for an
+  EXPLAIN ANALYZE against ~1k seeded rows was descoped along with the
+  rest of the "handful of varied properties" plan agreed with you,
+  not silently skipped.
 
 ### Frontend Phase 3 (on `feature/phase_3_frontend_client`, cut from `dev`)
 - **Property Details page shipped 2026-07-29** — new `/properties/[id]`
