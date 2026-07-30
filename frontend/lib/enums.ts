@@ -28,6 +28,37 @@ export const PropertyStatus = {
 } as const;
 export type PropertyStatus = (typeof PropertyStatus)[keyof typeof PropertyStatus];
 
+export const ListingType = {
+  sale: "sale",
+  rent: "rent",
+  pg: "pg",
+} as const;
+export type ListingType = (typeof ListingType)[keyof typeof ListingType];
+
+export const PropertyType = {
+  apartment: "apartment",
+  villa: "villa",
+  independent_house: "independent_house",
+  plot: "plot",
+  office: "office",
+  shop: "shop",
+  pg_colive: "pg_colive",
+} as const;
+export type PropertyType = (typeof PropertyType)[keyof typeof PropertyType];
+
+export const Furnishing = {
+  unfurnished: "unfurnished",
+  semi_furnished: "semi_furnished",
+  fully_furnished: "fully_furnished",
+} as const;
+export type Furnishing = (typeof Furnishing)[keyof typeof Furnishing];
+
+export const MediaType = {
+  image: "image",
+  video: "video",
+} as const;
+export type MediaType = (typeof MediaType)[keyof typeof MediaType];
+
 export const LeadStatus = {
   new: "new",
   contacted: "contacted",

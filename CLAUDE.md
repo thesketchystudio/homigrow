@@ -1155,6 +1155,52 @@ A reader should understand the code from the comment alone.
   linking the page in from the homepage/`PropertyCard` — all separate,
   later tasks (tracked in ClickUp).
 
+### Frontend Phase 3 (on `feature/phase_3_frontend_client`, cut from `dev`)
+- **Property Details page shipped 2026-07-29** — new `/properties/[id]`
+  route (`app/(client)/properties/[id]/page.tsx`), built against the
+  real `GET /api/v1/properties/{id}` endpoint from the backend task
+  above. Pulled the actual Figma frame (node `31:1845`, "property
+  details" on the `Client view` page) rather than guessing layout. New
+  `features/properties/`: `PropertyHeroGallery` (asymmetric bento photo
+  grid), `PropertyHeader` (title/location/listing-type tag/price/quick
+  stats — each quick stat only renders if the property actually has that
+  optional field), `PropertyDescription`, `PropertyAmenities` (generic
+  check-icon per amenity, since amenities are free-form strings with no
+  icon mapping), `PropertyContactCard` (broker card + inquiry form + map
+  placeholder — form buttons show a "not available yet" toast since
+  `POST /properties/{id}/enquire` doesn't exist), `PropertyLoanCalculator`
+  (EMI calculator seeded with the property's own price, reusing the
+  homepage EMI calculator's amortization math). New
+  `lib/api/endpoints/properties.ts`; added `ListingType`/`PropertyType`/
+  `Furnishing`/`MediaType` to `lib/enums.ts` (mirroring the backend
+  enums, previously missing); added `--brand-green-700: #6eb857` to
+  `globals.css` (Figma's "Accent Green/700", not previously in the
+  scale — same extend-as-needed pattern T22 used). Not built, matching
+  the backend task's own deferred list: the Vaastu compliance checker,
+  "Redesign with AI" button, and Market Context/"Download Market Report"
+  card; not yet linked from the homepage or `PropertyCard` (separate,
+  later task).
+  **Two real bugs found by loading the live page, not just reading the
+  code:** (1) the loan calculator was seeded with the raw `price` field
+  regardless of listing type — meaningless for the seeded property,
+  which is a rental (`price` is monthly rent there, not a purchase
+  price), producing a technically-correct but nonsensical mortgage
+  calculation. Fixed by only rendering the loan calculator when
+  `listing_type === "sale"`. (2) The hero gallery's grid used inconsistent
+  column-span math (two tiles each claimed half of a row that only had a
+  third of the width left), so two photos stacked full-width instead of
+  forming the intended bento grid — rebuilt as a simpler nested
+  left/right flex split instead of one flat grid. `tsc`/`eslint`/
+  `next build` all clean. Live-verified with Playwright against the real
+  backend (run from a throwaway git worktree so this checkout didn't
+  need to leave its own branch) + the real seeded property: full page
+  renders with no console errors beyond the expected logged-out
+  `/auth/refresh` 401; temporarily flipped the seeded property to
+  `listing_type=sale` in the real dev DB (and back again after) purely
+  to see the loan calculator render, since the standing demo property is
+  a rental; confirmed the 404 path renders `ErrorState` correctly for a
+  made-up id.
+
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
   docs/architecture/15_Decision_Log.md); integrate via
