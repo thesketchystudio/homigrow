@@ -35,6 +35,7 @@ from app.models.enums import (  # noqa: E402
 )
 from app.models.property import Property, PropertyMedia  # noqa: E402
 from app.models.user import User  # noqa: E402
+from scripts.create_test_property import DEFAULT_DESCRIPTION  # noqa: E402
 
 DEFAULT_BROKER_EMAIL = "vikram.broker.test@homigrow.local"
 DEFAULT_BROKER_PHONE = "9900011122"
@@ -43,6 +44,11 @@ DEFAULT_BROKER_PASSWORD = "Preetham-test"
 
 # (title, listing_type, property_type, price, bhk, bathrooms, area_sqft,
 #  furnishing, city, locality, state, pincode, amenities, image)
+#
+# None of these have real per-property editorial copy written yet, so they
+# all share create_test_property.py's DEFAULT_DESCRIPTION (the "Architectural
+# Vision" text) rather than a placeholder — the same content shown for every
+# one of them until real per-listing descriptions exist.
 DEMO_PROPERTIES = [
     (
         "Emerald Heights Apartment",
@@ -263,7 +269,7 @@ def seed_demo_properties() -> None:
             property_ = Property(
                 broker_id=broker.id,
                 title=title,
-                description=f"{title} — a curated Homigrow listing in {locality}, {city}.",
+                description=DEFAULT_DESCRIPTION,
                 listing_type=listing_type,
                 property_type=property_type,
                 status=PropertyStatus.active,
