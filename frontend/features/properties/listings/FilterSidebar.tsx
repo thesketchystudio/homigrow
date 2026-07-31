@@ -1,21 +1,25 @@
 // features/properties/listings/FilterSidebar.tsx
 // "AsideSidebarFilters" (Figma node 126:1311, "Curated Listings" search
-// screen). Only the sections with real backend support are built:
-// Price Range, Bedrooms, Listing Type (Figma's "Lease Type" Residential/
-// Commercial pills repurposed to Buy/Rent/PG — that pair maps onto the
-// real listing_type enum, "Residential vs Commercial" doesn't), Property
-// Type (Figma's marketing labels like "Estates & Mansions" replaced with
-// the real PropertyType categories), and Amenities. Metro Station
-// (needs a station-name dataset we don't have), Property Use (commercial
-// sub-categories not modeled), and "Founder's property" are omitted
-// entirely rather than shipped as dead controls — see project memory
-// figma-listings-search-screen-2026-07-30 for the full scope note.
+// screen). Price Range, Bedrooms, Listing Type (Figma's "Lease Type"
+// Residential/Commercial pills repurposed to Buy/Rent/PG — that pair
+// maps onto the real listing_type enum, "Residential vs Commercial"
+// doesn't), Property Type (Figma's marketing labels like "Estates &
+// Mansions" replaced with the real PropertyType categories), and
+// Amenities are fully wired to GET /properties. Metro Station (needs a
+// station-name dataset we don't have), Property Use (commercial
+// sub-categories not modeled), and "Founder's property" (no backing
+// field) are rendered matching Figma but disabled/"Coming soon" —
+// checkbox-style controls that silently no-op on click would be worse
+// UX than the toast pattern used for one-off action buttons elsewhere.
+// See project memory figma-listings-search-screen-2026-07-30.
+
+import { ChevronDown } from "lucide-react";
 
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PillGroup } from "@/features/auth/preferences/PillGroup";
 import { ListingType, PropertyType } from "@/lib/enums";
-import { formatINR } from "@/lib/utils";
+import { cn, formatINR } from "@/lib/utils";
 import { DEFAULT_FILTERS, PRICE_MAX, PRICE_MIN, PRICE_STEP, type ListingsFilters } from "./types";
 
 const BEDROOM_OPTIONS = [
@@ -41,21 +45,29 @@ const PROPERTY_TYPE_OPTIONS: { value: PropertyType; label: string }[] = [
   { value: PropertyType.pg_colive, label: "PG / Co-living" },
 ];
 
+const PROPERTY_USE_OPTIONS = ["Cafe", "Restaurant", "Retail Store", "Office Space"];
+
 const AMENITY_OPTIONS = [
   { value: "Metro station", label: "Metro station" },
   { value: "Swimming pool", label: "Swimming pool" },
 ];
 
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return <p className="font-heading text-[14px] font-bold uppercase tracking-[1.4px] text-brand-primary-300">{children}</p>;
+function SectionHeading({ children, comingSoon }: { children: React.ReactNode; comingSoon?: boolean }) {
+  return (
+    <p className="font-heading text-[14px] font-bold uppercase tracking-[1.4px] text-brand-primary-300">
+      {children}
+      {comingSoon && <span className="ml-2 normal-case tracking-normal text-brand-primary-300/70">(Coming soon)</span>}
+    </p>
+  );
 }
 
 type FilterSidebarProps = {
   filters: ListingsFilters;
   onChange: (filters: ListingsFilters) => void;
+  className?: string;
 };
 
-export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
+export function FilterSidebar({ filters, onChange, className }: FilterSidebarProps) {
   const set = <K extends keyof ListingsFilters>(key: K, value: ListingsFilters[K]) => onChange({ ...filters, [key]: value });
 
   const togglePropertyType = (value: PropertyType) => {
@@ -63,7 +75,7 @@ export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
   };
 
   return (
-    <aside className="w-full shrink-0 bg-brand-secondary-400 p-8 lg:w-[320px]">
+    <aside className={cn("w-full shrink-0 bg-brand-secondary-400 p-8 lg:w-[320px]", className)}>
       <div className="flex w-full flex-col gap-9">
         <div className="flex items-center justify-between">
           <h2 className="font-heading text-[20px] font-bold text-brand-primary-400">Filters</h2>
@@ -113,6 +125,25 @@ export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
           />
         </div>
 
+        <div className="flex flex-col gap-4 opacity-50">
+          <SectionHeading comingSoon>Metro Station</SectionHeading>
+          <div className="flex flex-col gap-4">
+            {["From", "To"].map((label) => (
+              <div key={label} className="flex flex-col gap-2">
+                <p className="font-heading text-[16px] font-medium text-brand-primary-400">{label}</p>
+                <button
+                  type="button"
+                  disabled
+                  className="flex items-center justify-between border-b border-brand-primary-800 px-3 py-2 text-left"
+                >
+                  <span className="font-heading text-[16px] text-brand-secondary-700">Select station</span>
+                  <ChevronDown className="size-3 text-brand-primary-400" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="flex flex-col gap-4">
           <SectionHeading>Listing Type</SectionHeading>
           <PillGroup
@@ -138,6 +169,29 @@ export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
                 <span className="font-body text-[14px] text-brand-primary-400">{option.label}</span>
               </label>
             ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 opacity-50">
+          <SectionHeading comingSoon>Property Use</SectionHeading>
+          <div className="flex flex-col gap-1.5">
+            {PROPERTY_USE_OPTIONS.map((label) => (
+              <label key={label} className="flex items-center gap-3">
+                <Checkbox disabled className="size-4 rounded-lg border-brand-secondary-700" />
+                <span className="font-body text-[14px] text-brand-primary-400">{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 opacity-50">
+          <SectionHeading comingSoon>Special Filters</SectionHeading>
+          <div className="flex flex-col gap-1.5">
+            <label className="flex items-center gap-3">
+              <Checkbox disabled className="size-4 rounded-lg border-brand-secondary-700" />
+              <span className="font-body text-[14px] text-brand-primary-400">Founder&apos;s property</span>
+            </label>
+            <p className="font-heading text-[16px] text-brand-secondary-700">Show only founder&apos;s properties</p>
           </div>
         </div>
 

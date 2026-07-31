@@ -8,7 +8,7 @@
 // and "Featured" would overstate what the sort actually does; "Top
 // Rated" is omitted for the same reason (no rating field exists).
 
-import { Grid2x2, Map } from "lucide-react";
+import { Grid2x2, Map, SlidersHorizontal } from "lucide-react";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/lib/toast";
@@ -24,9 +24,10 @@ type ListingsToolbarProps = {
   total: number;
   sort: SortValue;
   onSortChange: (sort: SortValue) => void;
+  onOpenFilters: () => void;
 };
 
-export function ListingsToolbar({ total, sort, onSortChange }: ListingsToolbarProps) {
+export function ListingsToolbar({ total, sort, onSortChange, onOpenFilters }: ListingsToolbarProps) {
   return (
     <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
       <div className="flex flex-col gap-1">
@@ -37,7 +38,16 @@ export function ListingsToolbar({ total, sort, onSortChange }: ListingsToolbarPr
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-1 rounded-lg bg-brand-secondary-400 p-1">
+        <button
+          type="button"
+          onClick={onOpenFilters}
+          className="flex items-center gap-2 rounded-lg bg-brand-secondary-400 px-4 py-2 font-heading text-[16px] font-bold text-brand-primary-400 lg:hidden"
+        >
+          <SlidersHorizontal className="size-3.5" />
+          Filters
+        </button>
+
+        <div className="hidden items-center gap-1 rounded-lg bg-brand-secondary-400 p-1 sm:flex">
           <div className="flex items-center gap-2 rounded-md bg-background px-4 py-2 shadow-sm">
             <Grid2x2 className="size-3.5" />
             <span className="font-heading text-[16px] font-bold text-brand-primary-400">Grid</span>

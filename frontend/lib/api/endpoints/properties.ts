@@ -105,7 +105,10 @@ export type PropertyListParams = {
   page_size?: number;
 };
 
-function buildQueryString(params: PropertyListParams): string {
+// Exported so the Listings page can build the identical query string for
+// the browser URL (shareable/bookmarkable filtered views) without
+// duplicating this param-serialization logic.
+export function buildQueryString(params: PropertyListParams): string {
   const search = new URLSearchParams();
   if (params.city) search.set("city", params.city);
   if (params.listing_type) search.set("listing_type", params.listing_type);
