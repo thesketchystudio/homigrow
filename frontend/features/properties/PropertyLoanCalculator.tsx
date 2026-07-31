@@ -74,7 +74,7 @@ export function PropertyLoanCalculator({ propertyPrice }: { propertyPrice: numbe
   const handleDeferred = (action: string) => toast.info(`${action} isn't available yet — check back soon.`);
 
   return (
-    <div className="flex flex-col gap-6 rounded-2xl bg-brand-secondary-400 px-6 pt-16 pb-8 sm:px-12">
+    <div className="flex flex-col gap-6 rounded-2xl bg-brand-secondary-400 pt-16 pr-6 pb-8 sm:pr-12">
       <div className="flex flex-col gap-2">
         <p className="font-heading text-[12px] uppercase tracking-[1.2px] text-brand-secondary-900">Plan your purchase</p>
         <h2 className="font-heading text-[28px] font-bold text-brand-primary-400">Home loan calculator</h2>

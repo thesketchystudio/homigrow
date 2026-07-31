@@ -13,6 +13,7 @@ const PRICE_STEP = 5_00_000;
 export { PRICE_STEP };
 
 export type ListingsFilters = {
+  city: string | null;
   priceMin: number;
   priceMax: number;
   bhkMin: number | null;
@@ -22,6 +23,7 @@ export type ListingsFilters = {
 };
 
 export const DEFAULT_FILTERS: ListingsFilters = {
+  city: null,
   priceMin: PRICE_MIN,
   priceMax: PRICE_MAX,
   bhkMin: null,

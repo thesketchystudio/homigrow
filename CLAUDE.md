@@ -1329,6 +1329,93 @@ A reader should understand the code from the comment alone.
   pattern as Property Details), a mobile-specific filter drawer (the
   sidebar is a static column today, not yet responsive), and URL-synced
   filter state.
+- **Homepage "Explore all properties" linked, 2026-07-30** — the
+  homepage `Listings.tsx` section's CTA (previously a dead `<button>`
+  with no `onClick` at all) now routes to `/properties` via `next/link`.
+  Verified live: click navigates correctly, no console errors.
+  Everything else on the homepage (hero search bar, the 3 mock
+  `PropertyCard` tiles) is still unwired — a separate, later task.
+- **Remaining Figma gaps filled on both pages, 2026-07-31** — closes
+  every "deferred, not built" item from the Property Details and
+  Listings tasks above except what genuinely needs new backend work
+  (tracked separately, not started yet). **Property Details:**
+  "Redesign with AI" (hero gallery overlay button, node `127:1499`) now
+  renders for real — toasts "not available yet" like the contact
+  form's actions, no image-gen service exists. **Vaastu Compliance**
+  (node `166:3505`) renders as an honest "Coming soon" card instead of
+  Figma's scored checklist — confirmed with you rather than fabricating
+  a score, since no per-room facing/plot-shape data exists on
+  `Property` to compute one from. **Market Context card** (node
+  `31:2041`) keeps its visual shape but swaps Figma's fabricated
+  per-property commentary ("14% YOY appreciation...") for honest
+  "coming soon" copy; "Download Market Report" toasts, per your
+  explicit choice on that button specifically. **Listings page:**
+  Metro Station/Property Use/"Founder's property" sections (previously
+  omitted entirely) now render matching Figma but disabled + labeled
+  "(Coming soon)" — checkboxes that silently no-op on click would read
+  as broken, worse than the toast pattern used for one-off buttons.
+  New **mobile filter drawer**: sidebar hidden below `lg`, a "Filters"
+  button in the toolbar opens the same filter set in the existing
+  shared `Modal` (drawer variant, bottom sheet) with a sticky "Show N
+  results" footer that updates live. New **URL-synced filter/sort/page
+  state**: every filter + sort + page now lives in the URL query string
+  (same param names the API takes), written via `router.replace` (no
+  history spam), read back on load — filtered views are now bookmarkable/
+  shareable; required wrapping the page in `<Suspense>` for
+  `useSearchParams` (confirmed via `next build` that `/properties`
+  still statically builds, not forced dynamic). `lib/api/endpoints/
+  properties.ts`'s `buildQueryString` exported so the page reuses the
+  exact same param-serialization the API client uses, rather than
+  duplicating it. **Two real bugs found live-testing, not just reading
+  the code:** (1) the mobile toolbar row (Filters + Grid/Map toggle +
+  Sort) overflowed horizontally on a real phone-width viewport, cutting
+  off the sort control — fixed by hiding the non-functional Grid/Map
+  toggle below `sm`. (2) The new mobile drawer failed a real
+  accessibility check on open — Radix flagged the dialog for a missing
+  `DialogTitle`/description, since neither was passed to avoid visually
+  duplicating `FilterSidebar`'s own "Filters" heading; fixed with a
+  screen-reader-only title/description rather than skipping them.
+  `tsc`/`eslint`/`next build` all clean. Live-verified with Playwright:
+  both new Details-page toasts fire correctly; every new Listings
+  section renders disabled/"(Coming soon)"; filter changes update the
+  URL live and a cold-loaded URL with filters/sort/page pre-set
+  restores the exact same UI state with no interaction; resized to a
+  real phone viewport, confirmed the toolbar no longer overflows,
+  opened/used the mobile drawer (live result count + sticky footer
+  button both updated together), zero console errors/warnings
+  throughout. **Still not started, on purpose:** backend cleanup for
+  whichever of these should get real support (enquiry form, metro
+  station dataset, property-use/founder's-property data model, Vaastu
+  data, market data) — scoping that with you before writing any of it.
+- **Homepage hero search + trending listings connected to real backend,
+  2026-07-31** — the two remaining frontend-only homepage pieces (hero
+  search widget, "Trending" property grid) now hit the real
+  `GET /properties` endpoint. `features/homepage/Hero.tsx`'s "Explore"
+  button pushes real filters onto `/properties` via the same
+  `buildQueryString` the Listings page uses (`lib/api/endpoints/
+  properties.ts`); Property Type dropdown options are relabeled per tab
+  to the real `PropertyType` enum (furnishing labels like "Fully
+  Furnished" aren't a real filter, so kept out rather than shipped as a
+  dead control) and Price Range labels map to real numeric min/max
+  pairs. `features/homepage/Listings.tsx`'s "Trending in Bengaluru"
+  section now fetches the 3 newest active Bengaluru listings for real,
+  with a real listing-type badge (For Sale/For Rent/PG) replacing the
+  fabricated "Premium Curation"/"Exclusive" marketing labels, and links
+  through to the real `/properties/{id}` page. Added `city` as a real,
+  URL-synced filter on the Listings page itself (`features/properties/
+  listings/types.ts`, `app/(client)/properties/page.tsx`,
+  `ListingsToolbar.tsx`) — the backend already supported it, nothing on
+  the frontend used it — so a hero search lands on the correctly scoped
+  result set (toolbar heading switches to "Properties in {city}" as
+  visible confirmation). `tsc`/`eslint`/`next build` all clean.
+  Live-verified with Playwright against the real backend + seeded data:
+  a full Buy → Villa → ₹1Cr–3Cr → "Bengaluru" → Explore search produced
+  the exact right URL and landed on the Listings page with the right
+  heading and a correct (real) empty-result state; a broader
+  `city=Bengaluru&listing_type=sale` search correctly returned "Showing
+  2 properties"; the homepage Trending grid rendered 3 real properties
+  with correct badges/prices, and clicking through a real card's "VIEW
+  DETAILS" loaded its real Property Details page cleanly.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

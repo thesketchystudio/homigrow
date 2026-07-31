@@ -20,11 +20,14 @@ export function PropertyDetailsSkeleton() {
             <Skeleton className="h-5 w-1/3" />
             <Skeleton className="h-9 w-40" />
           </div>
+          <Skeleton className="h-32 w-full" />
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-32 w-full" />
         </div>
-        <div className="w-full lg:w-[380px] shrink-0">
+        <div className="flex w-full flex-col gap-6 lg:w-[380px] shrink-0">
           <Skeleton className="h-[500px] w-full rounded" />
+          <Skeleton className="h-80 w-full rounded" />
+          <Skeleton className="h-40 w-full rounded" />
         </div>
       </div>
     </div>
