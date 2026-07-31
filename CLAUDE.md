@@ -1214,6 +1214,20 @@ A reader should understand the code from the comment alone.
   EXPLAIN ANALYZE against ~1k seeded rows was descoped along with the
   rest of the "handful of varied properties" plan agreed with you,
   not silently skipped.
+- **Backend cleanup review completed 2026-07-31, no changes needed** —
+  once the frontend Listings/Details pages were brought fully in line
+  with Figma, checked the backend for real cleanup work before touching
+  anything: `ruff check` clean, 167/167 tests pass, no stray TODO/FIXME
+  markers, and the one `alembic check` finding (`spatial_ref_sys`) is
+  the known-harmless PostGIS extension artifact, not real drift. Read
+  through `property_service.py`/`routes/properties.py` in full — nothing
+  actionable found. **One real gap surfaced and deliberately left
+  open:** `10_Phase_3.md` P3-T04 scopes `GET /properties/{id}/similar`
+  alongside the detail endpoint, but it was never built, and no
+  "Similar Properties" section exists in the Figma Property Details
+  frame either — building it now would be an endpoint with zero
+  consumers, so it stays un-built and just noted here rather than
+  silently dropped from the record.
 
 ### Frontend Phase 3 (on `feature/phase_3_frontend_client`, cut from `dev`)
 - **Property Details page shipped 2026-07-29** — new `/properties/[id]`
