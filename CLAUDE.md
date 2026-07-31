@@ -1313,6 +1313,35 @@ A reader should understand the code from the comment alone.
   whichever of these should get real support (enquiry form, metro
   station dataset, property-use/founder's-property data model, Vaastu
   data, market data) — scoping that with you before writing any of it.
+- **Homepage hero search + trending listings connected to real backend,
+  2026-07-31** — the two remaining frontend-only homepage pieces (hero
+  search widget, "Trending" property grid) now hit the real
+  `GET /properties` endpoint. `features/homepage/Hero.tsx`'s "Explore"
+  button pushes real filters onto `/properties` via the same
+  `buildQueryString` the Listings page uses (`lib/api/endpoints/
+  properties.ts`); Property Type dropdown options are relabeled per tab
+  to the real `PropertyType` enum (furnishing labels like "Fully
+  Furnished" aren't a real filter, so kept out rather than shipped as a
+  dead control) and Price Range labels map to real numeric min/max
+  pairs. `features/homepage/Listings.tsx`'s "Trending in Bengaluru"
+  section now fetches the 3 newest active Bengaluru listings for real,
+  with a real listing-type badge (For Sale/For Rent/PG) replacing the
+  fabricated "Premium Curation"/"Exclusive" marketing labels, and links
+  through to the real `/properties/{id}` page. Added `city` as a real,
+  URL-synced filter on the Listings page itself (`features/properties/
+  listings/types.ts`, `app/(client)/properties/page.tsx`,
+  `ListingsToolbar.tsx`) — the backend already supported it, nothing on
+  the frontend used it — so a hero search lands on the correctly scoped
+  result set (toolbar heading switches to "Properties in {city}" as
+  visible confirmation). `tsc`/`eslint`/`next build` all clean.
+  Live-verified with Playwright against the real backend + seeded data:
+  a full Buy → Villa → ₹1Cr–3Cr → "Bengaluru" → Explore search produced
+  the exact right URL and landed on the Listings page with the right
+  heading and a correct (real) empty-result state; a broader
+  `city=Bengaluru&listing_type=sale` search correctly returned "Showing
+  2 properties"; the homepage Trending grid rendered 3 real properties
+  with correct badges/prices, and clicking through a real card's "VIEW
+  DETAILS" loaded its real Property Details page cleanly.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
