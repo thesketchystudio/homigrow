@@ -1,10 +1,14 @@
 // features/properties/PropertyHeroGallery.tsx
 // Asymmetric bento-grid hero gallery for the Property Details screen
 // (Figma node 31:1847). Renders whatever photos the property actually has
-// (falls back gracefully below 4) — the "Redesign with AI" button shown in
-// Figma is intentionally not built (10_Phase_3.md P3-T04's deferred list).
+// (falls back gracefully below 4). "Redesign with AI" (node 127:1499) has
+// no backing image-generation service — same "not available yet" toast
+// pattern as PropertyContactCard's Schedule/Get Number actions.
+
+import { Sparkles } from "lucide-react";
 
 import type { PropertyMediaRead } from "@/lib/api/endpoints/properties";
+import { toast } from "@/lib/toast";
 
 type PropertyHeroGalleryProps = {
   media: PropertyMediaRead[];
@@ -20,11 +24,21 @@ export function PropertyHeroGallery({ media, title }: PropertyHeroGalleryProps) 
     <div className="flex flex-col gap-4 lg:h-[716px] lg:flex-row">
       <div className="relative h-[350px] shrink-0 overflow-hidden rounded lg:h-full lg:w-2/3 lg:flex-1">
         {hero && <img src={hero.url} alt={title} className="h-full w-full object-cover" />}
-        <div className="absolute bottom-7 left-8 rounded bg-brand-green-500 px-4 py-2">
+        <div className="absolute top-6 left-8 rounded bg-brand-green-500 px-4 py-2">
           <p className="font-heading text-[12px] font-bold uppercase tracking-[1.2px] text-brand-primary-600">
             Featured Architecture
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => toast.info("AI redesign isn't available yet — check back soon.")}
+          className="absolute bottom-7 left-8 flex items-center gap-2 rounded border border-[#13c200] bg-brand-secondary-400 px-6 py-4"
+        >
+          <Sparkles className="size-5 text-brand-green-600" />
+          <span className="font-heading text-[14px] font-bold uppercase tracking-[1.4px] text-brand-green-600">
+            Redesign with AI
+          </span>
+        </button>
       </div>
 
       <div className="hidden flex-col gap-4 lg:flex lg:h-full lg:w-1/3 lg:shrink-0">
