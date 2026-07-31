@@ -1,8 +1,11 @@
 // features/properties/PropertyHeroGallery.tsx
 // Asymmetric bento-grid hero gallery for the Property Details screen
-// (Figma node 31:1847). Renders whatever photos the property actually has
-// (falls back gracefully below 4). "Redesign with AI" (node 127:1499) has
-// no backing image-generation service — same "not available yet" toast
+// (Figma node 31:1847). Most seeded listings only have one real photo —
+// rather than leaving the other three grid cells blank/grey, they cycle
+// through whatever photos the property does have so the grid always
+// looks populated (a single-photo property just repeats that one photo
+// across all four cells). "Redesign with AI" (node 127:1499) has no
+// backing image-generation service — same "not available yet" toast
 // pattern as PropertyContactCard's Schedule/Get Number actions.
 
 import { Sparkles } from "lucide-react";
@@ -17,8 +20,13 @@ type PropertyHeroGalleryProps = {
 
 export function PropertyHeroGallery({ media, title }: PropertyHeroGalleryProps) {
   const images = [...media].sort((a, b) => a.position - b.position);
-  const [hero, interior, detail] = images;
-  const remaining = Math.max(images.length - 3, 0);
+  const remaining = Math.max(images.length - 4, 0);
+  // Cycle rather than leave a cell empty when there are fewer than 4 real photos.
+  const cellImage = (index: number) => (images.length > 0 ? images[index % images.length] : undefined);
+  const hero = cellImage(0);
+  const interior = cellImage(1);
+  const detail = cellImage(2);
+  const overlayCell = cellImage(3);
 
   return (
     <div className="flex flex-col gap-4 lg:h-[716px] lg:flex-row">
@@ -50,9 +58,10 @@ export function PropertyHeroGallery({ media, title }: PropertyHeroGalleryProps) 
             {detail && <img src={detail.url} alt={`${title} — detail`} className="h-full w-full object-cover" />}
           </div>
           <div className="relative w-1/2 overflow-hidden rounded bg-brand-secondary-500">
+            {overlayCell && <img src={overlayCell.url} alt={`${title} — more`} className="h-full w-full object-cover" />}
             {remaining > 0 && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <p className="font-heading text-[12px] font-bold uppercase tracking-[1.2px] text-brand-primary-600">
+              <div className="absolute inset-0 flex items-center justify-center bg-[rgba(9,9,9,0.5)]">
+                <p className="font-heading text-[12px] font-bold uppercase tracking-[1.2px] text-brand-secondary-100">
                   View {images.length} Photos
                 </p>
               </div>
