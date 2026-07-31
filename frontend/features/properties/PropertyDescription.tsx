@@ -12,7 +12,7 @@ export function PropertyDescription({ description }: { description?: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="font-heading text-[12px] font-bold uppercase tracking-[1.2px] text-brand-green-700">Overview</p>
+      <p className="font-heading text-[12px] font-bold uppercase tracking-[1.2px] text-brand-green-700">Architectural Vision</p>
       <p className="font-heading text-[28px] leading-[36px] text-brand-primary-600">{hook}</p>
       {rest.length > 0 && (
         <div className="flex flex-col gap-6">
