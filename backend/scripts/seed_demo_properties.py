@@ -41,11 +41,26 @@ DEFAULT_BROKER_PHONE = "9900011122"
 DEFAULT_BROKER_NAME = "Vikram Sethi"
 DEFAULT_BROKER_PASSWORD = "Preetham-test"
 
-# (title, listing_type, property_type, price, bhk, bathrooms, area_sqft,
-#  furnishing, city, locality, state, pincode, amenities, image)
+# (title, description, listing_type, property_type, price, bhk, bathrooms,
+#  area_sqft, furnishing, city, locality, state, pincode, amenities, image)
+#
+# `description` follows the same two-paragraph shape as
+# create_test_property.py's DEFAULT_DESCRIPTION (a short "hook" line, a
+# blank line, then a supporting detail paragraph) — PropertyDescription.tsx
+# splits on the blank line and renders the first paragraph as the large
+# "Overview" heading text, the rest as body copy. Previously these all
+# used a generic "{title} — a curated Homigrow listing in {locality},
+# {city}." placeholder, which left the Overview section on the frontend
+# looking like unfinished filler text for every demo listing except the
+# separately-authored "The Obsidian Estate".
 DEMO_PROPERTIES = [
     (
         "Emerald Heights Apartment",
+        "A warm, light-filled apartment residence in the heart of "
+        "Indiranagar, built for elevated everyday living.\n\n"
+        "Floor-to-ceiling glazing and cross-ventilated layouts keep every "
+        "room bright, while a private balcony frames the neighbourhood's "
+        "signature tree canopy.",
         ListingType.sale,
         PropertyType.apartment,
         18000000,
@@ -62,6 +77,11 @@ DEMO_PROPERTIES = [
     ),
     (
         "Whitefield Tech Loft",
+        "A compact, fully-furnished loft engineered for Bengaluru's tech "
+        "corridor.\n\n"
+        "Efficient space planning, built-in storage and a dedicated work "
+        "nook make it a turnkey base for professionals who value function "
+        "as much as form.",
         ListingType.rent,
         PropertyType.apartment,
         45000,
@@ -78,6 +98,11 @@ DEMO_PROPERTIES = [
     ),
     (
         "Marine Drive Residency",
+        "A sea-facing residence on one of Mumbai's most storied "
+        "addresses.\n\n"
+        "Sweeping windows turn every sunset into part of the architecture, "
+        "while generous living spaces and a restrained material palette "
+        "let the Arabian Sea remain the real centrepiece.",
         ListingType.sale,
         PropertyType.apartment,
         65000000,
@@ -94,6 +119,11 @@ DEMO_PROPERTIES = [
     ),
     (
         "Bandra Garden Villa",
+        "A private-garden villa tucked away from Bandra West's busy "
+        "lanes.\n\n"
+        "Timber accents and open courtyards soften the urban edge, "
+        "creating a home that feels more coastal retreat than city "
+        "rental.",
         ListingType.rent,
         PropertyType.villa,
         120000,
@@ -110,6 +140,11 @@ DEMO_PROPERTIES = [
     ),
     (
         "Vasant Vihar Independent House",
+        "A stately independent house in one of Delhi's most established "
+        "residential enclaves.\n\n"
+        "Wide verandas and a mature private garden give the property a "
+        "settled, generational character rare this close to the city "
+        "centre.",
         ListingType.sale,
         PropertyType.independent_house,
         42000000,
@@ -126,6 +161,11 @@ DEMO_PROPERTIES = [
     ),
     (
         "Cyber City Co-living PG",
+        "A co-living residence designed for Gurugram's always-on Cyber "
+        "City crowd.\n\n"
+        "Private rooms open onto shared lounges built for both focus and "
+        "downtime, with meals, Wi-Fi and housekeeping handled so residents "
+        "can spend their energy elsewhere.",
         ListingType.pg,
         PropertyType.pg_colive,
         18000,
@@ -142,6 +182,10 @@ DEMO_PROPERTIES = [
     ),
     (
         "Koregaon Park Retail Space",
+        "A ground-floor retail space on one of Koregaon Park's busiest "
+        "commercial stretches.\n\n"
+        "Wide frontage and an open floor plate leave the layout ready for "
+        "almost any format, from flagship store to café.",
         ListingType.sale,
         PropertyType.shop,
         21000000,
@@ -158,6 +202,10 @@ DEMO_PROPERTIES = [
     ),
     (
         "HITEC City Office Suite",
+        "A move-in-ready office suite at the centre of Hyderabad's HITEC "
+        "City.\n\n"
+        "Efficient cabin-and-bay planning and dedicated parking keep the "
+        "daily commute simple for teams that have outgrown co-working.",
         ListingType.rent,
         PropertyType.office,
         85000,
@@ -174,6 +222,11 @@ DEMO_PROPERTIES = [
     ),
     (
         "ECR Beachside Plot",
+        "A rare beachside plot along Chennai's East Coast Road, ready for "
+        "a custom build.\n\n"
+        "Clear title and an open canvas make this one for buyers who want "
+        "to design their own coastal retreat from the ground up, with the "
+        "Bay of Bengal as its backdrop.",
         ListingType.sale,
         PropertyType.plot,
         9500000,
@@ -190,6 +243,11 @@ DEMO_PROPERTIES = [
     ),
     (
         "Sarjapur Modern Villa",
+        "A clean-lined, glass-forward villa built for Bengaluru's "
+        "tech-adjacent Sarjapur Road corridor.\n\n"
+        "A private garden and pool wrap around double-height living "
+        "spaces, giving the interiors an unusually generous sense of "
+        "scale for the neighbourhood.",
         ListingType.sale,
         PropertyType.villa,
         35000000,
@@ -242,6 +300,7 @@ def seed_demo_properties() -> None:
         created = 0
         for index, (
             title,
+            description,
             listing_type,
             property_type,
             price,
@@ -263,7 +322,7 @@ def seed_demo_properties() -> None:
             property_ = Property(
                 broker_id=broker.id,
                 title=title,
-                description=f"{title} — a curated Homigrow listing in {locality}, {city}.",
+                description=description,
                 listing_type=listing_type,
                 property_type=property_type,
                 status=PropertyStatus.active,
