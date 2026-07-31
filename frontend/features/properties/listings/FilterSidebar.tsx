@@ -164,7 +164,7 @@ export function FilterSidebar({ filters, onChange, className }: FilterSidebarPro
                 <Checkbox
                   checked={filters.propertyTypes.includes(option.value)}
                   onCheckedChange={() => togglePropertyType(option.value)}
-                  className="size-4 rounded-lg border-brand-secondary-700 data-[state=checked]:border-brand-primary-400 data-[state=checked]:bg-brand-primary-400 data-[state=checked]:text-background"
+                  className="size-4 border-brand-secondary-700 data-[state=checked]:border-brand-primary-400 data-[state=checked]:bg-brand-primary-400 data-[state=checked]:text-background"
                 />
                 <span className="font-body text-[14px] text-brand-primary-400">{option.label}</span>
               </label>
@@ -177,7 +177,7 @@ export function FilterSidebar({ filters, onChange, className }: FilterSidebarPro
           <div className="flex flex-col gap-1.5">
             {PROPERTY_USE_OPTIONS.map((label) => (
               <label key={label} className="flex items-center gap-3">
-                <Checkbox disabled className="size-4 rounded-lg border-brand-secondary-700" />
+                <Checkbox disabled className="size-4 border-brand-secondary-700" />
                 <span className="font-body text-[14px] text-brand-primary-400">{label}</span>
               </label>
             ))}
@@ -188,7 +188,7 @@ export function FilterSidebar({ filters, onChange, className }: FilterSidebarPro
           <SectionHeading comingSoon>Special Filters</SectionHeading>
           <div className="flex flex-col gap-1.5">
             <label className="flex items-center gap-3">
-              <Checkbox disabled className="size-4 rounded-lg border-brand-secondary-700" />
+              <Checkbox disabled className="size-4 border-brand-secondary-700" />
               <span className="font-body text-[14px] text-brand-primary-400">Founder&apos;s property</span>
             </label>
             <p className="font-heading text-[16px] text-brand-secondary-700">Show only founder&apos;s properties</p>
