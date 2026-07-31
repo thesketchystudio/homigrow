@@ -1,61 +1,39 @@
 // features/homepage/Listings.tsx
-// Featured/trending property listings grid on the homepage.
+// Featured/trending property listings grid on the homepage. Pulls the 3
+// newest active Bengaluru listings from the real GET /properties endpoint
+// (same one the /properties Listings page uses) instead of hardcoded
+// mock data. The badge is now the real listing type (For Sale/For Rent/
+// PG), matching the LISTING_TAG convention PropertyHeader.tsx already
+// uses on the Details page — not fabricated marketing copy like "Premium
+// Curation"/"Exclusive", which had no data behind it.
 
 "use client";
 
 import { useState } from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 
 import svgPaths from "@/lib/homepage-svg-paths";
+import { listProperties, type PropertyListItem } from "@/lib/api/endpoints/properties";
+import { ListingType } from "@/lib/enums";
+import { formatINR } from "@/lib/utils";
 
-const imgModernMansion = "/homepage/modern-mansion.png";
-const imgModernLivingRoom = "/homepage/modern-living-room.png";
-const imgProp3 = "/homepage/listing-3.png";
+const FALLBACK_IMAGE = "/homepage/modern-mansion.png";
+const TRENDING_CITY = "Bengaluru";
 
 const sg = "'Space Grotesk', sans-serif";
 const pj = "'Plus Jakarta Sans', sans-serif";
 
-const properties = [
-  {
-    id: 1,
-    name: "The Meridian Estate",
-    location: "Indiranagar",
-    price: "₹2,45,000/mo",
-    tag: "rent",
-    bhk: 4,
-    sqft: "4,500",
-    badge: "Premium Curation",
-    badgeBg: "#92f574",
-    badgeRadius: 4,
-    img: imgModernMansion,
-  },
-  {
-    id: 2,
-    name: "Aravali Sky Residences",
-    location: "Sadashivanagar",
-    price: "₹4.8 Cr",
-    tag: "buy",
-    bhk: 3,
-    sqft: "3,200",
-    badge: "New Launch",
-    badgeBg: "#13c200",
-    badgeRadius: 12,
-    img: imgModernLivingRoom,
-  },
-  {
-    id: 3,
-    name: "The Glass Penthouse",
-    location: "MG Road",
-    price: "₹12.5 Cr",
-    tag: "buy",
-    bhk: 5,
-    sqft: "6,800",
-    badge: "Exclusive",
-    badgeBg: "#090909",
-    badgeRadius: 4,
-    img: imgProp3,
-  },
-];
+const LISTING_TAG: Record<ListingType, { label: string; bg: string; text: string }> = {
+  [ListingType.sale]: { label: "For Sale", bg: "#13c200", text: "#fefeff" },
+  [ListingType.rent]: { label: "For Rent", bg: "#92f574", text: "#232323" },
+  [ListingType.pg]: { label: "PG / Co-living", bg: "#090909", text: "#fefeff" },
+};
+
+function formatPrice(item: PropertyListItem): string {
+  if (item.listing_type === ListingType.sale) return formatINR(item.price);
+  return `₹${Math.round(item.price).toLocaleString("en-IN")}/mo`;
+}
 
 function HeartIcon({ filled }: { filled: boolean }) {
   return (
@@ -89,9 +67,10 @@ function PinIcon() {
   );
 }
 
-function PropertyCard({ p }: { p: (typeof properties)[number] }) {
+function PropertyCard({ item }: { item: PropertyListItem }) {
   const [liked, setLiked] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const tag = LISTING_TAG[item.listing_type];
 
   return (
     <div
@@ -110,8 +89,8 @@ function PropertyCard({ p }: { p: (typeof properties)[number] }) {
     >
       <div style={{ position: "relative", height: 280, overflow: "hidden", flexShrink: 0 }}>
         <img
-          src={p.img}
-          alt={p.name}
+          src={item.cover_image_url ?? FALLBACK_IMAGE}
+          alt={item.title}
           style={{
             width: "100%",
             height: "133%",
@@ -150,21 +129,12 @@ function PropertyCard({ p }: { p: (typeof properties)[number] }) {
             position: "absolute",
             bottom: 13,
             left: 16,
-            background: p.badgeBg,
-            borderRadius: p.badgeRadius,
+            background: tag.bg,
+            borderRadius: 4,
             padding: "3.5px 12px",
           }}
         >
-          <span
-            style={{
-              fontFamily: pj,
-              fontWeight: 700,
-              fontSize: 12,
-              color: p.badgeBg === "#92f574" ? "#232323" : "#fefeff",
-            }}
-          >
-            {p.badge}
-          </span>
+          <span style={{ fontFamily: pj, fontWeight: 700, fontSize: 12, color: tag.text }}>{tag.label}</span>
         </div>
       </div>
 
@@ -180,7 +150,7 @@ function PropertyCard({ p }: { p: (typeof properties)[number] }) {
                 color: "#1a1a1a",
               }}
             >
-              {p.name}
+              {item.title}
             </span>
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
               <PinIcon />
@@ -192,7 +162,7 @@ function PropertyCard({ p }: { p: (typeof properties)[number] }) {
                   color: "rgba(26,26,26,0.8)",
                 }}
               >
-                {p.location}
+                {item.locality}, {item.city}
               </span>
             </div>
           </div>
@@ -204,31 +174,40 @@ function PropertyCard({ p }: { p: (typeof properties)[number] }) {
               color: "#1a1a1a",
             }}
           >
-            {p.price}
+            {formatPrice(item)}
           </span>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            gap: 24,
-            alignItems: "center",
-            padding: "5px 0",
-            borderTop: "1px solid rgba(198,198,205,0.1)",
-            borderBottom: "1px solid rgba(198,198,205,0.1)",
-          }}
-        >
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <BedIcon />
-            <span style={{ fontFamily: pj, fontWeight: 500, fontSize: 14, color: "#1a1a1a" }}>{p.bhk} BHK</span>
+        {(item.bhk !== null || item.area_sqft !== null) && (
+          <div
+            style={{
+              display: "flex",
+              gap: 24,
+              alignItems: "center",
+              padding: "5px 0",
+              borderTop: "1px solid rgba(198,198,205,0.1)",
+              borderBottom: "1px solid rgba(198,198,205,0.1)",
+            }}
+          >
+            {item.bhk !== null && (
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <BedIcon />
+                <span style={{ fontFamily: pj, fontWeight: 500, fontSize: 14, color: "#1a1a1a" }}>{item.bhk} BHK</span>
+              </div>
+            )}
+            {item.area_sqft !== null && (
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <AreaIcon />
+                <span style={{ fontFamily: pj, fontWeight: 500, fontSize: 14, color: "#1a1a1a" }}>
+                  {item.area_sqft.toLocaleString("en-IN")} sqft
+                </span>
+              </div>
+            )}
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <AreaIcon />
-            <span style={{ fontFamily: pj, fontWeight: 500, fontSize: 14, color: "#1a1a1a" }}>{p.sqft} sqft</span>
-          </div>
-        </div>
+        )}
 
-        <button
+        <Link
+          href={`/properties/${item.id}`}
           style={{
             width: "100%",
             padding: "16px",
@@ -241,12 +220,15 @@ function PropertyCard({ p }: { p: (typeof properties)[number] }) {
             fontSize: 16,
             color: "#1a1a1a",
             transition: "background 0.2s",
+            textAlign: "center",
+            textDecoration: "none",
+            display: "block",
           }}
           onMouseEnter={(e) => (e.currentTarget.style.background = "#c8c9ca")}
           onMouseLeave={(e) => (e.currentTarget.style.background = "#dfe0e1")}
         >
           VIEW DETAILS
-        </button>
+        </Link>
       </div>
     </div>
   );
@@ -260,7 +242,28 @@ function ArrowIcon() {
   );
 }
 
+function CardSkeleton() {
+  return (
+    <div style={{ background: "#fefeff", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+      <div style={{ height: 280, background: "#e5e7eb" }} />
+      <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ height: 16, width: "70%", background: "#e5e7eb", borderRadius: 4 }} />
+        <div style={{ height: 12, width: "50%", background: "#e5e7eb", borderRadius: 4 }} />
+        <div style={{ height: 16, width: "40%", background: "#e5e7eb", borderRadius: 4 }} />
+      </div>
+    </div>
+  );
+}
+
 export default function Listings() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["homepage-trending", TRENDING_CITY],
+    queryFn: () => listProperties({ city: TRENDING_CITY, sort: "newest", page_size: 3 }),
+  });
+
+  const items = data?.items ?? [];
+  if (!isLoading && items.length === 0) return null;
+
   return (
     <section style={{ background: "#f8f9fa" }}>
       <div style={{ maxWidth: 1400, margin: "0 auto", padding: "clamp(60px, 10vw, 100px) clamp(20px, 5vw, 150px)" }}>
@@ -297,7 +300,7 @@ export default function Listings() {
                 margin: 0,
               }}
             >
-              Trending in Bengaluru
+              Trending in {TRENDING_CITY}
             </h2>
           </div>
           <Link
@@ -324,9 +327,9 @@ export default function Listings() {
         </div>
 
         <div className="listings-grid">
-          {properties.map((p) => (
-            <PropertyCard key={p.id} p={p} />
-          ))}
+          {isLoading
+            ? Array.from({ length: 3 }, (_, i) => <CardSkeleton key={i} />)
+            : items.map((item) => <PropertyCard key={item.id} item={item} />)}
         </div>
       </div>
 

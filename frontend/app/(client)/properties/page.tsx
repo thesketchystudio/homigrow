@@ -32,6 +32,7 @@ const PAGE_SIZE = 12;
 
 function toListParams(filters: ListingsFilters, sort: SortValue, page: number): PropertyListParams {
   return {
+    city: filters.city ?? undefined,
     // Only sent once the user actually moves the slider off its resting
     // extremes — the default ₹50L–₹15Cr range is meaningless for rent/PG
     // listings, whose `price` is a monthly figure (e.g. ₹18,000), and
@@ -53,6 +54,7 @@ function parseStateFromSearchParams(searchParams: URLSearchParams): {
   sort: SortValue;
   page: number;
 } {
+  const cityRaw = searchParams.get("city");
   const priceMin = Number(searchParams.get("price_min")) || DEFAULT_FILTERS.priceMin;
   const priceMax = Number(searchParams.get("price_max")) || DEFAULT_FILTERS.priceMax;
   const bhkMinRaw = searchParams.get("bhk_min");
@@ -62,6 +64,7 @@ function parseStateFromSearchParams(searchParams: URLSearchParams): {
 
   return {
     filters: {
+      city: cityRaw || null,
       priceMin,
       priceMax,
       bhkMin: bhkMinRaw ? Number(bhkMinRaw) : null,
@@ -116,6 +119,7 @@ function PropertiesListingsContent() {
       <div className="flex min-w-0 flex-1 flex-col gap-8 lg:px-12 lg:py-8">
         <ListingsToolbar
           total={data?.total ?? 0}
+          city={filters.city}
           sort={sort}
           onSortChange={updateSort}
           onOpenFilters={() => setMobileFiltersOpen(true)}
