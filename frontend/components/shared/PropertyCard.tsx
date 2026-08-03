@@ -52,7 +52,10 @@ export default function PropertyCard({ property, size = "md", isSaved = false, o
   const imageHeight = size === "sm" ? "h-40" : "h-56";
 
   return (
-    <div className="bg-card text-card-foreground flex flex-col overflow-hidden rounded-xl border shadow-sm transition-shadow hover:shadow-md">
+    <a
+      href={property.href}
+      className="bg-card text-card-foreground flex flex-col overflow-hidden rounded-xl border shadow-sm transition-shadow hover:shadow-md"
+    >
       <div className={cn("relative shrink-0 overflow-hidden", imageHeight)}>
         {!imageLoaded && <Skeleton className="absolute inset-0" />}
         <img
@@ -71,7 +74,11 @@ export default function PropertyCard({ property, size = "md", isSaved = false, o
         {onToggleSave && (
           <button
             type="button"
-            onClick={() => onToggleSave(property.id)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleSave(property.id);
+            }}
             aria-label={isSaved ? "Remove from saved" : "Save property"}
             aria-pressed={isSaved}
             disabled={isSold}
@@ -90,7 +97,7 @@ export default function PropertyCard({ property, size = "md", isSaved = false, o
         )}
       </div>
 
-      <a href={property.href} className={cn("flex flex-col gap-3", size === "sm" ? "p-4" : "p-5")}>
+      <div className={cn("flex flex-col gap-3", size === "sm" ? "p-4" : "p-5")}>
         <div className="flex flex-col gap-1">
           <span className={cn("font-semibold leading-tight", size === "sm" ? "text-sm" : "text-base")}>
             {property.title}
@@ -119,7 +126,7 @@ export default function PropertyCard({ property, size = "md", isSaved = false, o
             )}
           </div>
         )}
-      </a>
-    </div>
+      </div>
+    </a>
   );
 }

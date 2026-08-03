@@ -127,11 +127,14 @@
 }
 
 /* ─── Footer newsletter row ─────────────────────────────── */
+/* Horizontal padding maxes at 100px (not the general .section-inner's
+   150px) — matches Figma's real homepage Footer instance (node 388:984),
+   where every band's content starts at x=100 within the 1400px frame. */
 .footer-newsletter {
   display: flex;
   flex-direction: column;
   gap: 48px;
-  padding: clamp(48px, 8vw, 80px) clamp(20px, 5vw, 150px) clamp(40px, 6vw, 65px);
+  padding: clamp(48px, 8vw, 80px) clamp(20px, 5vw, 100px) clamp(40px, 6vw, 65px);
   border-bottom: 1px solid rgba(198,198,205,0.1);
 }
 @media (min-width: 769px) {
@@ -140,12 +143,12 @@
 
 /* ─── Footer nav columns (4 → 2 → 1) ───────────────────── */
 .footer-nav {
-  max-width: 1280px;
+  max-width: 1400px;
   margin: 0 auto;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: clamp(24px, 4vw, 32px);
-  padding: clamp(32px, 5vw, 40px) clamp(20px, 5vw, 32px);
+  padding: clamp(32px, 5vw, 40px) clamp(20px, 5vw, 100px);
 }
 @media (min-width: 769px) {
   .footer-nav { grid-template-columns: repeat(4, 1fr); }
@@ -153,13 +156,13 @@
 
 /* ─── Footer bottom bar ─────────────────────────────────── */
 .footer-bottom {
-  max-width: 1280px;
+  max-width: 1400px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
   align-items: flex-start;
-  padding: clamp(24px, 4vw, 40px) clamp(20px, 5vw, 32px);
+  padding: clamp(24px, 4vw, 40px) clamp(20px, 5vw, 100px);
   border-top: 1px solid rgba(198,198,205,0.05);
 }
 @media (min-width: 769px) {
