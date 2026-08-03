@@ -1342,6 +1342,37 @@ A reader should understand the code from the comment alone.
   2 properties"; the homepage Trending grid rendered 3 real properties
   with correct badges/prices, and clicking through a real card's "VIEW
   DETAILS" loaded its real Property Details page cleanly.
+- **Saved Properties frontend shipped 2026-08-03** (P3-T40, frontend
+  half) — wired the previously-cosmetic heart/save button on
+  `PropertyCard` to the real backend from the same task's other half.
+  New `lib/api/endpoints/savedProperties.ts` and `lib/hooks/
+  useSavedPropertyToggle.ts` (the shared piece: fetches up to 50 saved
+  ids for card display — not the real paginated Saved list, that's
+  still a separate un-built screen, P3-T41 — and exposes an optimistic
+  `onToggleSave(id)` with rollback-on-error; shows a "Log in to save
+  properties." toast instead of firing a request if the visitor isn't
+  authenticated). Both `ListingsGrid.tsx` (the `/properties` page,
+  shared `PropertyCard`) and the homepage `Listings.tsx` Trending
+  section (its own bespoke inline card) now source real `savedIds`/
+  `onToggleSave` from this one hook instead of each having its own
+  local, non-persisted `liked` state. `tsc`/`eslint`/`next build` all
+  clean. Live-verified with Playwright, already authenticated as the
+  standing test account, against the real backend + seeded data: saved
+  a homepage Trending card (`PUT` → `204`, heart turned red
+  immediately), hard-reloaded, and confirmed the same property still
+  showed saved — read straight off the real DOM
+  (`aria-label="Remove from saved"`, SVG `fill="#ef4444"`) since a
+  screenshot at that scroll position didn't render the small heart
+  clearly enough to eyeball — then unsaved it (`DELETE` → `204`).
+  Repeated the identical save/unsave round trip on the `/properties`
+  Listings grid. No console errors from the app itself. **Confirmed
+  while investigating this: `/profile/my-properties` is NOT the same
+  concept as this Saved feature** — its own skeleton file documents it
+  as properties the user *owns* (needs backend ownership data that
+  doesn't exist yet), not a saved/watchlist screen; the real "Saved"
+  destination is most likely the nav bar's existing "Saved" link
+  (currently a dead `#` href) — P3-T41, needs its own Figma pull before
+  building, not yet started.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

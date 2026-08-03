@@ -26,6 +26,7 @@ import { ListingsGrid, ListingsGridSkeleton } from "@/features/properties/listin
 import { ListingsPagination } from "@/features/properties/listings/ListingsPagination";
 import { DEFAULT_FILTERS, type ListingsFilters, type SortValue } from "@/features/properties/listings/types";
 import { buildQueryString, listProperties, type PropertyListParams } from "@/lib/api/endpoints/properties";
+import { useSavedPropertyToggle } from "@/lib/hooks/useSavedPropertyToggle";
 import { ListingType, PropertyType } from "@/lib/enums";
 
 const PAGE_SIZE = 12;
@@ -93,6 +94,7 @@ function PropertiesListingsContent() {
     queryFn: () => listProperties(params),
     placeholderData: keepPreviousData,
   });
+  const { savedIds, onToggleSave } = useSavedPropertyToggle();
 
   useEffect(() => {
     const query = buildQueryString(params);
@@ -131,7 +133,7 @@ function PropertiesListingsContent() {
           <ListingsGridSkeleton />
         ) : (
           <div className={isPlaceholderData ? "opacity-60 transition-opacity" : undefined}>
-            <ListingsGrid items={data?.items ?? []} />
+            <ListingsGrid items={data?.items ?? []} savedIds={savedIds} onToggleSave={onToggleSave} />
           </div>
         )}
 
