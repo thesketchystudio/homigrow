@@ -2,28 +2,59 @@
 app/services/saved_property_service.py
 
 Client watchlist reads and idempotent save/unsave (05_API_Design.md
-§saved-properties; 10_Phase_3.md P3-T40). No status filter on the listed
-properties — a saved property stays in the watchlist even if it later
-goes off-market, since the row is the user's own save history, not a
-public search result.
+§saved-properties; 10_Phase_3.md P3-T40/P3-T41). No status filter on the
+listed properties — a saved property stays in the watchlist even if it
+later goes off-market, since the row is the user's own save history, not
+a public search result.
 """
 
+from typing import Literal, Optional
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError
+from app.models.enums import PropertyType
 from app.models.property import Property, PropertyMedia
 from app.models.saved_property import SavedProperty
 from app.schemas.saved_properties import SavedPropertyItem
 
+SavedSortOption = Literal["recent", "price_asc", "price_desc"]
+
+_SORT_CLAUSES = {
+    "recent": SavedProperty.created_at.desc(),
+    "price_asc": Property.price.asc(),
+    "price_desc": Property.price.desc(),
+}
+
 
 def list_saved_properties(
-    db: Session, user_id: UUID, *, page: int = 1, page_size: int = 20
+    db: Session,
+    user_id: UUID,
+    *,
+    property_type: Optional[list[PropertyType]] = None,
+    sort: SavedSortOption = "recent",
+    page: int = 1,
+    page_size: int = 20,
 ) -> tuple[list[SavedPropertyItem], int]:
-    """Returns a page of the user's saved properties, newest-saved first, plus the total count."""
-    total = db.query(func.count(SavedProperty.property_id)).filter(SavedProperty.user_id == user_id).scalar()
+    """
+    Returns a page of the user's saved properties plus the total count,
+    filtered by the Saved screen's category pills and ordered per its sort
+    control. `property_type` narrows to the given physical categories
+    (the "Villas"/"Commercial" pills); `sort` defaults to newest-saved
+    first, matching the pre-P3-T41 behavior.
+    """
+    conditions = [SavedProperty.user_id == user_id]
+    if property_type:
+        conditions.append(Property.property_type.in_(property_type))
+
+    total = (
+        db.query(func.count(SavedProperty.property_id))
+        .join(Property, Property.id == SavedProperty.property_id)
+        .filter(*conditions)
+        .scalar()
+    )
 
     cover_image_subq = (
         select(PropertyMedia.url)
@@ -36,8 +67,8 @@ def list_saved_properties(
     rows = (
         db.query(SavedProperty, Property, cover_image_subq.label("cover_image_url"))
         .join(Property, Property.id == SavedProperty.property_id)
-        .filter(SavedProperty.user_id == user_id)
-        .order_by(SavedProperty.created_at.desc())
+        .filter(*conditions)
+        .order_by(_SORT_CLAUSES[sort])
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()

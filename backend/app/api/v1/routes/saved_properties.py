@@ -13,8 +13,10 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.deps import CurrentUser
 from app.db.session import get_db
+from app.models.enums import PropertyType
 from app.schemas.saved_properties import SavedPropertyListResponse
 from app.services import saved_property_service
+from app.services.saved_property_service import SavedSortOption
 
 router = APIRouter(prefix="/saved-properties", tags=["saved-properties"])
 
@@ -23,11 +25,15 @@ router = APIRouter(prefix="/saved-properties", tags=["saved-properties"])
 def list_saved_properties(
     user: CurrentUser,
     db: Session = Depends(get_db),
+    property_type: list[PropertyType] = Query(default=[]),
+    sort: SavedSortOption = "recent",
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=50),
 ) -> SavedPropertyListResponse:
-    """Lists the caller's saved properties, newest-saved first."""
-    items, total = saved_property_service.list_saved_properties(db, user.id, page=page, page_size=page_size)
+    """Lists the caller's saved properties, filtered by the Saved screen's category pills and ordered per its sort control (default: newest-saved first)."""
+    items, total = saved_property_service.list_saved_properties(
+        db, user.id, property_type=property_type or None, sort=sort, page=page, page_size=page_size
+    )
     return SavedPropertyListResponse(items=items, page=page, page_size=page_size, total=total)
 
 

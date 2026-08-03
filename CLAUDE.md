@@ -1263,6 +1263,33 @@ A reader should understand the code from the comment alone.
   next:** wiring `PropertyCard`'s existing (currently cosmetic)
   `isSaved`/`onToggleSave` props to these endpoints, and building real
   content for the `/profile/my-properties` tab.
+- **Saved Properties category filter + sort shipped 2026-08-03** (P3-T41
+  backend follow-up) — `GET /api/v1/saved-properties` gained two more
+  optional query params: `property_type` (list, filters to the given
+  `PropertyType` categories — `saved_property_service.
+  list_saved_properties` now joins `Property` in the count query too,
+  not just the row query, so `total`/`total_pages` stay correct under
+  the filter) and `sort` (new `SavedSortOption = Literal["recent",
+  "price_asc", "price_desc"]`, mirroring `property_service.SortOption`;
+  `"recent"` is the pre-existing default `SavedProperty.created_at.desc()`
+  order, unchanged). Driven by the frontend's real Figma pull for this
+  screen — the "Villas"/"Commercial" category pills map to
+  `[villa]`/`[office, shop]` respectively; "Penthouses" has no matching
+  `PropertyType` at all, left to the frontend to render disabled.
+  178→182 tests pass (2 new: property-type filter, price sort); `ruff`
+  clean. **Live-verification caught a real stale-server repeat of the
+  documented class of bug** (see prior worktree-server notes above): the
+  process listening on port 8000 was traced via
+  `Get-CimInstance Win32_Process` to a `python -m uvicorn` launched from
+  the *original* `homigrow/backend` directory, not this worktree — so it
+  silently served the pre-P3-T41 route with zero errors, only caught by
+  diffing `GET /openapi.json`'s params against what was just added. Fixed
+  by killing that process and its orphaned `--reload` multiprocessing
+  child, then restarting `python -m uvicorn app.main:app --reload --port
+  8000` with cwd actually set to this worktree. Re-verified live
+  end-to-end afterward against the real Supabase dev DB: villa filter,
+  commercial filter, and both price sorts all returned exactly the
+  expected subset/order.
 
 ### Frontend Phase 3 (on `feature/phase_3_frontend_client`, cut from `dev`)
 - **Property Details page shipped 2026-07-29** — new `/properties/[id]`
