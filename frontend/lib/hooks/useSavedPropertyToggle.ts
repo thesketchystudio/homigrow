@@ -14,7 +14,10 @@ import { listSavedProperties, saveProperty, unsaveProperty } from "@/lib/api/end
 import { useAuthStore } from "@/lib/stores/auth";
 import { toast } from "@/lib/toast";
 
-const SAVED_IDS_QUERY_KEY = ["saved-property-ids"];
+// Exported so the Saved properties page (P3-T41) can invalidate this same
+// cache after an unsave — otherwise a heart icon on another page (Listings,
+// homepage Trending) would keep showing "saved" until its own query refetches.
+export const SAVED_IDS_QUERY_KEY = ["saved-property-ids"];
 
 export function useSavedPropertyToggle() {
   const isAuthenticated = useAuthStore((state) => state.status === "authenticated");

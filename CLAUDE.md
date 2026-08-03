@@ -1509,6 +1509,52 @@ A reader should understand the code from the comment alone.
   destination is most likely the nav bar's existing "Saved" link
   (currently a dead `#` href) — P3-T41, needs its own Figma pull before
   building, not yet started.
+- **Saved Properties screen shipped 2026-08-03** (P3-T41) — new
+  `app/(client)/saved/page.tsx`, wiring the nav bar's "Saved" link
+  (`components/shared/TopNavBar.tsx`: only that one link now routes
+  somewhere real — Discover/AI Tools/Compare stay `#`). Pulled the real
+  Figma design (`Client view` page, section "saved", node `133:3060`,
+  "Your Curated Collection") — a far richer screen than scoped (private
+  notes per card, a multi-select "Compare" tool, "Book a Private Tour"/
+  "Contact Curator" actions), none backed by real data or a service, so
+  built the scoped-down version: the real saved list as shared
+  `PropertyCard`s + a real empty state. `AuthGuard`-gated (all roles).
+  Reuses `ListingsGrid`/`ListingsPagination` (gained an optional
+  `emptyState` prop rather than forking the grid) and the existing
+  `SAVED_IDS_QUERY_KEY` (now exported from `useSavedPropertyToggle.ts`)
+  so unsaving here invalidates the same cache the Listings page/homepage
+  Trending section read from — hearts stay in sync across all three
+  without a reload. New backend support (see backend CLAUDE.md,
+  2026-08-03): `property_type` filter + `sort` param on
+  `GET /saved-properties`. `tsc`/`eslint`/`next build` all clean.
+  Live-verified against the real backend + Supabase dev DB: saved/
+  unsaved down to the empty state (count text pluralizes correctly at 0/
+  1/N), confirmed cross-page cache sync, confirmed session rehydrates
+  cleanly on a hard reload of `/saved` with no bounce to login.
+  **Visual-accuracy follow-up, same day** — you compared a screenshot
+  against Figma and flagged three gaps: (1) the subtitle copy didn't
+  match Figma's literal text — now reads "N exceptional properties
+  meticulously selected for your portfolio" with a real dynamic count;
+  (2) the category pills (All/Villas/Penthouses/Commercial) and
+  "Recently Saved" sort were cosmetic-only — both now real, backed by
+  the new backend params above; "Penthouses" stays visible per Figma but
+  disabled (no matching `PropertyType` exists); (3) the sort control was
+  misplaced (inline with the pills, full-width) and the bottom
+  "Schedule a Portfolio Review" banner was missing its background photo
+  — Figma actually places the sort control in the Header row next to the
+  title (node `133:3062`), not the Filters row, so it moved into a new
+  `SavedSortControl.tsx` (compact pill button, `ArrowUpDown` icon) split
+  out from the pill-only `SavedCategoryPills.tsx`; the CTA
+  (`PortfolioReviewCta.tsx`) now blends the real Figma conference-room
+  photo under its gradient via `mix-blend-overlay`, matching Figma's
+  layer order exactly — downloaded locally to `public/saved/
+  portfolio-review-bg.png` since Figma asset URLs expire after 7 days
+  (same precedent as the Login screen's `brand-panel.png`). Button still
+  toasts "not available yet" — no curator service exists. Re-verified
+  live: all three fixes screenshot-matched against the Figma reference,
+  zero console errors. **Compare (the multi-select tool + "Selected: N
+  Properties" counter from the same Figma frame) remains explicitly out
+  of scope**, per your instruction.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
