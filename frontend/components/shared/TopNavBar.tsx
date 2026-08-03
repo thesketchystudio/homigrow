@@ -17,6 +17,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, Search } from "lucide-react";
 
@@ -26,6 +27,10 @@ import { useAuthStore } from "@/lib/stores/auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const sg = "'Space Grotesk', sans-serif";
+
+// Only "Saved" has a real destination so far (P3-T41) — Discover/AI
+// Tools/Compare stay dead "#" links until those features exist.
+const NAV_LINK_HREFS: Record<string, string> = { Saved: "/saved" };
 
 function initials(name?: string) {
   if (!name) return "?";
@@ -94,9 +99,9 @@ export default function TopNavBar() {
 
         <div style={{ display: "flex", gap: 32, alignItems: "center" }} className="desktop-only">
           {["Discover", "AI Tools", "Compare", "Saved"].map((link) => (
-            <a
+            <Link
               key={link}
-              href="#"
+              href={NAV_LINK_HREFS[link] ?? "#"}
               style={{
                 fontFamily: sg,
                 fontWeight: 500,
@@ -107,7 +112,7 @@ export default function TopNavBar() {
               }}
             >
               {link}
-            </a>
+            </Link>
           ))}
         </div>
 
@@ -200,9 +205,10 @@ export default function TopNavBar() {
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {["Discover", "AI Tools", "Compare", "Saved"].map((link) => (
-              <a
+              <Link
                 key={link}
-                href="#"
+                href={NAV_LINK_HREFS[link] ?? "#"}
+                onClick={() => setMobileOpen(false)}
                 style={{
                   fontFamily: sg,
                   fontWeight: 500,
@@ -213,7 +219,7 @@ export default function TopNavBar() {
                 }}
               >
                 {link}
-              </a>
+              </Link>
             ))}
           </div>
         </div>

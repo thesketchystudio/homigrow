@@ -5,7 +5,12 @@
 // Cards from this endpoint are always active listings (the backend only
 // returns status=active), so no sold-state overlay is wired here — but
 // the save toggle is real (10_Phase_3.md P3-T40), driven by whichever
-// page renders this grid via useSavedPropertyToggle.
+// page renders this grid via useSavedPropertyToggle. Reused as-is by the
+// Saved properties page (P3-T41) via SavedPropertyItem, which extends
+// PropertyListItem with just a `saved_at` field — the `emptyState` prop
+// lets each caller supply its own copy ("no filter matches" vs "nothing
+// saved yet") without forking the grid/skeleton/mapping logic.
+import type { ReactNode } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import PropertyCard from "@/components/shared/PropertyCard";
@@ -48,13 +53,17 @@ export function ListingsGrid({
   items,
   savedIds,
   onToggleSave,
+  emptyState,
 }: {
   items: PropertyListItem[];
   savedIds: Set<string>;
   onToggleSave: (id: string) => void;
+  emptyState?: ReactNode;
 }) {
   if (items.length === 0) {
-    return <EmptyState title="No properties match your filters" body="Try widening your price range or clearing a filter." />;
+    return (
+      emptyState ?? <EmptyState title="No properties match your filters" body="Try widening your price range or clearing a filter." />
+    );
   }
 
   return (
