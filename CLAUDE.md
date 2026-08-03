@@ -1228,6 +1228,41 @@ A reader should understand the code from the comment alone.
   frame either — building it now would be an endpoint with zero
   consumers, so it stays un-built and just noted here rather than
   silently dropped from the record.
+- **Saved Properties backend shipped 2026-08-03** (P3-T40, backend
+  half only) — `GET /api/v1/saved-properties` (paginated, newest-saved
+  first, embeds the same `PropertyListItem`/PropertyCard shape the
+  Listings endpoint uses, plus a `saved_at` timestamp),
+  `PUT /api/v1/saved-properties/{property_id}` (idempotent save, 204;
+  404 `PROPERTY_NOT_FOUND` if the property doesn't exist at all), and
+  `DELETE /api/v1/saved-properties/{property_id}` (idempotent unsave,
+  204 whether or not it was ever saved). New
+  `app/schemas/saved_properties.py` (`SavedPropertyItem` extends
+  `PropertyListItem` with `saved_at`, same `PropertyListResponse`
+  pagination-envelope convention), `app/services/
+  saved_property_service.py`, `app/api/v1/routes/
+  saved_properties.py`, registered in `router.py`. No migration
+  needed — `saved_properties` (composite PK, cascade deletes) has
+  existed unused since the original Phase 1 M1 migration. A saved
+  property deliberately stays in the list even if the listing later
+  goes off-market — it's the user's own save history, not a live
+  search result, so nothing gets filtered out post-save. This
+  worktree (`homigrow-backend-wt`) had gone stale (unregistered,
+  emptied) since the last backend session — recreated via
+  `git worktree add` on `feature/phase_3_backend_client` before
+  starting; its `.env` doesn't survive a fresh worktree checkout
+  (gitignored, untracked) and had to be copied over from the main
+  `homigrow/backend` checkout before tests/server would boot. 167→178
+  tests pass (11 new, `tests/api/v1/routes/test_saved_properties.py`);
+  `ruff` clean. Live-verified end-to-end against the real Supabase dev
+  DB from a freshly started `python -m uvicorn` (not the bare
+  `uvicorn` shim — same past gotcha) using the standing test account
+  and a real seeded property: save → appears correctly in the list →
+  save again (still one row, still 204) → unsave → list empty again →
+  unsave again (still 204) → save a made-up id (404) → list with no
+  auth token (401). **Not part of this task, separate follow-ups
+  next:** wiring `PropertyCard`'s existing (currently cosmetic)
+  `isSaved`/`onToggleSave` props to these endpoints, and building real
+  content for the `/profile/my-properties` tab.
 
 ### Frontend Phase 3 (on `feature/phase_3_frontend_client`, cut from `dev`)
 - **Property Details page shipped 2026-07-29** — new `/properties/[id]`
