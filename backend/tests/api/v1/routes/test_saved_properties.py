@@ -98,6 +98,35 @@ class TestListSavedProperties:
 
         assert [item["title"] for item in response.json()["items"]] == ["Newer Save", "Older Save"]
 
+    def test_property_type_filter(self, client, db_session):
+        user = make_user(db_session, phone="+919876580011")
+        villa = _make_property(db_session, title="Villa Save", property_type=PropertyType.villa)
+        office = _make_property(db_session, title="Office Save", property_type=PropertyType.office)
+        db_session.add(SavedProperty(user_id=user.id, property_id=villa.id))
+        db_session.add(SavedProperty(user_id=user.id, property_id=office.id))
+        db_session.flush()
+
+        response = client.get(
+            "/api/v1/saved-properties", headers=_auth_headers(user), params={"property_type": "villa"}
+        )
+
+        assert response.status_code == 200
+        assert [item["title"] for item in response.json()["items"]] == ["Villa Save"]
+
+    def test_price_sort(self, client, db_session):
+        user = make_user(db_session, phone="+919876580012")
+        cheap = _make_property(db_session, title="Cheap Save", price=100000)
+        pricey = _make_property(db_session, title="Pricey Save", price=900000)
+        db_session.add(SavedProperty(user_id=user.id, property_id=pricey.id))
+        db_session.add(SavedProperty(user_id=user.id, property_id=cheap.id))
+        db_session.flush()
+
+        response = client.get(
+            "/api/v1/saved-properties", headers=_auth_headers(user), params={"sort": "price_asc"}
+        )
+
+        assert [item["title"] for item in response.json()["items"]] == ["Cheap Save", "Pricey Save"]
+
     def test_pagination_envelope(self, client, db_session):
         user = make_user(db_session, phone="+919876580020")
         for i in range(3):
