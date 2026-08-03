@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import svgPaths from "@/lib/homepage-svg-paths";
 import { listProperties, type PropertyListItem } from "@/lib/api/endpoints/properties";
+import { useSavedPropertyToggle } from "@/lib/hooks/useSavedPropertyToggle";
 import { ListingType } from "@/lib/enums";
 import { formatINR } from "@/lib/utils";
 
@@ -67,8 +68,15 @@ function PinIcon() {
   );
 }
 
-function PropertyCard({ item }: { item: PropertyListItem }) {
-  const [liked, setLiked] = useState(false);
+function PropertyCard({
+  item,
+  isSaved,
+  onToggleSave,
+}: {
+  item: PropertyListItem;
+  isSaved: boolean;
+  onToggleSave: (id: string) => void;
+}) {
   const [hovered, setHovered] = useState(false);
   const tag = LISTING_TAG[item.listing_type];
 
@@ -103,8 +111,8 @@ function PropertyCard({ item }: { item: PropertyListItem }) {
           }}
         />
         <button
-          onClick={() => setLiked(!liked)}
-          aria-label={liked ? "Remove from saved" : "Save property"}
+          onClick={() => onToggleSave(item.id)}
+          aria-label={isSaved ? "Remove from saved" : "Save property"}
           style={{
             position: "absolute",
             top: 16,
@@ -122,7 +130,7 @@ function PropertyCard({ item }: { item: PropertyListItem }) {
             transition: "background 0.2s",
           }}
         >
-          <HeartIcon filled={liked} />
+          <HeartIcon filled={isSaved} />
         </button>
         <div
           style={{
@@ -260,6 +268,7 @@ export default function Listings() {
     queryKey: ["homepage-trending", TRENDING_CITY],
     queryFn: () => listProperties({ city: TRENDING_CITY, sort: "newest", page_size: 3 }),
   });
+  const { savedIds, onToggleSave } = useSavedPropertyToggle();
 
   const items = data?.items ?? [];
   if (!isLoading && items.length === 0) return null;
@@ -329,7 +338,9 @@ export default function Listings() {
         <div className="listings-grid">
           {isLoading
             ? Array.from({ length: 3 }, (_, i) => <CardSkeleton key={i} />)
-            : items.map((item) => <PropertyCard key={item.id} item={item} />)}
+            : items.map((item) => (
+                <PropertyCard key={item.id} item={item} isSaved={savedIds.has(item.id)} onToggleSave={onToggleSave} />
+              ))}
         </div>
       </div>
 

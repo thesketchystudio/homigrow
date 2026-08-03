@@ -3,7 +3,9 @@
 // PropertyCard (components/shared/PropertyCard.tsx) — previously only
 // exercised in the /dev/components gallery, this is its first real use.
 // Cards from this endpoint are always active listings (the backend only
-// returns status=active), so no saved/sold state is wired here.
+// returns status=active), so no sold-state overlay is wired here — but
+// the save toggle is real (10_Phase_3.md P3-T40), driven by whichever
+// page renders this grid via useSavedPropertyToggle.
 
 import { Skeleton } from "@/components/ui/skeleton";
 import PropertyCard from "@/components/shared/PropertyCard";
@@ -42,7 +44,15 @@ export function ListingsGridSkeleton({ count = 6 }: { count?: number }) {
   );
 }
 
-export function ListingsGrid({ items }: { items: PropertyListItem[] }) {
+export function ListingsGrid({
+  items,
+  savedIds,
+  onToggleSave,
+}: {
+  items: PropertyListItem[];
+  savedIds: Set<string>;
+  onToggleSave: (id: string) => void;
+}) {
   if (items.length === 0) {
     return <EmptyState title="No properties match your filters" body="Try widening your price range or clearing a filter." />;
   }
@@ -62,6 +72,8 @@ export function ListingsGrid({ items }: { items: PropertyListItem[] }) {
             areaSqft: item.area_sqft ?? undefined,
             href: `/properties/${item.id}`,
           }}
+          isSaved={savedIds.has(item.id)}
+          onToggleSave={onToggleSave}
         />
       ))}
     </div>
