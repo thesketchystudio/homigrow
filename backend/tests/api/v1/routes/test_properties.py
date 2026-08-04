@@ -275,3 +275,47 @@ class TestListProperties:
         response = client.get("/api/v1/properties", params={"page_size": 100})
 
         assert response.status_code == 422
+
+
+class TestCompareProperties:
+    def test_returns_active_properties_in_requested_order(self, client, db_session):
+        first = _make_property(db_session, title="First")
+        second = _make_property(db_session, title="Second")
+
+        response = client.get("/api/v1/properties/compare", params={"ids": f"{second.id},{first.id}"})
+
+        assert response.status_code == 200
+        assert [item["title"] for item in response.json()["items"]] == ["Second", "First"]
+
+    def test_drops_non_active_and_nonexistent_ids(self, client, db_session):
+        active = _make_property(db_session, title="Active")
+        pending = _make_property(db_session, title="Pending", status=PropertyStatus.pending)
+        missing_id = uuid.uuid4()
+
+        response = client.get(
+            "/api/v1/properties/compare",
+            params={"ids": f"{active.id},{pending.id},{missing_id}"},
+        )
+
+        assert response.status_code == 200
+        assert [item["title"] for item in response.json()["items"]] == ["Active"]
+
+    def test_malformed_id_returns_422(self, client):
+        response = client.get("/api/v1/properties/compare", params={"ids": "not-a-uuid"})
+
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "INVALID_COMPARE_IDS"
+
+    def test_more_than_max_ids_returns_422(self, client, db_session):
+        ids = [str(_make_property(db_session).id) for _ in range(4)]
+
+        response = client.get("/api/v1/properties/compare", params={"ids": ",".join(ids)})
+
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "TOO_MANY_COMPARE_IDS"
+
+    def test_empty_ids_returns_empty_list(self, client):
+        response = client.get("/api/v1/properties/compare", params={"ids": ""})
+
+        assert response.status_code == 200
+        assert response.json()["items"] == []

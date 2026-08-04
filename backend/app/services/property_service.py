@@ -46,6 +46,29 @@ def get_property_detail(db: Session, property_id: UUID) -> Property:
     return property_
 
 
+def compare_properties(db: Session, ids: list[UUID]) -> list[Property]:
+    """
+    Returns active properties matching the given ids, reordered back into the
+    caller's requested order (SQL IN doesn't preserve it). Missing or
+    non-active ids are silently dropped — same visibility rule
+    get_property_detail uses, just without raising for a subset that isn't
+    found rather than a single lookup.
+    """
+    if not ids:
+        return []
+    rows = (
+        db.query(Property)
+        .options(
+            joinedload(Property.media),
+            joinedload(Property.broker).joinedload(User.broker_profile),
+        )
+        .filter(Property.id.in_(ids), Property.status == PropertyStatus.active)
+        .all()
+    )
+    by_id = {row.id: row for row in rows}
+    return [by_id[i] for i in ids if i in by_id]
+
+
 def list_properties(
     db: Session,
     *,
