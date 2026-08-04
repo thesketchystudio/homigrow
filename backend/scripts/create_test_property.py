@@ -15,6 +15,7 @@ Usage:
 """
 
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Allows running this script directly (`python scripts/create_test_property.py`)
@@ -41,13 +42,23 @@ DEFAULT_BROKER_NAME = "Vikram Sethi"
 DEFAULT_BROKER_PASSWORD = "Preetham-test"
 
 DEFAULT_TITLE = "The Obsidian Estate"
+# Matches the Figma "Architectural Vision" section (node 31:1916) verbatim —
+# hook line, then two body paragraphs, split by a blank line the same way
+# PropertyDescription.tsx parses it on the frontend. Reused as-is for every
+# other seeded demo property too (seed_demo_properties.py) since none of
+# them have real per-property editorial copy written yet.
 DEFAULT_DESCRIPTION = (
     "A monolithic statement in stone and glass, The Obsidian Estate redefines "
     "urban sanctuary in the heart of Bengaluru's most coveted zip code.\n\n"
     "Designed by the award-winning Praxis Studio, this residence is a "
     "masterclass in Brutalist elegance tempered by tropical lushness. The "
     "exterior, clad in hand-honed basalt, creates a dramatic silhouette that "
-    "evolves with the movement of the sun."
+    "evolves with the movement of the sun.\n\n"
+    "Inside, the layout follows a fluid \"open-chamber\" philosophy. "
+    "Triple-height voids allow for passive cooling and a continuous dialogue "
+    "with the internal koi pond. The material palette—unfiltered concrete, "
+    "charred oak, and brushed brass—provides a sensory experience that is "
+    "both raw and profoundly luxurious."
 )
 DEFAULT_AMENITIES = [
     "Private Infinity Pool",
@@ -128,6 +139,7 @@ def create_test_property() -> None:
             state="Karnataka",
             pincode="560038",
             metro_distance_m=3000,
+            published_at=datetime.now(timezone.utc),
         )
         db.add(property_)
         db.flush()

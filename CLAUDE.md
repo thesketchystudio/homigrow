@@ -1176,6 +1176,142 @@ A reader should understand the code from the comment alone.
   Supabase dev DB + seeded demo properties via curl: order preservation,
   a missing id and a non-active id both silently dropped, a malformed id
   and a 4th id both correctly 422.
+- **Property Listings search endpoint shipped 2026-07-30** —
+  `GET /api/v1/properties`, the search/grid endpoint backing the
+  Listings page (10_Phase_3.md P3-T10), built after pulling the real
+  Figma "Curated Listings" screen (`search` frame, node `28:646`,
+  `Client view` page) so frontend work lands on the same real design.
+  That screen's filter sidebar has more filters than real schema
+  supports today (a named metro-station picker, commercial
+  sub-categories like Cafe/Restaurant, a "founder's property" toggle,
+  a map view) — scoped down to what real columns/enums back, same
+  pattern as Property Details' Vaastu/AI/Market-Report deferrals;
+  confirmed with you before building. Filters: `city` (case-
+  insensitive exact match), `listing_type`, `property_type`
+  (repeatable), `price_min`/`price_max`, `bhk_min`, `amenities`
+  (repeatable, matches ANY via Postgres JSONB `?|` — mirrors the
+  sidebar's multi-select checkboxes). Sort: `newest` (default,
+  `published_at desc nullslast`) / `price_asc` / `price_desc` — an
+  invalid `sort` value 422s automatically via a `Literal` type, no
+  custom validation code needed. Pagination: `page`/`page_size`
+  (default 20, max 50, doc's existing convention), response envelope
+  is `{items, page, page_size, total, total_pages}`. New
+  `PropertyListItem`/`PropertyListResponse` in `schemas/properties.py`
+  (lighter than `PropertyRead` — no media gallery/broker detail, just
+  one cover image via a correlated subquery on `PropertyMedia.
+  is_cover`) and `property_service.list_properties()`. **Found and
+  fixed a real gap while building this:** `published_at` was declared
+  on the `Property` model and even has a dedicated partial index
+  (`ix_properties_active_published_at`) but was never actually *set*
+  anywhere — not by the seed script, not by anything else — so
+  "newest first" sorting had nothing real to sort by. Fixed
+  `create_test_property.py` to set it, backfilled the one existing
+  Obsidian Estate row (which predated this fix) directly against the
+  dev DB, and set staggered values in the new seed data below so
+  "newest" sort has a real, distinct order to verify against. New
+  **`scripts/seed_demo_properties.py`**/**`delete_demo_properties.py`**
+  (same create/delete pair convention as `create_test_property.py`) —
+  10 more active demo listings spanning 5 cities (Bengaluru, Mumbai,
+  Delhi, Gurugram, Pune, Hyderabad, Chennai), all 3 `ListingType`
+  values, 6 of the 7 `PropertyType` values, and a price range from
+  ₹18k/mo rent to ₹6.5 Cr sale — enough real variation to exercise
+  every filter combination once the frontend grid exists. 167/167
+  tests pass (12 new, `TestListProperties` in the existing
+  `test_properties.py`); `ruff` clean. **Test isolation note:** these
+  tests run against the real dev DB (`tests/conftest.py`'s
+  transactional rollback only undoes what a test itself inserts, not
+  pre-existing committed rows like the intentionally-left-seeded
+  Obsidian Estate) — every list test scopes its query to a per-test
+  throwaway city name to stay exact regardless of what else is
+  sitting in the shared dev DB. Live-verified end-to-end against the
+  real Supabase dev DB: ran both seed scripts, then curled every
+  filter/sort/pagination combination and confirmed exact matching
+  result sets, plus confirmed `sort=bogus` and `page_size=999` both
+  422. Checked the query plan (`EXPLAIN ANALYZE`) for a representative
+  filtered query — the composite indexes (`ix_properties_status_
+  listing_type`, `ix_properties_city_locality`, `ix_properties_price`)
+  are correctly shaped for this access pattern; at the current ~11-row
+  seed volume Postgres reasonably picks a sequential scan over them
+  (expected at this scale, not a bug) — P3-T10's literal ask for an
+  EXPLAIN ANALYZE against ~1k seeded rows was descoped along with the
+  rest of the "handful of varied properties" plan agreed with you,
+  not silently skipped.
+- **Backend cleanup review completed 2026-07-31, no changes needed** —
+  once the frontend Listings/Details pages were brought fully in line
+  with Figma, checked the backend for real cleanup work before touching
+  anything: `ruff check` clean, 167/167 tests pass, no stray TODO/FIXME
+  markers, and the one `alembic check` finding (`spatial_ref_sys`) is
+  the known-harmless PostGIS extension artifact, not real drift. Read
+  through `property_service.py`/`routes/properties.py` in full — nothing
+  actionable found. **One real gap surfaced and deliberately left
+  open:** `10_Phase_3.md` P3-T04 scopes `GET /properties/{id}/similar`
+  alongside the detail endpoint, but it was never built, and no
+  "Similar Properties" section exists in the Figma Property Details
+  frame either — building it now would be an endpoint with zero
+  consumers, so it stays un-built and just noted here rather than
+  silently dropped from the record.
+- **Saved Properties backend shipped 2026-08-03** (P3-T40, backend
+  half only) — `GET /api/v1/saved-properties` (paginated, newest-saved
+  first, embeds the same `PropertyListItem`/PropertyCard shape the
+  Listings endpoint uses, plus a `saved_at` timestamp),
+  `PUT /api/v1/saved-properties/{property_id}` (idempotent save, 204;
+  404 `PROPERTY_NOT_FOUND` if the property doesn't exist at all), and
+  `DELETE /api/v1/saved-properties/{property_id}` (idempotent unsave,
+  204 whether or not it was ever saved). New
+  `app/schemas/saved_properties.py` (`SavedPropertyItem` extends
+  `PropertyListItem` with `saved_at`, same `PropertyListResponse`
+  pagination-envelope convention), `app/services/
+  saved_property_service.py`, `app/api/v1/routes/
+  saved_properties.py`, registered in `router.py`. No migration
+  needed — `saved_properties` (composite PK, cascade deletes) has
+  existed unused since the original Phase 1 M1 migration. A saved
+  property deliberately stays in the list even if the listing later
+  goes off-market — it's the user's own save history, not a live
+  search result, so nothing gets filtered out post-save. This
+  worktree (`homigrow-backend-wt`) had gone stale (unregistered,
+  emptied) since the last backend session — recreated via
+  `git worktree add` on `feature/phase_3_backend_client` before
+  starting; its `.env` doesn't survive a fresh worktree checkout
+  (gitignored, untracked) and had to be copied over from the main
+  `homigrow/backend` checkout before tests/server would boot. 167→178
+  tests pass (11 new, `tests/api/v1/routes/test_saved_properties.py`);
+  `ruff` clean. Live-verified end-to-end against the real Supabase dev
+  DB from a freshly started `python -m uvicorn` (not the bare
+  `uvicorn` shim — same past gotcha) using the standing test account
+  and a real seeded property: save → appears correctly in the list →
+  save again (still one row, still 204) → unsave → list empty again →
+  unsave again (still 204) → save a made-up id (404) → list with no
+  auth token (401). **Not part of this task, separate follow-ups
+  next:** wiring `PropertyCard`'s existing (currently cosmetic)
+  `isSaved`/`onToggleSave` props to these endpoints, and building real
+  content for the `/profile/my-properties` tab.
+- **Saved Properties category filter + sort shipped 2026-08-03** (P3-T41
+  backend follow-up) — `GET /api/v1/saved-properties` gained two more
+  optional query params: `property_type` (list, filters to the given
+  `PropertyType` categories — `saved_property_service.
+  list_saved_properties` now joins `Property` in the count query too,
+  not just the row query, so `total`/`total_pages` stay correct under
+  the filter) and `sort` (new `SavedSortOption = Literal["recent",
+  "price_asc", "price_desc"]`, mirroring `property_service.SortOption`;
+  `"recent"` is the pre-existing default `SavedProperty.created_at.desc()`
+  order, unchanged). Driven by the frontend's real Figma pull for this
+  screen — the "Villas"/"Commercial" category pills map to
+  `[villa]`/`[office, shop]` respectively; "Penthouses" has no matching
+  `PropertyType` at all, left to the frontend to render disabled.
+  178→182 tests pass (2 new: property-type filter, price sort); `ruff`
+  clean. **Live-verification caught a real stale-server repeat of the
+  documented class of bug** (see prior worktree-server notes above): the
+  process listening on port 8000 was traced via
+  `Get-CimInstance Win32_Process` to a `python -m uvicorn` launched from
+  the *original* `homigrow/backend` directory, not this worktree — so it
+  silently served the pre-P3-T41 route with zero errors, only caught by
+  diffing `GET /openapi.json`'s params against what was just added. Fixed
+  by killing that process and its orphaned `--reload` multiprocessing
+  child, then restarting `python -m uvicorn app.main:app --reload --port
+  8000` with cwd actually set to this worktree. Re-verified live
+  end-to-end afterward against the real Supabase dev DB: villa filter,
+  commercial filter, and both price sorts all returned exactly the
+  expected subset/order.
 
 ### Frontend Phase 3 (on `feature/phase_3_frontend_client`, cut from `dev`)
 - **Property Details page shipped 2026-07-29** — new `/properties/[id]`
