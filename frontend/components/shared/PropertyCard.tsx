@@ -6,7 +6,8 @@
 "use client";
 
 import { useState } from "react";
-import { BedDouble, Heart, MapPin, Ruler } from "lucide-react";
+import Link from "next/link";
+import { BedDouble, Check, Heart, MapPin, Ruler } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,16 +44,26 @@ export type PropertyCardProps = {
   size?: "sm" | "md";
   isSaved?: boolean;
   onToggleSave?: (id: string) => void;
+  isComparing?: boolean;
+  onToggleCompare?: (id: string) => void;
   badge?: PropertyCardBadge;
 };
 
-export default function PropertyCard({ property, size = "md", isSaved = false, onToggleSave, badge }: PropertyCardProps) {
+export default function PropertyCard({
+  property,
+  size = "md",
+  isSaved = false,
+  onToggleSave,
+  isComparing = false,
+  onToggleCompare,
+  badge,
+}: PropertyCardProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const isSold = property.status !== undefined && SOLD_STATUSES.includes(property.status);
   const imageHeight = size === "sm" ? "h-40" : "h-56";
 
   return (
-    <a
+    <Link
       href={property.href}
       className="bg-card text-card-foreground flex flex-col overflow-hidden rounded-xl border shadow-sm transition-shadow hover:shadow-md"
     >
@@ -85,6 +96,33 @@ export default function PropertyCard({ property, size = "md", isSaved = false, o
             className="bg-background/70 absolute top-3 right-3 flex size-9 items-center justify-center rounded-full backdrop-blur transition-colors hover:bg-background disabled:pointer-events-none disabled:opacity-50"
           >
             <Heart className={cn("size-4", isSaved ? "fill-destructive text-destructive" : "text-foreground")} />
+          </button>
+        )}
+
+        {onToggleCompare && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleCompare(property.id);
+            }}
+            aria-label={isComparing ? "Remove from comparison" : "Select for comparison"}
+            aria-pressed={isComparing}
+            disabled={isSold}
+            className={cn(
+              "absolute bottom-3 left-3 flex items-center gap-2 rounded transition-colors disabled:pointer-events-none disabled:opacity-50",
+              isComparing ? "bg-brand-primary-400 p-0.75" : "bg-background/70 border border-background/80 backdrop-blur size-5.5"
+            )}
+          >
+            {isComparing ? (
+              <>
+                <Check className="text-background size-4 shrink-0" />
+                <span className="text-background pr-2 text-sm font-medium drop-shadow-sm whitespace-nowrap">
+                  Selected for Comparison
+                </span>
+              </>
+            ) : null}
           </button>
         )}
 
@@ -127,6 +165,6 @@ export default function PropertyCard({ property, size = "md", isSaved = false, o
           </div>
         )}
       </div>
-    </a>
+    </Link>
   );
 }
