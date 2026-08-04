@@ -28,9 +28,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const sg = "'Space Grotesk', sans-serif";
 
-// Only "Saved" has a real destination so far (P3-T41) — Discover/AI
-// Tools/Compare stay dead "#" links until those features exist.
-const NAV_LINK_HREFS: Record<string, string> = { Saved: "/saved" };
+// "Saved" (P3-T41) and "Compare" (P3-T42) have real destinations —
+// Discover/AI Tools stay dead "#" links until those features exist.
+const NAV_LINK_HREFS: Record<string, string> = { Saved: "/saved", Compare: "/compare" };
 
 function initials(name?: string) {
   if (!name) return "?";

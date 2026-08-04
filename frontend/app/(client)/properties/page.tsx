@@ -20,6 +20,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import ErrorState from "@/components/shared/ErrorState";
 import Modal from "@/components/shared/Modal";
+import { CompareSelectionBar } from "@/features/properties/CompareSelectionBar";
 import { FilterSidebar } from "@/features/properties/listings/FilterSidebar";
 import { ListingsToolbar } from "@/features/properties/listings/ListingsToolbar";
 import { ListingsGrid, ListingsGridSkeleton } from "@/features/properties/listings/ListingsGrid";
@@ -27,6 +28,7 @@ import { ListingsPagination } from "@/features/properties/listings/ListingsPagin
 import { DEFAULT_FILTERS, type ListingsFilters, type SortValue } from "@/features/properties/listings/types";
 import { buildQueryString, listProperties, type PropertyListParams } from "@/lib/api/endpoints/properties";
 import { useSavedPropertyToggle } from "@/lib/hooks/useSavedPropertyToggle";
+import { useCompareStore } from "@/lib/stores/compare";
 import { ListingType, PropertyType } from "@/lib/enums";
 
 const PAGE_SIZE = 12;
@@ -95,6 +97,8 @@ function PropertiesListingsContent() {
     placeholderData: keepPreviousData,
   });
   const { savedIds, onToggleSave } = useSavedPropertyToggle();
+  const compareIds = useCompareStore((state) => state.ids);
+  const toggleCompare = useCompareStore((state) => state.toggle);
 
   useEffect(() => {
     const query = buildQueryString(params);
@@ -127,13 +131,21 @@ function PropertiesListingsContent() {
           onOpenFilters={() => setMobileFiltersOpen(true)}
         />
 
+        <CompareSelectionBar />
+
         {error ? (
           <ErrorState title="Couldn't load properties" body="Please try again in a moment." />
         ) : isLoading ? (
           <ListingsGridSkeleton />
         ) : (
           <div className={isPlaceholderData ? "opacity-60 transition-opacity" : undefined}>
-            <ListingsGrid items={data?.items ?? []} savedIds={savedIds} onToggleSave={onToggleSave} />
+            <ListingsGrid
+              items={data?.items ?? []}
+              savedIds={savedIds}
+              onToggleSave={onToggleSave}
+              compareIds={compareIds}
+              onToggleCompare={toggleCompare}
+            />
           </div>
         )}
 

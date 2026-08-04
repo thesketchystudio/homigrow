@@ -1154,6 +1154,28 @@ A reader should understand the code from the comment alone.
   memory); `POST /properties/{id}/enquire` (contact-form submission);
   linking the page in from the homepage/`PropertyCard` — all separate,
   later tasks (tracked in ClickUp).
+- **Compare properties endpoint shipped 2026-08-04** (P3-T42, backend
+  half) — `GET /api/v1/properties/compare?ids=a,b,c`, public, reusing
+  `PropertyRead` as the normalized spec table (`PropertyCompareResponse`
+  in `app/schemas/properties.py`). New `compare_properties()` in
+  `app/services/property_service.py` (same eager-load pattern as
+  `get_property_detail`, filters to active only, silently drops
+  missing/non-active ids, reorders results back into the caller's
+  requested id order since SQL `IN` doesn't preserve it). Route parses
+  the comma-separated `ids` query string itself, raising
+  `422 INVALID_COMPARE_IDS`/`422 TOO_MANY_COMPARE_IDS`; registered ahead
+  of `GET /{property_id}` in the router file as defensive ordering.
+  **Max compare count resolved as 3, not the 4 originally drafted in
+  `05_API_Design.md`** — the real Figma "Comparison" screen's own hint
+  copy says "up to 3", found only once the design was actually pulled
+  this session (no Figma access was available when this task was first
+  scoped); both `05_API_Design.md` and this file's own P3-T42 backlog
+  line in `10_Phase_3.md` were corrected from 4 to 3 to match, your
+  explicit call over the alternative of changing the Figma copy. 185/185
+  tests pass (5 new); `ruff` clean. Live-verified against the real
+  Supabase dev DB + seeded demo properties via curl: order preservation,
+  a missing id and a non-active id both silently dropped, a malformed id
+  and a 4th id both correctly 422.
 - **Property Listings search endpoint shipped 2026-07-30** —
   `GET /api/v1/properties`, the search/grid endpoint backing the
   Listings page (10_Phase_3.md P3-T10), built after pulling the real
@@ -1554,7 +1576,105 @@ A reader should understand the code from the comment alone.
   live: all three fixes screenshot-matched against the Figma reference,
   zero console errors. **Compare (the multi-select tool + "Selected: N
   Properties" counter from the same Figma frame) remains explicitly out
-  of scope**, per your instruction.
+  of scope**, per your instruction. **Superseded 2026-08-04 — see below,
+  Compare shipped.**
+- **Compare properties shipped 2026-08-04** (P3-T42, frontend half) —
+  reverses the "out of scope" note directly above. Pulled the real Figma
+  design this session (file `YvQ2kfODoSxUTwYo6JZ7Tv`, "Client view"
+  page): a checkbox overlay on the property card image (bottom-left,
+  "Selected for Comparison" label when checked — not a separate icon
+  button, which a first pass without Figma access would have guessed),
+  a "Selected: N Properties"/"Compare" control in the Saved page's own
+  Filters row (node `133:3060`/`133:3084`-`133:3090`, exact colors/fonts
+  pulled — this is the exact control the Saved task above dropped),
+  reused on the Listings page toolbar too per `06_Component_Library.md`'s
+  explicit "floating drawer over saved/search" scope (not the homepage,
+  which isn't in that scope and has no Figma frame showing it either), a
+  persistent floating `CompareDrawer` (node `133:3227`, exact styling),
+  and a full `/compare` "Comparison" screen (node `150:15348`) with 4
+  accordion sections. New `lib/stores/compare.ts` (Zustand + `persist` —
+  the project's first use of that middleware; unlike the memory-only
+  `authStore`, this is a plain UI selection with no security constraint
+  against localStorage), `lib/hooks/useCompareProperties.ts` (shared
+  react-query fetch), `features/properties/CompareSelectionBar.tsx`,
+  `components/shared/CompareDrawer.tsx`, `app/(client)/compare/page.tsx`
+  + `features/properties/compare/` (`ComparisonHeader`,
+  `ComparisonPropertyCard`, `ComparisonAccordionSection`,
+  `ComparisonTable`). `PropertyCard.tsx` gained `isComparing`/
+  `onToggleCompare` alongside the existing save-toggle props.
+  **Two real conflicts found only once the actual Figma file was pulled,
+  both resolved with you before writing code:** (1) Figma's own hint
+  copy says "up to 3", conflicting with `05_API_Design.md`'s drafted
+  max 4 — resolved as 3, doc corrected (see backend entry above); (2)
+  the Comparison screen's Possession/Airport-distance/Nearby-Schools
+  rows and its entire Investment section (Rental Yield, Appreciation %,
+  RERA Status) have zero backing data on `Property`, and the per-card
+  "✦ Best Value" etc. badges have no scoring algorithm — resolved as
+  honest omission (Investment renders "Coming soon"), same pattern as
+  the Details page's Vaastu/Market Context sections, over the
+  alternative of shipping static placeholder numbers. Amenities uses the
+  real sorted union of amenities across the compared properties (not
+  Figma's fixed 8-item checklist) — genuinely data-driven, not a
+  simplification. `tsc`/`eslint`/`next build` all clean. Live-verified
+  with Playwright against the real backend + Supabase dev DB: toggled
+  compare from both the Listings grid and the Saved page; confirmed the
+  Filters-row counter, the floating drawer, and localStorage persistence
+  across a hard reload all stayed in sync; hit the 3-item cap and got
+  the correct toast with no state change; "Compare Now" produced a real
+  Comparison screen with correct Amenities checks and an honest
+  "Coming soon" Investment section; loaded a `/compare?ids=...` URL
+  directly with an empty local store (simulating a shared link) and
+  confirmed it still rendered correctly with no floating drawer (store
+  genuinely empty, as intended); removed properties down to 1 and
+  confirmed the insufficient-selection empty state; confirmed the nav
+  bar's "Compare" link now routes correctly. Zero console errors
+  throughout.
+- **PropertyCard plain-`<a>` logout bug fixed, 2026-08-04** — reported
+  live: clicking a property card on `/saved` navigated to the Property
+  Details page, then bounced to `/login?returnTo=%2Fsaved`. Same root
+  cause and fix as the earlier Profile sidebar logout bug: `PropertyCard.tsx`
+  rendered its whole-card link as a plain `<a href>`, not `next/link`'s
+  `Link` — already flagged as a risk in project memory ("recheck if
+  [PropertyCard] gains a real route behind AuthGuard") back when only the
+  public homepage used it. The Saved page (AuthGuard-protected) started
+  rendering `PropertyCard` via `ListingsGrid` for P3-T41, so the risk
+  materialized: each card click did a full page reload, wiping the
+  memory-only `authStore`; enough reloads in quick succession tripped the
+  `/auth/refresh` 5/min rate limit, and `refreshAccessToken()` treats any
+  non-2xx (including `429`) as an invalid session and clears the store —
+  AuthGuard then bounced whatever protected page was mounted to `/login`.
+  Fixed by swapping the plain `<a>` for `next/link`'s `Link` in
+  `PropertyCard.tsx` — no other change needed since the nested heart/
+  compare buttons already call `stopPropagation()`, which prevents
+  `Link`'s client-side navigation exactly like it prevented the native
+  anchor's default navigation. `tsc`/`eslint` clean. Live-verified against
+  the real backend + Supabase dev DB (`hello@thesketchystudio.com`):
+  logged in, clicked a saved property card through to Details, navigated
+  back to `/saved` via the nav bar link — network log confirmed **zero**
+  `/auth/refresh` calls fired during that whole client-side sequence
+  (versus one per reload before the fix), and the session stayed
+  authenticated throughout.
+- **`/compare` landing screen now shows saved properties to pick from,
+  2026-08-04** — you flagged that visiting `/compare` with nothing
+  selected just showed a bare "browse properties" empty state instead of
+  letting you pick right there. New
+  `features/properties/compare/ComparePicker.tsx`: shown whenever the
+  URL has fewer than 2 ids, reusing the exact `ListingsGrid`/
+  `CompareSelectionBar`/`useCompareStore` wiring the Saved and Listings
+  pages already use, fetching the visitor's own saved properties via the
+  same `listSavedProperties` call the Saved page uses. Three states:
+  unauthenticated → a "Log in to see your saved properties" prompt
+  (`/login?returnTo=%2Fcompare`, since `/compare` itself stays public/
+  ungated — only this section needs auth); authenticated with nothing
+  saved → the existing "browse properties" empty state; authenticated
+  with saved properties → the real grid with working save/compare
+  toggles, so picking 2-3 and clicking "Compare" flows straight into the
+  real comparison table. `tsc`/`eslint`/`next build` clean. Live-verified
+  with Playwright against the real backend + Supabase dev DB: cleared
+  local compare selection, loaded `/compare` while logged in, confirmed
+  the 3 real saved properties rendered with working checkboxes, selected
+  2, clicked "Compare", landed on the real `/compare?ids=...` comparison
+  table with correct data. Zero console errors.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

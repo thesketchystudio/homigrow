@@ -12,8 +12,9 @@
 // filter + sort support added to GET /saved-properties for this task —
 // the sort control lives in the header row next to the title, matching
 // Figma's actual layout (node 133:3062), not inline with the pills. The
-// "Selected: N Properties"/"Compare" multi-select tool from the Filters
-// frame stays out of scope. The bottom "Schedule a Portfolio Review" CTA
+// "Selected: N Properties"/"Compare" control from that same Filters frame
+// (node 133:3084-133:3090) is wired in via CompareSelectionBar (P3-T42) —
+// no longer out of scope. The bottom "Schedule a Portfolio Review" CTA
 // is real UI with a "coming soon" toast — no curator service exists to
 // actually book.
 
@@ -26,6 +27,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AuthGuard } from "@/components/shared/AuthGuard";
 import EmptyState from "@/components/shared/EmptyState";
 import ErrorState from "@/components/shared/ErrorState";
+import { CompareSelectionBar } from "@/features/properties/CompareSelectionBar";
 import { ListingsGrid, ListingsGridSkeleton } from "@/features/properties/listings/ListingsGrid";
 import { ListingsPagination } from "@/features/properties/listings/ListingsPagination";
 import { PortfolioReviewCta } from "@/features/properties/saved/PortfolioReviewCta";
@@ -38,6 +40,7 @@ import {
   type SavedSort,
 } from "@/lib/api/endpoints/savedProperties";
 import { SAVED_IDS_QUERY_KEY } from "@/lib/hooks/useSavedPropertyToggle";
+import { useCompareStore } from "@/lib/stores/compare";
 import { UserRole } from "@/lib/enums";
 
 const PAGE_SIZE = 12;
@@ -84,6 +87,8 @@ function SavedPropertiesContent() {
   };
 
   const savedIds = new Set((data?.items ?? []).map((item) => item.id));
+  const compareIds = useCompareStore((state) => state.ids);
+  const toggleCompare = useCompareStore((state) => state.toggle);
 
   return (
     <div className="mx-auto flex max-w-350 flex-col gap-8 px-6 pt-28 pb-20">
@@ -99,7 +104,10 @@ function SavedPropertiesContent() {
         <SavedSortControl sort={sort} onSortChange={changeSort} />
       </div>
 
-      <SavedCategoryPills category={category} onCategoryChange={changeCategory} />
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <SavedCategoryPills category={category} onCategoryChange={changeCategory} />
+        <CompareSelectionBar />
+      </div>
 
       {error ? (
         <ErrorState title="Couldn't load your saved properties" body="Please try again in a moment." />
@@ -110,6 +118,8 @@ function SavedPropertiesContent() {
           items={data?.items ?? []}
           savedIds={savedIds}
           onToggleSave={(id) => unsaveMutation.mutate(id)}
+          compareIds={compareIds}
+          onToggleCompare={toggleCompare}
           emptyState={
             <EmptyState
               title="Nothing saved yet"
