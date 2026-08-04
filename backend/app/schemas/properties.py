@@ -122,3 +122,9 @@ class PropertyListResponse(BaseModel):
         if self.page_size <= 0:
             return 0
         return -(-self.total // self.page_size)
+
+
+class PropertyCompareResponse(BaseModel):
+    """GET /properties/compare — a normalized spec table, reusing PropertyRead's full field set."""
+
+    items: list[PropertyRead]
