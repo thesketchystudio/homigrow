@@ -5,8 +5,9 @@
 // "Penthouses" has no backing PropertyType category, so it's kept
 // visible to match Figma but disabled — same pattern as the Listings
 // sidebar's unbacked filter sections. That frame's "Selected: N
-// Properties"/"Compare" controls are intentionally dropped; Compare is
-// out of scope for this pass. The "Recently Saved" sort control that
+// Properties"/"Compare" control lives in CompareSelectionBar.tsx
+// (P3-T42), rendered alongside these pills rather than inside this file.
+// The "Recently Saved" sort control that
 // same design-context pull attached to this frame actually belongs to
 // the Header row above it (node 133:3062) — see SavedSortControl.
 

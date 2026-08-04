@@ -127,3 +127,13 @@ export function buildQueryString(params: PropertyListParams): string {
 export function listProperties(params: PropertyListParams = {}): Promise<PropertyListResponse> {
   return apiRequest<PropertyListResponse>(`/properties${buildQueryString(params)}`);
 }
+
+export const MAX_COMPARE_IDS = 3;
+
+export type PropertyCompareResponse = {
+  items: PropertyRead[];
+};
+
+export function compareProperties(ids: string[]): Promise<PropertyCompareResponse> {
+  return apiRequest<PropertyCompareResponse>(`/properties/compare?ids=${ids.join(",")}`);
+}

@@ -4,6 +4,7 @@
 
 import "@/features/homepage/homepage.css";
 
+import { CompareDrawer } from "@/components/shared/CompareDrawer";
 import Footer from "@/components/shared/Footer";
 import TopNavBar from "@/components/shared/TopNavBar";
 
@@ -13,6 +14,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       <TopNavBar />
       {children}
       <Footer />
+      <CompareDrawer />
     </div>
   );
 }

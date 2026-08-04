@@ -53,11 +53,15 @@ export function ListingsGrid({
   items,
   savedIds,
   onToggleSave,
+  compareIds,
+  onToggleCompare,
   emptyState,
 }: {
   items: PropertyListItem[];
   savedIds: Set<string>;
   onToggleSave: (id: string) => void;
+  compareIds?: string[];
+  onToggleCompare?: (id: string) => void;
   emptyState?: ReactNode;
 }) {
   if (items.length === 0) {
@@ -83,6 +87,8 @@ export function ListingsGrid({
           }}
           isSaved={savedIds.has(item.id)}
           onToggleSave={onToggleSave}
+          isComparing={compareIds?.includes(item.id) ?? false}
+          onToggleCompare={onToggleCompare}
         />
       ))}
     </div>
