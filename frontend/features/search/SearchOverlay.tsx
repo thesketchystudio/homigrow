@@ -56,6 +56,19 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
+  // Lock page scroll while open — otherwise the underlying page can still
+  // scroll behind this fixed-position overlay, which visually desyncs the
+  // backdrop from what's supposedly "behind" it and made clicks meant for
+  // the backdrop land on the (now-scrolled-into-place) page content instead.
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const goTo = (href: string, entry?: Omit<RecentSearch, "id">) => {
@@ -75,8 +88,13 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     <div className="fixed inset-0 overflow-y-auto">
       <div className="fixed inset-0 bg-[#0f172a]/40 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative flex justify-center px-4 pt-28 pb-10 sm:pt-32">
-        <div className="w-full max-w-[896px] rounded-xl bg-[#fcf8f9] p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] sm:p-10">
+      {/* pointer-events-none here (auto on the card below) — this row
+          spans the full width to center the card, so without it the
+          empty flex space beside/around the card would silently swallow
+          clicks meant for the backdrop underneath, even though nothing
+          is visible there. */}
+      <div className="pointer-events-none relative flex justify-center px-4 pt-28 pb-10 sm:pt-32">
+        <div className="pointer-events-auto w-full max-w-[896px] rounded-xl bg-[#fcf8f9] p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] sm:p-10">
           <div className="grid grid-cols-1 gap-10 sm:grid-cols-12 sm:gap-10">
             <div className="flex flex-col gap-6 sm:col-span-4">
               <div className="flex flex-col gap-6">
