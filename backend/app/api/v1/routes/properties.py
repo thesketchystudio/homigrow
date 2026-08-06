@@ -13,7 +13,12 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import ValidationFailed
 from app.db.session import get_db
 from app.models.enums import ListingType, PropertyType
-from app.schemas.properties import PropertyCompareResponse, PropertyListResponse, PropertyRead
+from app.schemas.properties import (
+    NeighborhoodSummary,
+    PropertyCompareResponse,
+    PropertyListResponse,
+    PropertyRead,
+)
 from app.services import property_service
 from app.services.property_service import SortOption
 
@@ -45,6 +50,8 @@ def _parse_compare_ids(raw: str) -> list[UUID]:
 def list_properties(
     db: Session = Depends(get_db),
     city: str | None = None,
+    locality: str | None = None,
+    q: str | None = None,
     listing_type: ListingType | None = None,
     property_type: list[PropertyType] = Query(default=[]),
     price_min: float | None = Query(default=None, ge=0),
@@ -59,6 +66,8 @@ def list_properties(
     items, total = property_service.list_properties(
         db,
         city=city,
+        locality=locality,
+        q=q,
         listing_type=listing_type,
         property_type=property_type or None,
         price_min=price_min,
@@ -70,6 +79,15 @@ def list_properties(
         page_size=page_size,
     )
     return PropertyListResponse(items=items, page=page, page_size=page_size, total=total)
+
+
+@router.get("/neighborhoods", response_model=list[NeighborhoodSummary])
+def list_neighborhoods(
+    limit: int = Query(default=4, ge=1, le=12),
+    db: Session = Depends(get_db),
+) -> list[NeighborhoodSummary]:
+    """Top localities by active listing count, for the search overlay's Curated Neighborhoods grid."""
+    return property_service.list_neighborhoods(db, limit=limit)
 
 
 @router.get("/compare", response_model=PropertyCompareResponse)

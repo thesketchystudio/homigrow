@@ -11,7 +11,7 @@ of moderation.
 from typing import Literal, Optional
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.dialects.postgresql import array
 from sqlalchemy.orm import Session, joinedload
 
@@ -19,7 +19,7 @@ from app.core.exceptions import NotFoundError
 from app.models.enums import ListingType, PropertyStatus, PropertyType
 from app.models.property import Property, PropertyMedia
 from app.models.user import User
-from app.schemas.properties import PropertyListItem
+from app.schemas.properties import NeighborhoodSummary, PropertyListItem
 
 SortOption = Literal["newest", "price_asc", "price_desc"]
 
@@ -73,6 +73,8 @@ def list_properties(
     db: Session,
     *,
     city: Optional[str] = None,
+    locality: Optional[str] = None,
+    q: Optional[str] = None,
     listing_type: Optional[ListingType] = None,
     property_type: Optional[list[PropertyType]] = None,
     price_min: Optional[float] = None,
@@ -87,11 +89,21 @@ def list_properties(
     Returns a page of active listings plus the total matching count, for
     the /properties search grid. Filters are AND-ed together; `amenities`
     matches a property that has ANY of the given amenities (Postgres
-    JSONB `?|`), matching the sidebar's multi-select checkbox UX.
+    JSONB `?|`), matching the sidebar's multi-select checkbox UX. `city`/
+    `locality` are exact (case-insensitive) matches, driven by dropdowns
+    and neighborhood links that already know the precise value. `q` is
+    separate: a free-text substring match against EITHER city OR locality,
+    for the nav search box — a typed "Whitefield" is a locality, not a
+    city, so an exact `city` match alone would silently return nothing.
     """
     conditions = [Property.status == PropertyStatus.active]
     if city:
         conditions.append(func.lower(Property.city) == city.lower())
+    if locality:
+        conditions.append(func.lower(Property.locality) == locality.lower())
+    if q:
+        pattern = f"%{q.lower()}%"
+        conditions.append(or_(func.lower(Property.city).like(pattern), func.lower(Property.locality).like(pattern)))
     if listing_type is not None:
         conditions.append(Property.listing_type == listing_type)
     if property_type:
@@ -143,3 +155,39 @@ def list_properties(
         for property_, cover_image_url in rows
     ]
     return items, total
+
+
+def list_neighborhoods(db: Session, *, limit: int = 4) -> list[NeighborhoodSummary]:
+    """
+    Returns the top `limit` localities by active listing count, each paired
+    with one representative cover image — backs the search overlay's
+    "Curated Neighborhoods" grid. Ranked purely by listing volume; there is
+    no separate curation step or featured-neighborhood concept.
+    """
+    rows = (
+        db.query(Property.locality, Property.city, func.count(Property.id).label("count"))
+        .filter(Property.status == PropertyStatus.active)
+        .group_by(Property.locality, Property.city)
+        .order_by(func.count(Property.id).desc())
+        .limit(limit)
+        .all()
+    )
+
+    results = []
+    for locality, city, count in rows:
+        cover_image_url = (
+            db.query(PropertyMedia.url)
+            .join(Property, Property.id == PropertyMedia.property_id)
+            .filter(
+                Property.locality == locality,
+                Property.city == city,
+                Property.status == PropertyStatus.active,
+                PropertyMedia.is_cover.is_(True),
+            )
+            .limit(1)
+            .scalar()
+        )
+        results.append(
+            NeighborhoodSummary(locality=locality, city=city, property_count=count, cover_image_url=cover_image_url)
+        )
+    return results
