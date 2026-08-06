@@ -14,6 +14,11 @@ export { PRICE_STEP };
 
 export type ListingsFilters = {
   city: string | null;
+  locality: string | null;
+  // Free-text nav-search match against either city or locality — kept
+  // separate from city/locality above, which are exact-match filters set
+  // by the sidebar dropdowns and neighborhood links.
+  locationQuery: string | null;
   priceMin: number;
   priceMax: number;
   bhkMin: number | null;
@@ -24,6 +29,8 @@ export type ListingsFilters = {
 
 export const DEFAULT_FILTERS: ListingsFilters = {
   city: null,
+  locality: null,
+  locationQuery: null,
   priceMin: PRICE_MIN,
   priceMax: PRICE_MAX,
   bhkMin: null,

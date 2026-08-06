@@ -36,6 +36,8 @@ const PAGE_SIZE = 12;
 function toListParams(filters: ListingsFilters, sort: SortValue, page: number): PropertyListParams {
   return {
     city: filters.city ?? undefined,
+    locality: filters.locality ?? undefined,
+    q: filters.locationQuery ?? undefined,
     // Only sent once the user actually moves the slider off its resting
     // extremes — the default ₹50L–₹15Cr range is meaningless for rent/PG
     // listings, whose `price` is a monthly figure (e.g. ₹18,000), and
@@ -58,6 +60,8 @@ function parseStateFromSearchParams(searchParams: URLSearchParams): {
   page: number;
 } {
   const cityRaw = searchParams.get("city");
+  const localityRaw = searchParams.get("locality");
+  const qRaw = searchParams.get("q");
   const priceMin = Number(searchParams.get("price_min")) || DEFAULT_FILTERS.priceMin;
   const priceMax = Number(searchParams.get("price_max")) || DEFAULT_FILTERS.priceMax;
   const bhkMinRaw = searchParams.get("bhk_min");
@@ -68,6 +72,8 @@ function parseStateFromSearchParams(searchParams: URLSearchParams): {
   return {
     filters: {
       city: cityRaw || null,
+      locality: localityRaw || null,
+      locationQuery: qRaw || null,
       priceMin,
       priceMax,
       bhkMin: bhkMinRaw ? Number(bhkMinRaw) : null,
@@ -83,6 +89,7 @@ function parseStateFromSearchParams(searchParams: URLSearchParams): {
 function PropertiesListingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const searchString = searchParams.toString();
   const initial = parseStateFromSearchParams(searchParams);
 
   const [filters, setFilters] = useState<ListingsFilters>(initial.filters);
@@ -91,6 +98,30 @@ function PropertiesListingsContent() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const params = toListParams(filters, sort, page);
+
+  // Next.js reuses this same page instance for search-param-only
+  // navigation (e.g. the nav search box's router.push while already on
+  // /properties) — filters/sort/page above were only ever initialized once
+  // from the URL at mount, so without this they'd silently go stale: the
+  // URL bar would update but the visible results wouldn't. Detect an
+  // external URL change by comparing it against what our OWN current state
+  // would itself serialize to — a pure, deterministic comparison, so no
+  // ref or effect-tracked "last written" value is needed — and resync when
+  // they diverge. Adjusting state during render (React's documented
+  // pattern for "reset state when a prop changes") rather than an effect,
+  // so the resync is visible on the very same render instead of flashing
+  // stale state first.
+  const selfSearchString = buildQueryString(params).replace(/^\?/, "");
+  const [syncedSearchString, setSyncedSearchString] = useState(searchString);
+  if (searchString !== syncedSearchString) {
+    setSyncedSearchString(searchString);
+    if (searchString !== selfSearchString) {
+      setFilters(initial.filters);
+      setSort(initial.sort);
+      setPage(initial.page);
+    }
+  }
+
   const { data, isLoading, isPlaceholderData, error } = useQuery({
     queryKey: ["properties", params],
     queryFn: () => listProperties(params),
@@ -125,7 +156,7 @@ function PropertiesListingsContent() {
       <div className="flex min-w-0 flex-1 flex-col gap-8 lg:px-12 lg:py-8">
         <ListingsToolbar
           total={data?.total ?? 0}
-          city={filters.city}
+          city={filters.locality ? `${filters.locality}, ${filters.city}` : (filters.city ?? filters.locationQuery)}
           sort={sort}
           onSortChange={updateSort}
           onOpenFilters={() => setMobileFiltersOpen(true)}
