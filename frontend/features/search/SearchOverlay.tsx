@@ -84,8 +84,14 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     // ~750px of viewport height. The backdrop is independently `fixed`
     // (not `absolute`) so it stays pinned to the full viewport regardless
     // of this container's scroll offset, instead of scrolling away with
-    // the content and leaving the top of the page undimmed.
-    <div className="fixed inset-0 overflow-y-auto">
+    // the content and leaving the top of the page undimmed. z-90 is
+    // required now that this is portaled to document.body instead of
+    // nested in <nav> — it no longer inherits nav's elevated stacking
+    // context, so without an explicit z-index page content with its own
+    // z-index (e.g. the homepage Hero's floating search widget, z-index
+    // up to 50) would render on top of this panel. Stays below <nav>'s
+    // z-index 100 so the nav bar itself is unaffected.
+    <div className="fixed inset-0 z-90 overflow-y-auto">
       <div className="fixed inset-0 bg-[#0f172a]/40 backdrop-blur-sm" onClick={onClose} />
 
       {/* pointer-events-none here (auto on the card below) — this row
