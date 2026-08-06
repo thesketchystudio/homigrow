@@ -128,3 +128,12 @@ class PropertyCompareResponse(BaseModel):
     """GET /properties/compare — a normalized spec table, reusing PropertyRead's full field set."""
 
     items: list[PropertyRead]
+
+
+class NeighborhoodSummary(BaseModel):
+    """One locality's worth of data for the search overlay's Curated Neighborhoods grid."""
+
+    locality: str
+    city: str
+    property_count: int
+    cover_image_url: Optional[str] = None

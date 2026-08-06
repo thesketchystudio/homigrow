@@ -171,6 +171,40 @@ class TestListProperties:
         body = response.json()
         assert [item["title"] for item in body["items"]] == ["City A Home"]
 
+    def test_locality_filter_is_case_insensitive(self, client, db_session):
+        city = _unique_city()
+        _make_property(db_session, title="Indiranagar Home", city=city, locality="Indiranagar")
+        _make_property(db_session, title="Whitefield Home", city=city, locality="Whitefield")
+
+        response = client.get("/api/v1/properties", params={"city": city, "locality": "INDIRANAGAR"})
+
+        assert response.status_code == 200
+        assert [item["title"] for item in response.json()["items"]] == ["Indiranagar Home"]
+
+    def test_q_matches_locality_not_just_city(self, client, db_session):
+        # A typed "whitefield" is a locality, not a city — q must match
+        # either column, unlike the exact `city`/`locality` filters above.
+        locality = f"Whitefield-{uuid.uuid4().hex[:8]}"
+        city = _unique_city()
+        _make_property(db_session, title="Locality Match", city=city, locality=locality)
+        _make_property(db_session, title="Unrelated", city=_unique_city(), locality="Somewhere Else")
+
+        response = client.get("/api/v1/properties", params={"q": locality.lower()})
+
+        assert response.status_code == 200
+        titles = {item["title"] for item in response.json()["items"]}
+        assert "Locality Match" in titles
+        assert "Unrelated" not in titles
+
+    def test_q_matches_city_too(self, client, db_session):
+        city = _unique_city()
+        _make_property(db_session, title="City Match", city=city)
+
+        response = client.get("/api/v1/properties", params={"q": city[:6].upper()})
+
+        assert response.status_code == 200
+        assert "City Match" in {item["title"] for item in response.json()["items"]}
+
     def test_listing_type_filter(self, client, db_session):
         city = _unique_city()
         _make_property(db_session, title="For Sale", listing_type=ListingType.sale, city=city)
@@ -273,6 +307,27 @@ class TestListProperties:
 
     def test_invalid_page_size_returns_422(self, client):
         response = client.get("/api/v1/properties", params={"page_size": 100})
+
+        assert response.status_code == 422
+
+
+class TestListNeighborhoods:
+    def test_returns_top_localities_by_active_count_with_cover_image(self, client, db_session):
+        city = _unique_city()
+        locality = f"TestLocality-{uuid.uuid4().hex[:8]}"
+        _make_property(db_session, title="One", city=city, locality=locality)
+        _make_property(db_session, title="Two", city=city, locality=locality)
+        _make_property(db_session, title="Pending", city=city, locality=locality, status=PropertyStatus.pending)
+
+        response = client.get("/api/v1/properties/neighborhoods", params={"limit": 12})
+
+        assert response.status_code == 200
+        match = next(item for item in response.json() if item["locality"] == locality and item["city"] == city)
+        assert match["property_count"] == 2
+        assert match["cover_image_url"] == "https://example.com/cover.jpg"
+
+    def test_invalid_limit_returns_422(self, client):
+        response = client.get("/api/v1/properties/neighborhoods", params={"limit": 100})
 
         assert response.status_code == 422
 
