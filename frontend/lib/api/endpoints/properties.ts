@@ -94,6 +94,12 @@ export type PropertyListResponse = {
 
 export type PropertyListParams = {
   city?: string;
+  locality?: string;
+  // Free-text match against EITHER city OR locality — for the nav search
+  // box, which can't know whether what's typed is a city or a locality.
+  // Distinct from city/locality above, which are exact matches driven by
+  // dropdowns and neighborhood links that already know the precise value.
+  q?: string;
   listing_type?: ListingType;
   property_type?: PropertyType[];
   price_min?: number;
@@ -111,6 +117,8 @@ export type PropertyListParams = {
 export function buildQueryString(params: PropertyListParams): string {
   const search = new URLSearchParams();
   if (params.city) search.set("city", params.city);
+  if (params.locality) search.set("locality", params.locality);
+  if (params.q) search.set("q", params.q);
   if (params.listing_type) search.set("listing_type", params.listing_type);
   for (const value of params.property_type ?? []) search.append("property_type", value);
   if (params.price_min !== undefined) search.set("price_min", String(params.price_min));
@@ -136,4 +144,15 @@ export type PropertyCompareResponse = {
 
 export function compareProperties(ids: string[]): Promise<PropertyCompareResponse> {
   return apiRequest<PropertyCompareResponse>(`/properties/compare?ids=${ids.join(",")}`);
+}
+
+export type NeighborhoodSummary = {
+  locality: string;
+  city: string;
+  property_count: number;
+  cover_image_url: string | null;
+};
+
+export function getNeighborhoods(limit = 4): Promise<NeighborhoodSummary[]> {
+  return apiRequest<NeighborhoodSummary[]>(`/properties/neighborhoods?limit=${limit}`);
 }
