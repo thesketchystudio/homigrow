@@ -1,6 +1,6 @@
 // features/properties/compare/ComparePicker.tsx
-// Shown on /compare whenever fewer than 2 properties are selected (10_Phase_3.md
-// P3-T42) — lets the visitor pick directly from their saved/liked properties
+// Shown on /compare whenever fewer than 2 properties are selected — lets
+// the visitor pick directly from their saved/liked properties
 // instead of just being told to go elsewhere. Reuses the exact same
 // ListingsGrid + CompareSelectionBar wiring the Saved and Listings pages use,
 // so toggling a checkbox here stays in sync with those pages' counters and

@@ -27,12 +27,10 @@ import { useAuthStore } from "@/lib/stores/auth";
 import { useSearchHistoryStore } from "@/lib/stores/searchHistory";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { SearchOverlay } from "@/features/search/SearchOverlay";
+import { FONT_HEADING as sg } from "@/lib/fonts";
 
-const sg = "'Space Grotesk', sans-serif";
-
-// "Saved" (P3-T41), "Compare" (P3-T42), and "Discover" (the Listings/search
-// page) have real destinations — AI Tools stays a dead "#" link until that
-// feature exists.
+// "Saved", "Compare", and "Discover" (the Listings/search page) have real
+// destinations — AI Tools stays a dead "#" link until that feature exists.
 const NAV_LINK_HREFS: Record<string, string> = { Discover: "/properties", Saved: "/saved", Compare: "/compare" };
 
 function initials(name?: string) {
@@ -70,14 +68,15 @@ export default function TopNavBar() {
     setSearchOpen(false);
   }
 
-  const runLocationSearch = () => {
+  const runSearch = () => {
     const query = searchValue.trim();
     if (!query) return;
-    // `q` (free-text, matches city OR locality) rather than `city` (exact
-    // match) — a typed "Whitefield" is a locality, not a city, and an
-    // exact city match alone would silently return zero results for it.
-    const href = `/properties?q=${encodeURIComponent(query)}`;
-    record({ label: query, subtitle: "Search by location", href });
+    // `search` (free-text, matches title/description/city/locality/
+    // landmark/amenities) rather than `city` (exact match) — a typed
+    // "Whitefield" is a locality and "pool" is an amenity, neither of
+    // which an exact city match would ever catch.
+    const href = `/properties?search=${encodeURIComponent(query)}`;
+    record({ label: query, subtitle: "Search", href });
     setSearchOpen(false);
     router.push(href);
   };
@@ -164,7 +163,7 @@ export default function TopNavBar() {
           <Search size={16} color="#707070" style={{ flexShrink: 0 }} />
           <input
             type="text"
-            placeholder="Search locations..."
+            placeholder="Search properties, locations..."
             value={searchValue}
             onChange={(event) => setSearchValue(event.target.value)}
             onFocus={() => setSearchOpen(true)}
@@ -173,7 +172,7 @@ export default function TopNavBar() {
             // reopens it explicitly regardless of prior focus state.
             onClick={() => setSearchOpen(true)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") runLocationSearch();
+              if (event.key === "Enter") runSearch();
               if (event.key === "Escape") setSearchOpen(false);
             }}
             style={{

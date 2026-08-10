@@ -5,9 +5,7 @@
 "use client";
 
 import svgPaths from "@/lib/homepage-svg-paths";
-
-const sg = "'Space Grotesk', sans-serif";
-const pj = "'Plus Jakarta Sans', sans-serif";
+import { FONT_HEADING as sg, FONT_BODY as pj } from "@/lib/fonts";
 
 const areas = [
   {

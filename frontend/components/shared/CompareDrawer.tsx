@@ -1,11 +1,11 @@
 // components/shared/CompareDrawer.tsx
 // Persistent floating tray (Figma node 133:3227 "Compare Drawer (Floating)",
 // exact colors/fonts pulled via get_design_context) shown across every
-// client page once 1+ property is queued for comparison (10_Phase_3.md
-// P3-T42). Not routed through the shared Modal — Modal's Dialog/Drawer
-// variants are for user-triggered open/close with a backdrop, not an
-// always-mounted element that should sit quietly out of the way of
-// whatever else is on the page.
+// client page once 1+ property is queued for comparison. Not routed
+// through the shared Modal — Modal's Dialog/Drawer variants are for
+// user-triggered open/close with a backdrop, not an always-mounted
+// element that should sit quietly out of the way of whatever else is on
+// the page.
 
 "use client";
 
@@ -14,10 +14,7 @@ import { X } from "lucide-react";
 
 import { useCompareProperties } from "@/lib/hooks/useCompareProperties";
 import { useCompareStore } from "@/lib/stores/compare";
-
-function coverImageUrl(media: { url: string; is_cover: boolean }[]): string | undefined {
-  return media.find((item) => item.is_cover)?.url ?? media[0]?.url;
-}
+import { coverImageUrl } from "@/lib/property-media";
 
 export function CompareDrawer() {
   const router = useRouter();

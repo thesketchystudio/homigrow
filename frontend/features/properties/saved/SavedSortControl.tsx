@@ -5,8 +5,8 @@
 // button (bg-secondary-400, rounded-xl), not the full-width Select
 // trigger style ListingsToolbar uses for its sort dropdown — this one
 // is sized to its content per Figma. Wired to the real `sort` param
-// GET /saved-properties now supports (10_Phase_3.md P3-T41): "Recently
-// Saved" (the pre-existing default order) plus Price Low/High, matching
+// GET /saved-properties now supports: "Recently Saved" (the pre-existing
+// default order) plus Price Low/High, matching
 // the same real-sorts-only convention as the Listings page.
 
 "use client";

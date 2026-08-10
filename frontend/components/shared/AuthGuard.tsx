@@ -1,5 +1,5 @@
 // components/shared/AuthGuard.tsx
-// Per-portal layout wrapper (06_Component_Library.md, P2-T18): resolves the
+// Per-portal layout wrapper: resolves the
 // session from the httpOnly refresh cookie on first load, renders a
 // fallback while that resolves, then redirects a logged-out visitor to
 // /login (with a returnTo) and a logged-in visitor whose role isn't

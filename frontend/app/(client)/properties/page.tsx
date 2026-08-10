@@ -1,8 +1,7 @@
 // app/(client)/properties/page.tsx
-// Listings/search screen (Figma "Curated Listings", node 28:646;
-// 10_Phase_3.md P3-T10's frontend follow-up). Public route, no
-// AuthGuard — GET /properties is unauthenticated. Not yet linked from
-// PropertyCard elsewhere — that's a separate later task.
+// Listings/search screen (Figma "Curated Listings", node 28:646).
+// Public route, no AuthGuard — GET /properties is unauthenticated. Not
+// yet linked from PropertyCard elsewhere — that's a separate later task.
 //
 // Filter/sort/page state is synced to the URL query string (same param
 // names the API itself uses) so a filtered view is bookmarkable/
@@ -37,7 +36,7 @@ function toListParams(filters: ListingsFilters, sort: SortValue, page: number): 
   return {
     city: filters.city ?? undefined,
     locality: filters.locality ?? undefined,
-    q: filters.locationQuery ?? undefined,
+    search: filters.searchQuery ?? undefined,
     // Only sent once the user actually moves the slider off its resting
     // extremes — the default ₹50L–₹15Cr range is meaningless for rent/PG
     // listings, whose `price` is a monthly figure (e.g. ₹18,000), and
@@ -61,7 +60,7 @@ function parseStateFromSearchParams(searchParams: URLSearchParams): {
 } {
   const cityRaw = searchParams.get("city");
   const localityRaw = searchParams.get("locality");
-  const qRaw = searchParams.get("q");
+  const searchQueryRaw = searchParams.get("search");
   const priceMin = Number(searchParams.get("price_min")) || DEFAULT_FILTERS.priceMin;
   const priceMax = Number(searchParams.get("price_max")) || DEFAULT_FILTERS.priceMax;
   const bhkMinRaw = searchParams.get("bhk_min");
@@ -73,7 +72,7 @@ function parseStateFromSearchParams(searchParams: URLSearchParams): {
     filters: {
       city: cityRaw || null,
       locality: localityRaw || null,
-      locationQuery: qRaw || null,
+      searchQuery: searchQueryRaw || null,
       priceMin,
       priceMax,
       bhkMin: bhkMinRaw ? Number(bhkMinRaw) : null,
@@ -156,7 +155,8 @@ function PropertiesListingsContent() {
       <div className="flex min-w-0 flex-1 flex-col gap-8 lg:px-12 lg:py-8">
         <ListingsToolbar
           total={data?.total ?? 0}
-          city={filters.locality ? `${filters.locality}, ${filters.city}` : (filters.city ?? filters.locationQuery)}
+          city={filters.locality ? `${filters.locality}, ${filters.city}` : filters.city}
+          searchQuery={filters.searchQuery}
           sort={sort}
           onSortChange={updateSort}
           onOpenFilters={() => setMobileFiltersOpen(true)}

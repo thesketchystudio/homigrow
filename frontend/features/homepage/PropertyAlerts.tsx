@@ -6,6 +6,8 @@
 
 import { useState } from "react";
 
+import { toast } from "@/lib/toast";
+
 type Step = 0 | 1 | 2 | 3;
 
 const budgetOptions = [
@@ -401,8 +403,13 @@ export function PropertyAlertsSection() {
                   <button
                     onClick={() => {
                       if (!canAdvance) return;
-                      if (step < 3) setStep((s) => (s + 1) as Step);
-                      else setDone(true);
+                      if (step < 3) {
+                        setStep((s) => (s + 1) as Step);
+                      } else {
+                        // TODO: wire to a real property-alert-subscription endpoint once one exists.
+                        setDone(true);
+                        toast.info("Property alerts aren't available yet — check back soon.");
+                      }
                     }}
                     style={{
                       flex: 1,

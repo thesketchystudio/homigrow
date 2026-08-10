@@ -1,7 +1,7 @@
 // app/(broker)/broker/layout.tsx
 // Sidebar shell for every Broker Portal page, gated by AuthGuard: a
 // logged-out visitor is redirected to /login, and a logged-in client
-// visitor is redirected home (P2-T18).
+// visitor is redirected home.
 
 "use client";
 

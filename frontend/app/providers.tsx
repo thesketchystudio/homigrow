@@ -1,6 +1,6 @@
 // app/providers.tsx
 // Client-side provider tree mounted once in the root layout. TanStack
-// Query owns all server state per ADR-007 (04_Frontend_Architecture.md).
+// Query owns all server state per ADR-007.
 
 "use client";
 

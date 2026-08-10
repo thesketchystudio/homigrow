@@ -4,10 +4,10 @@
 // exercised in the /dev/components gallery, this is its first real use.
 // Cards from this endpoint are always active listings (the backend only
 // returns status=active), so no sold-state overlay is wired here — but
-// the save toggle is real (10_Phase_3.md P3-T40), driven by whichever
-// page renders this grid via useSavedPropertyToggle. Reused as-is by the
-// Saved properties page (P3-T41) via SavedPropertyItem, which extends
-// PropertyListItem with just a `saved_at` field — the `emptyState` prop
+// the save toggle is real, driven by whichever page renders this grid
+// via useSavedPropertyToggle. Reused as-is by the Saved properties page
+// via SavedPropertyItem, which extends PropertyListItem with just a
+// `saved_at` field — the `emptyState` prop
 // lets each caller supply its own copy ("no filter matches" vs "nothing
 // saved yet") without forking the grid/skeleton/mapping logic.
 import type { ReactNode } from "react";
@@ -16,15 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import PropertyCard from "@/components/shared/PropertyCard";
 import EmptyState from "@/components/shared/EmptyState";
 import type { PropertyListItem } from "@/lib/api/endpoints/properties";
-import { ListingType } from "@/lib/enums";
-import { formatINR } from "@/lib/utils";
-
-function formatListingPrice(item: PropertyListItem): string {
-  if (item.listing_type === ListingType.sale) {
-    return formatINR(item.price);
-  }
-  return `₹${Math.round(item.price).toLocaleString("en-IN")}/mo`;
-}
+import { formatListingPrice } from "@/lib/utils";
 
 function CardSkeleton() {
   return (

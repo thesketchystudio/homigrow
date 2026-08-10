@@ -1,7 +1,7 @@
 // app/dev/components/page.tsx
-// TEMPORARY — Tier 0/1 component gallery required by the P1→P2 phase gate
-// ("Tier 0+1 components render in a storybook-like /dev/components page").
-// Delete this route before production (07_Implementation_Strategy.md).
+// TEMPORARY — Tier 0/1 component gallery required as a verification
+// artifact ("Tier 0+1 components render in a storybook-like
+// /dev/components page"). Delete this route before production.
 
 "use client";
 

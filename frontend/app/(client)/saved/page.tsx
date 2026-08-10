@@ -1,7 +1,7 @@
 // app/(client)/saved/page.tsx
 // Saved properties screen (Figma "Client view" page, section "saved",
-// node 133:3060, "Your Curated Collection" — 10_Phase_3.md P3-T41). Wires
-// the TopNavBar's previously-dead "Saved" link.
+// node 133:3060, "Your Curated Collection"). Wires the TopNavBar's
+// previously-dead "Saved" link.
 //
 // Reuses the shared ListingsGrid/ListingsPagination/PropertyCard, the
 // same pattern as the /properties Listings page, rather than the bespoke
@@ -13,9 +13,9 @@
 // the sort control lives in the header row next to the title, matching
 // Figma's actual layout (node 133:3062), not inline with the pills. The
 // "Selected: N Properties"/"Compare" control from that same Filters frame
-// (node 133:3084-133:3090) is wired in via CompareSelectionBar (P3-T42) —
-// no longer out of scope. The bottom "Schedule a Portfolio Review" CTA
-// is real UI with a "coming soon" toast — no curator service exists to
+// (node 133:3084-133:3090) is wired in via CompareSelectionBar — no
+// longer out of scope. The bottom "Schedule a Portfolio Review" CTA is
+// real UI with a "coming soon" toast — no curator service exists to
 // actually book.
 
 "use client";

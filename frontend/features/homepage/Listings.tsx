@@ -2,245 +2,39 @@
 // Featured/trending property listings grid on the homepage. Pulls the 3
 // newest active Bengaluru listings from the real GET /properties endpoint
 // (same one the /properties Listings page uses) instead of hardcoded
-// mock data. The badge is now the real listing type (For Sale/For Rent/
-// PG), matching the LISTING_TAG convention PropertyHeader.tsx already
-// uses on the Details page — not fabricated marketing copy like "Premium
-// Curation"/"Exclusive", which had no data behind it.
+// mock data. Cards reuse the shared components/shared/PropertyCard —
+// previously this section had its own bespoke, near-duplicate card
+// implementation, against the project's rule that shared components are
+// built once and never forked per page. The badge is the real listing
+// type (For Sale/For Rent/PG), matching the LISTING_TAG convention
+// PropertyHeader.tsx already uses on the Details page — not fabricated
+// marketing copy like "Premium Curation"/"Exclusive", which had no data
+// behind it. Its exact per-type tag colors aren't expressible via the
+// shared card's badge `variant` (a fixed default/secondary/outline/
+// destructive palette), so this passes an inline `style` override — a
+// prop PropertyCard already exposes for exactly this case.
 
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
 import svgPaths from "@/lib/homepage-svg-paths";
-import { listProperties, type PropertyListItem } from "@/lib/api/endpoints/properties";
+import PropertyCard from "@/components/shared/PropertyCard";
+import { listProperties } from "@/lib/api/endpoints/properties";
 import { useSavedPropertyToggle } from "@/lib/hooks/useSavedPropertyToggle";
-import { ListingType } from "@/lib/enums";
-import { formatINR } from "@/lib/utils";
+import { ListingType, LISTING_TYPE_LABELS } from "@/lib/enums";
+import { formatListingPrice } from "@/lib/utils";
+import { FONT_HEADING as sg } from "@/lib/fonts";
 
 const FALLBACK_IMAGE = "/homepage/modern-mansion.png";
 const TRENDING_CITY = "Bengaluru";
 
-const sg = "'Space Grotesk', sans-serif";
-const pj = "'Plus Jakarta Sans', sans-serif";
-
 const LISTING_TAG: Record<ListingType, { label: string; bg: string; text: string }> = {
-  [ListingType.sale]: { label: "For Sale", bg: "#13c200", text: "#fefeff" },
-  [ListingType.rent]: { label: "For Rent", bg: "#92f574", text: "#232323" },
-  [ListingType.pg]: { label: "PG / Co-living", bg: "#090909", text: "#fefeff" },
+  [ListingType.sale]: { label: LISTING_TYPE_LABELS[ListingType.sale], bg: "#13c200", text: "#fefeff" },
+  [ListingType.rent]: { label: LISTING_TYPE_LABELS[ListingType.rent], bg: "#92f574", text: "#232323" },
+  [ListingType.pg]: { label: LISTING_TYPE_LABELS[ListingType.pg], bg: "#090909", text: "#fefeff" },
 };
-
-function formatPrice(item: PropertyListItem): string {
-  if (item.listing_type === ListingType.sale) return formatINR(item.price);
-  return `₹${Math.round(item.price).toLocaleString("en-IN")}/mo`;
-}
-
-function HeartIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg width="20" height="18" viewBox="0 0 20 18.35" fill={filled ? "#ef4444" : "none"}>
-      <path d={svgPaths.p279a9400} fill={filled ? "#ef4444" : "#FEFEFF"} />
-    </svg>
-  );
-}
-
-function BedIcon() {
-  return (
-    <svg width="15" height="10" viewBox="0 0 15 10.5" fill="none">
-      <path d={svgPaths.p1b3c1c80} fill="rgba(26,26,26,0.8)" />
-    </svg>
-  );
-}
-
-function AreaIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 12.7631 12.7631" fill="none">
-      <path d={svgPaths.p27694840} fill="rgba(26,26,26,0.8)" />
-    </svg>
-  );
-}
-
-function PinIcon() {
-  return (
-    <svg width="9" height="20" viewBox="0 0 9.33333 19.6667" fill="none">
-      <path d={svgPaths.p3ad3adc0} fill="rgba(26,26,26,0.8)" />
-    </svg>
-  );
-}
-
-function PropertyCard({
-  item,
-  isSaved,
-  onToggleSave,
-}: {
-  item: PropertyListItem;
-  isSaved: boolean;
-  onToggleSave: (id: string) => void;
-}) {
-  const [hovered, setHovered] = useState(false);
-  const tag = LISTING_TAG[item.listing_type];
-
-  return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        background: "#fefeff",
-        borderRadius: 16,
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        boxShadow: hovered ? "0 16px 48px rgba(0,0,0,0.12)" : "0 1px 4px rgba(0,0,0,0.06)",
-        transform: hovered ? "translateY(-3px)" : "translateY(0)",
-        transition: "box-shadow 0.25s ease, transform 0.25s ease",
-      }}
-    >
-      <div style={{ position: "relative", height: 280, overflow: "hidden", flexShrink: 0 }}>
-        <img
-          src={item.cover_image_url ?? FALLBACK_IMAGE}
-          alt={item.title}
-          style={{
-            width: "100%",
-            height: "133%",
-            objectFit: "cover",
-            objectPosition: "center",
-            marginTop: "-16.67%",
-            display: "block",
-            transform: hovered ? "scale(1.03)" : "scale(1)",
-            transition: "transform 0.4s ease",
-          }}
-        />
-        <button
-          onClick={() => onToggleSave(item.id)}
-          aria-label={isSaved ? "Remove from saved" : "Save property"}
-          style={{
-            position: "absolute",
-            top: 16,
-            right: 16,
-            width: 40,
-            height: 40,
-            borderRadius: 12,
-            background: "rgba(254,254,255,0.2)",
-            backdropFilter: "blur(6px)",
-            border: "none",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            transition: "background 0.2s",
-          }}
-        >
-          <HeartIcon filled={isSaved} />
-        </button>
-        <div
-          style={{
-            position: "absolute",
-            bottom: 13,
-            left: 16,
-            background: tag.bg,
-            borderRadius: 4,
-            padding: "3.5px 12px",
-          }}
-        >
-          <span style={{ fontFamily: pj, fontWeight: 700, fontSize: 12, color: tag.text }}>{tag.label}</span>
-        </div>
-      </div>
-
-      <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span
-              style={{
-                fontFamily: sg,
-                fontWeight: 700,
-                fontSize: 16,
-                lineHeight: "24px",
-                color: "#1a1a1a",
-              }}
-            >
-              {item.title}
-            </span>
-            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-              <PinIcon />
-              <span
-                style={{
-                  fontFamily: pj,
-                  fontWeight: 400,
-                  fontSize: 12,
-                  color: "rgba(26,26,26,0.8)",
-                }}
-              >
-                {item.locality}, {item.city}
-              </span>
-            </div>
-          </div>
-          <span
-            style={{
-              fontFamily: sg,
-              fontWeight: 700,
-              fontSize: 16,
-              color: "#1a1a1a",
-            }}
-          >
-            {formatPrice(item)}
-          </span>
-        </div>
-
-        {(item.bhk !== null || item.area_sqft !== null) && (
-          <div
-            style={{
-              display: "flex",
-              gap: 24,
-              alignItems: "center",
-              padding: "5px 0",
-              borderTop: "1px solid rgba(198,198,205,0.1)",
-              borderBottom: "1px solid rgba(198,198,205,0.1)",
-            }}
-          >
-            {item.bhk !== null && (
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <BedIcon />
-                <span style={{ fontFamily: pj, fontWeight: 500, fontSize: 14, color: "#1a1a1a" }}>{item.bhk} BHK</span>
-              </div>
-            )}
-            {item.area_sqft !== null && (
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <AreaIcon />
-                <span style={{ fontFamily: pj, fontWeight: 500, fontSize: 14, color: "#1a1a1a" }}>
-                  {item.area_sqft.toLocaleString("en-IN")} sqft
-                </span>
-              </div>
-            )}
-          </div>
-        )}
-
-        <Link
-          href={`/properties/${item.id}`}
-          style={{
-            width: "100%",
-            padding: "16px",
-            background: "#dfe0e1",
-            borderRadius: 8,
-            border: "none",
-            cursor: "pointer",
-            fontFamily: sg,
-            fontWeight: 700,
-            fontSize: 16,
-            color: "#1a1a1a",
-            transition: "background 0.2s",
-            textAlign: "center",
-            textDecoration: "none",
-            display: "block",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "#c8c9ca")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "#dfe0e1")}
-        >
-          VIEW DETAILS
-        </Link>
-      </div>
-    </div>
-  );
-}
 
 function ArrowIcon() {
   return (
@@ -253,8 +47,8 @@ function ArrowIcon() {
 function CardSkeleton() {
   return (
     <div style={{ background: "#fefeff", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-      <div style={{ height: 280, background: "#e5e7eb" }} />
-      <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ height: 224, background: "#e5e7eb" }} />
+      <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ height: 16, width: "70%", background: "#e5e7eb", borderRadius: 4 }} />
         <div style={{ height: 12, width: "50%", background: "#e5e7eb", borderRadius: 4 }} />
         <div style={{ height: 16, width: "40%", background: "#e5e7eb", borderRadius: 4 }} />
@@ -338,9 +132,27 @@ export default function Listings() {
         <div className="listings-grid">
           {isLoading
             ? Array.from({ length: 3 }, (_, i) => <CardSkeleton key={i} />)
-            : items.map((item) => (
-                <PropertyCard key={item.id} item={item} isSaved={savedIds.has(item.id)} onToggleSave={onToggleSave} />
-              ))}
+            : items.map((item) => {
+                const tag = LISTING_TAG[item.listing_type];
+                return (
+                  <PropertyCard
+                    key={item.id}
+                    property={{
+                      id: item.id,
+                      title: item.title,
+                      imageUrl: item.cover_image_url ?? FALLBACK_IMAGE,
+                      price: formatListingPrice(item),
+                      location: `${item.locality}, ${item.city}`,
+                      bhk: item.bhk ?? undefined,
+                      areaSqft: item.area_sqft ?? undefined,
+                      href: `/properties/${item.id}`,
+                    }}
+                    isSaved={savedIds.has(item.id)}
+                    onToggleSave={onToggleSave}
+                    badge={{ label: tag.label, style: { background: tag.bg, color: tag.text } }}
+                  />
+                );
+              })}
         </div>
       </div>
 

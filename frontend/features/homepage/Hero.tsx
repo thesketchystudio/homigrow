@@ -19,10 +19,9 @@ import { useRouter } from "next/navigation";
 import svgPaths from "@/lib/homepage-svg-paths";
 import { buildQueryString, type PropertyListParams } from "@/lib/api/endpoints/properties";
 import { ListingType, PropertyType } from "@/lib/enums";
+import { FONT_HEADING as sg } from "@/lib/fonts";
 
 const imgLuxuryVilla = "/homepage/luxury-villa.png";
-
-const sg = "'Space Grotesk', sans-serif";
 
 type Tab = "Buy" | "Rent" | "Commercial";
 

@@ -1,3 +1,8 @@
+// app/layout.tsx
+// Root layout: loads the Geist font variables and global stylesheet,
+// wraps every page in the app-wide Providers (TanStack Query), and
+// mounts the shared toast renderer.
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";

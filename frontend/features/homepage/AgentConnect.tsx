@@ -5,6 +5,8 @@
 
 import { useState } from "react";
 
+import { toast } from "@/lib/toast";
+
 const specialties = [
   { label: "Luxury Homes", count: "₹2Cr+" },
   { label: "New Launches", count: "RERA verified" },
@@ -449,7 +451,12 @@ export function AgentConnectSection() {
                   </div>
 
                   <button
-                    onClick={() => phone && setSent(true)}
+                    onClick={() => {
+                      if (!phone) return;
+                      // TODO: wire to a real advisor-call-request endpoint once one exists.
+                      setSent(true);
+                      toast.info("Call requests aren't available yet — check back soon.");
+                    }}
                     style={{
                       padding: "15px",
                       borderRadius: 8,

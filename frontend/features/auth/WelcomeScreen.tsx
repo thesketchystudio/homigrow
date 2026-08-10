@@ -2,7 +2,7 @@
 // Welcome/chooser screen (Figma: "landing", node 423:3792, "common screen"
 // section) — the entry point offered before both signup and login. Google
 // sign-in is deferred here too, matching the same call made on the login
-// screen (P2-T35).
+// screen.
 
 "use client";
 

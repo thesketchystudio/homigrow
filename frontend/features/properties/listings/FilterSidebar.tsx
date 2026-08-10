@@ -11,14 +11,13 @@
 // field) are rendered matching Figma but disabled/"Coming soon" —
 // checkbox-style controls that silently no-op on click would be worse
 // UX than the toast pattern used for one-off action buttons elsewhere.
-// See project memory figma-listings-search-screen-2026-07-30.
 
 import { ChevronDown } from "lucide-react";
 
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PillGroup } from "@/features/auth/preferences/PillGroup";
-import { ListingType, PropertyType } from "@/lib/enums";
+import { ListingType, PropertyType, PROPERTY_TYPE_LABELS } from "@/lib/enums";
 import { cn, formatINR } from "@/lib/utils";
 import { DEFAULT_FILTERS, PRICE_MAX, PRICE_MIN, PRICE_STEP, type ListingsFilters } from "./types";
 
@@ -35,15 +34,9 @@ const LISTING_TYPE_OPTIONS = [
   { value: ListingType.pg, label: "PG" },
 ];
 
-const PROPERTY_TYPE_OPTIONS: { value: PropertyType; label: string }[] = [
-  { value: PropertyType.apartment, label: "Apartment" },
-  { value: PropertyType.villa, label: "Villa" },
-  { value: PropertyType.independent_house, label: "Independent House" },
-  { value: PropertyType.plot, label: "Plot" },
-  { value: PropertyType.office, label: "Office" },
-  { value: PropertyType.shop, label: "Shop" },
-  { value: PropertyType.pg_colive, label: "PG / Co-living" },
-];
+const PROPERTY_TYPE_OPTIONS: { value: PropertyType; label: string }[] = Object.entries(PROPERTY_TYPE_LABELS).map(
+  ([value, label]) => ({ value: value as PropertyType, label }),
+);
 
 const PROPERTY_USE_OPTIONS = ["Cafe", "Restaurant", "Retail Store", "Office Space"];
 

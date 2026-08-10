@@ -1,9 +1,8 @@
 // lib/api/client.ts
 // Single fetch wrapper for every backend call: attaches the in-memory access
-// token, normalizes the {"error": {code, message, fields?}} envelope
-// (05_API_Design.md) into a typed ApiError, and parses JSON/empty responses
-// uniformly. On a 401 from a protected endpoint it silently retries once via
-// /auth/refresh (04_Frontend_Architecture.md §API layer, P2-T17). Requests
+// token, normalizes the {"error": {code, message, fields?}} envelope into a
+// typed ApiError, and parses JSON/empty responses uniformly. On a 401 from
+// a protected endpoint it silently retries once via /auth/refresh. Requests
 // under /auth/ are never retried this way — they carry no access token, and
 // a 401 there (e.g. bad login credentials) isn't a token-expiry signal.
 //

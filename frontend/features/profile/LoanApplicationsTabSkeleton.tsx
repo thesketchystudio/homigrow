@@ -1,9 +1,9 @@
 // features/profile/LoanApplicationsTabSkeleton.tsx
 // Loading placeholder for the Loan Applications tab (Figma skeleton
 // frame under 470:3374's "LoansTab" — the file has two pixel-identical
-// copies of this frame, 470:3374 and 470:3866, confirmed via
-// screenshot diff to be an accidental duplicate rather than two
-// states), shown by ProfileLayout's AuthGuard fallback while the
+// copies of this frame, 470:3374 and 470:3866, an accidental duplicate
+// rather than two distinct states), shown by ProfileLayout's AuthGuard
+// fallback while the
 // session resolves. The real tab isn't built yet — it needs a
 // loan-application backend that doesn't exist — so this mirrors
 // Figma's shape (heading + button, loan cards with a 4-stat row and a
