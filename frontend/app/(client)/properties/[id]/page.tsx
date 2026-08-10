@@ -1,8 +1,8 @@
 // app/(client)/properties/[id]/page.tsx
-// Property Details screen (Figma node 31:1845, "property details";
-// 10_Phase_3.md P3-T04's frontend follow-up). Public route, no AuthGuard —
-// GET /properties/{id} is unauthenticated. Not yet linked from the
-// homepage or PropertyCard — that's a separate, later task.
+// Property Details screen (Figma node 31:1845, "property details").
+// Public route, no AuthGuard — GET /properties/{id} is unauthenticated.
+// Not yet linked from the homepage or PropertyCard — that's a separate,
+// later task.
 
 "use client";
 

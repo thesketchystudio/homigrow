@@ -2,9 +2,9 @@
 // The "Selected: N Properties"/"Compare" control from the Saved page's own
 // Filters row (Figma node 133:3084-133:3090, exact colors/fonts pulled via
 // get_design_context) — deliberately dropped when Saved shipped, added back
-// here (10_Phase_3.md P3-T42). 06_Component_Library.md scopes CompareDrawer
-// to "saved/search", so this same control is reused on the Listings page
-// toolbar too rather than inventing a divergent design for it. The
+// here. CompareDrawer is scoped to the saved/search pages, so this same
+// control is reused on the Listings page toolbar too rather than
+// inventing a divergent design for it. The
 // "Click any property card..." hint (node 150:18423) shows only while
 // nothing is selected yet, mirroring the "saved_2" first-use variant frame.
 

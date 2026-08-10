@@ -1,6 +1,6 @@
 // features/properties/compare/ComparisonTable.tsx
 // Builds the Overview/Amenities/Location/Investment accordion rows from
-// real PropertyRead data (10_Phase_3.md P3-T42). Figma's Comparison screen
+// real PropertyRead data. Figma's Comparison screen
 // (node 150:15348) also shows Possession, Airport distance, and Nearby
 // Schools rows, plus a fixed 8-item amenity checklist (Pool/Gym/Concierge/
 // etc.) and an Investment section (Rental Yield/Appreciation/RERA
@@ -16,17 +16,8 @@ import { Bath, BedDouble, Building2, Car, Check, Compass, IndianRupee, Layers, M
 
 import { ComparisonAccordionSection, type ComparisonRow } from "./ComparisonAccordionSection";
 import type { PropertyRead } from "@/lib/api/endpoints/properties";
+import { PROPERTY_TYPE_LABELS } from "@/lib/enums";
 import { formatINR } from "@/lib/utils";
-
-const PROPERTY_TYPE_LABELS: Record<string, string> = {
-  apartment: "Apartment",
-  villa: "Villa",
-  independent_house: "Independent House",
-  plot: "Plot",
-  office: "Office",
-  shop: "Shop",
-  pg_colive: "PG / Co-living",
-};
 
 function pricePerSqft(property: PropertyRead): string {
   if (!property.area_sqft || property.area_sqft === 0) return "—";

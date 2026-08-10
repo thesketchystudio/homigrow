@@ -1,15 +1,15 @@
 // features/properties/saved/SavedCategoryPills.tsx
 // The category pill group from the "Filters" row (Figma node 133:3074:
 // All/Villas/Penthouses/Commercial), wired to the real property_type
-// filter GET /saved-properties now supports (10_Phase_3.md P3-T41).
+// filter GET /saved-properties now supports.
 // "Penthouses" has no backing PropertyType category, so it's kept
 // visible to match Figma but disabled — same pattern as the Listings
 // sidebar's unbacked filter sections. That frame's "Selected: N
-// Properties"/"Compare" control lives in CompareSelectionBar.tsx
-// (P3-T42), rendered alongside these pills rather than inside this file.
-// The "Recently Saved" sort control that
-// same design-context pull attached to this frame actually belongs to
-// the Header row above it (node 133:3062) — see SavedSortControl.
+// Properties"/"Compare" control lives in CompareSelectionBar.tsx,
+// rendered alongside these pills rather than inside this file. The
+// "Recently Saved" sort control from that same design-context pull
+// actually belongs to the Header row above it (node 133:3062), not
+// here — see SavedSortControl.
 
 "use client";
 

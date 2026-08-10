@@ -10,9 +10,9 @@
 //
 // Full Name/Email are real User columns; Phone Number has no update path
 // on the backend (User.phone is immutable post-signup) so it renders
-// read-only, same as Location — the city/state collected at signup
-// (P2-T21's City/State fields), displayed here as a single combined,
-// non-editable "City, State" string read from `preferences.city`/`.state`
+// read-only, same as Location — the city/state collected at signup,
+// displayed here as a single combined, non-editable "City, State" string
+// read from `preferences.city`/`.state`
 // (flat top-level keys, see auth_service.signup) rather than exposed as
 // editable fields. The Buyer Profile section reads/writes
 // `preferences.buyer_preferences` directly — the same structured object
@@ -40,37 +40,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ChangePasswordDialog } from "@/features/profile/ChangePasswordDialog";
 import { BudgetRangeSlider, BUDGET_MIN, BUDGET_MAX } from "@/features/auth/preferences/BudgetRangeSlider";
 import { CityMultiSelectChips } from "@/features/auth/preferences/CityMultiSelectChips";
-import { ChipMultiSelect, type ChipOption } from "@/features/auth/preferences/ChipMultiSelect";
+import { ChipMultiSelect } from "@/features/auth/preferences/ChipMultiSelect";
+import { PROPERTY_TYPE_OPTIONS, INVESTMENT_GOAL_OPTIONS } from "@/features/auth/preferences/options";
 import type { BuyerPreferences } from "@/features/auth/preferences/types";
 import { ApiError } from "@/lib/api/client";
 import { getMe, updateMe, type UserRead } from "@/lib/api/endpoints/users";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { accountFormSchema, type AccountFormValues } from "@/lib/validation/profile";
-
-// Mirrors the option values PropertyTypeCardGrid/InvestmentGoalStep use
-// (features/auth/preferences), as plain chips rather than the wizard's
-// full-screen image cards/eyebrow labels — a compact settings form, not
-// a dedicated preference screen.
-const PROPERTY_TYPE_OPTIONS: ChipOption[] = [
-  { value: "modernist_villas", label: "Modernist Villas" },
-  { value: "luxury_penthouses", label: "Luxury Penthouses" },
-  { value: "estates_mansions", label: "Estates & Mansions" },
-  { value: "studio_lofts", label: "Studio Lofts" },
-  { value: "serviced_apartments", label: "Serviced Apartments" },
-  { value: "plots_land", label: "Plots & Land" },
-  { value: "commercial_spaces", label: "Commercial Spaces" },
-  { value: "farmhouses", label: "Farmhouses" },
-];
-
-const INVESTMENT_GOAL_OPTIONS: ChipOption[] = [
-  { value: "rent_to_ownership", label: "Rent to Ownership" },
-  { value: "long_term_investment", label: "Long-term Investment" },
-  { value: "joint_investment_projects", label: "Joint-investment Projects" },
-  { value: "capital_appreciation_play", label: "Capital Appreciation Play" },
-  { value: "steady_yield_generation", label: "Steady Yield Generation" },
-  { value: "business_infrastructure", label: "Business Infrastructure" },
-];
 
 function toFormValues(user: UserRead): AccountFormValues {
   const prefs = user.preferences ?? {};

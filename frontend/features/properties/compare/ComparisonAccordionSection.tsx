@@ -3,8 +3,8 @@
 // pulled via get_design_context: bg-muted header, #f0f2f4 hairline column
 // borders — no exact existing token for that hairline, used as an
 // arbitrary value directly) reused for every section of the Comparison
-// screen (10_Phase_3.md P3-T42): Overview, Amenities, Location, and
-// Investment. `comingSoon` renders an honest placeholder instead of rows —
+// screen: Overview, Amenities, Location, and Investment. `comingSoon`
+// renders an honest placeholder instead of rows —
 // used for Investment, which has zero backing data on the Property model
 // (Rental Yield/Appreciation/RERA Status), same pattern as the Details
 // page's Vaastu/Market Context sections.

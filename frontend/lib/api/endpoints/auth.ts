@@ -1,6 +1,6 @@
 // lib/api/endpoints/auth.ts
-// Typed functions for the /auth resource (05_API_Design.md). Components
-// never call fetch directly — they go through these.
+// Typed functions for the /auth resource. Components never call fetch
+// directly — they go through these.
 
 import { apiRequest } from "@/lib/api/client";
 import type { OTPPurpose, UserRole } from "@/lib/enums";

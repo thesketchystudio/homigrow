@@ -1,11 +1,11 @@
 // app/(client)/compare/page.tsx
-// The full "Comparison" screen (Figma node 150:15348, 10_Phase_3.md
-// P3-T42). Reads `ids` from the URL (?ids=a,b,c) rather than only the
-// local compare store, so a shared /compare?ids=... link works even for a
-// visitor whose localStorage never had anything selected — same
-// shareable-URL precedent as the Listings page's filter state.
-// useSearchParams requires a Suspense boundary for static rendering (same
-// reason /properties and /reset-password split their page this way).
+// The full "Comparison" screen (Figma node 150:15348). Reads `ids` from
+// the URL (?ids=a,b,c) rather than only the local compare store, so a
+// shared /compare?ids=... link works even for a visitor whose
+// localStorage never had anything selected — same shareable-URL
+// precedent as the Listings page's filter state. useSearchParams
+// requires a Suspense boundary for static rendering (same reason
+// /properties and /reset-password split their page this way).
 
 "use client";
 

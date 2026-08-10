@@ -1,6 +1,5 @@
 // lib/api/endpoints/properties.ts
-// Typed functions for the public /properties resource (05_API_Design.md,
-// 10_Phase_3.md P3-T04 detail + P3-T10 search). No auth required —
+// Typed functions for the public /properties resource. No auth required —
 // GET /properties/{id} serves the public Property Details screen,
 // GET /properties serves the Listings search grid.
 
@@ -114,24 +113,47 @@ export type PropertyListParams = {
   page_size?: number;
 };
 
+// The param shape buildQueryString actually serializes — a superset of
+// PropertyListParams (`sort` widened to `string`) so other list endpoints
+// with their own sort literal union (e.g. saved-properties' SavedSort) can
+// reuse this same serialization instead of hand-rolling their own
+// URLSearchParams construction. Every concrete params type below (a
+// PropertyListParams, a SavedPropertyListParams, ...) is a structural
+// subtype of this and can be passed directly.
+export type ListQueryParams = {
+  city?: string;
+  locality?: string;
+  search?: string;
+  listing_type?: ListingType;
+  property_type?: PropertyType[];
+  price_min?: number;
+  price_max?: number;
+  bhk_min?: number;
+  amenities?: string[];
+  sort?: string;
+  page?: number;
+  page_size?: number;
+};
+
 // Exported so the Listings page can build the identical query string for
-// the browser URL (shareable/bookmarkable filtered views) without
-// duplicating this param-serialization logic.
-export function buildQueryString(params: PropertyListParams): string {
-  const search = new URLSearchParams();
-  if (params.city) search.set("city", params.city);
-  if (params.locality) search.set("locality", params.locality);
-  if (params.search) search.set("search", params.search);
-  if (params.listing_type) search.set("listing_type", params.listing_type);
-  for (const value of params.property_type ?? []) search.append("property_type", value);
-  if (params.price_min !== undefined) search.set("price_min", String(params.price_min));
-  if (params.price_max !== undefined) search.set("price_max", String(params.price_max));
-  if (params.bhk_min !== undefined) search.set("bhk_min", String(params.bhk_min));
-  for (const value of params.amenities ?? []) search.append("amenities", value);
-  if (params.sort) search.set("sort", params.sort);
-  if (params.page !== undefined) search.set("page", String(params.page));
-  if (params.page_size !== undefined) search.set("page_size", String(params.page_size));
-  const query = search.toString();
+// the browser URL (shareable/bookmarkable filtered views), and so other
+// /list-style endpoints (e.g. saved-properties) can reuse the same
+// param-serialization logic instead of duplicating it.
+export function buildQueryString(params: ListQueryParams): string {
+  const queryParams = new URLSearchParams();
+  if (params.city) queryParams.set("city", params.city);
+  if (params.locality) queryParams.set("locality", params.locality);
+  if (params.search) queryParams.set("search", params.search);
+  if (params.listing_type) queryParams.set("listing_type", params.listing_type);
+  for (const value of params.property_type ?? []) queryParams.append("property_type", value);
+  if (params.price_min !== undefined) queryParams.set("price_min", String(params.price_min));
+  if (params.price_max !== undefined) queryParams.set("price_max", String(params.price_max));
+  if (params.bhk_min !== undefined) queryParams.set("bhk_min", String(params.bhk_min));
+  for (const value of params.amenities ?? []) queryParams.append("amenities", value);
+  if (params.sort) queryParams.set("sort", params.sort);
+  if (params.page !== undefined) queryParams.set("page", String(params.page));
+  if (params.page_size !== undefined) queryParams.set("page_size", String(params.page_size));
+  const query = queryParams.toString();
   return query ? `?${query}` : "";
 }
 

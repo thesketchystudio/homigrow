@@ -27,12 +27,10 @@ import { useAuthStore } from "@/lib/stores/auth";
 import { useSearchHistoryStore } from "@/lib/stores/searchHistory";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { SearchOverlay } from "@/features/search/SearchOverlay";
+import { FONT_HEADING as sg } from "@/lib/fonts";
 
-const sg = "'Space Grotesk', sans-serif";
-
-// "Saved" (P3-T41), "Compare" (P3-T42), and "Discover" (the Listings/search
-// page) have real destinations — AI Tools stays a dead "#" link until that
-// feature exists.
+// "Saved", "Compare", and "Discover" (the Listings/search page) have real
+// destinations — AI Tools stays a dead "#" link until that feature exists.
 const NAV_LINK_HREFS: Record<string, string> = { Discover: "/properties", Saved: "/saved", Compare: "/compare" };
 
 function initials(name?: string) {

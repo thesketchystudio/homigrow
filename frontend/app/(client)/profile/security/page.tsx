@@ -1,6 +1,6 @@
 // app/(client)/profile/security/page.tsx
-// Security tab placeholder — active-sessions UI (P2-T26 frontend half)
-// and account deactivation (P2-T27 frontend half) land here next.
+// Security tab placeholder — active-sessions UI and account
+// deactivation land here next.
 
 import { Shield } from "lucide-react";
 

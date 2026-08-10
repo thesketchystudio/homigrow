@@ -1,5 +1,5 @@
 // lib/api/endpoints/users.ts
-// Typed functions for the /users/me resource (05_API_Design.md).
+// Typed functions for the /users/me resource.
 
 import { apiRequest } from "@/lib/api/client";
 import type { UserRole, VerificationStatus } from "@/lib/enums";
@@ -18,7 +18,7 @@ export type BrokerProfileOut = {
 export type UserRead = {
   id: string;
   // Nullable since backend migration M5 — Google Sign-In accounts have
-  // no phone number (google-auth-design-2026-07-21).
+  // no phone number.
   phone: string | null;
   email?: string;
   full_name?: string;

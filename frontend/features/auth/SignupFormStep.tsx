@@ -1,8 +1,7 @@
 // features/auth/SignupFormStep.tsx
 // Step 2 of 3 — "Welcome to the inner circle." signup form (Figma:
 // SignUpScreen, node 416:913). Submits POST /auth/signup; server 422
-// field errors are mapped back into react-hook-form via setError,
-// per the forms pattern in 04_Frontend_Architecture.md.
+// field errors are mapped back into react-hook-form via setError.
 
 "use client";
 

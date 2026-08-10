@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { BedDouble, Check, Heart, MapPin, Ruler } from "lucide-react";
 
@@ -37,6 +37,10 @@ export type PropertyCardData = {
 export type PropertyCardBadge = {
   label: string;
   variant?: "default" | "secondary" | "outline" | "destructive";
+  // Escape hatch for callers needing exact brand colors the fixed variant
+  // palette can't express (e.g. per-listing-type tag colors) — takes
+  // precedence over variant via inline style, not a fork of the badge.
+  style?: CSSProperties;
 };
 
 export type PropertyCardProps = {
@@ -77,7 +81,7 @@ export default function PropertyCard({
         />
 
         {badge && (
-          <Badge variant={badge.variant ?? "default"} className="absolute bottom-3 left-3">
+          <Badge variant={badge.variant ?? "default"} className="absolute bottom-3 left-3" style={badge.style}>
             {badge.label}
           </Badge>
         )}

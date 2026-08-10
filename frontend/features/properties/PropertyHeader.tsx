@@ -10,14 +10,8 @@ import { useState } from "react";
 import { Bath, BedDouble, CalendarDays, Car, MapPin, Ruler, Share2, TrainFront } from "lucide-react";
 
 import type { PropertyRead } from "@/lib/api/endpoints/properties";
-import { ListingType } from "@/lib/enums";
+import { ListingType, LISTING_TYPE_LABELS as LISTING_TAG } from "@/lib/enums";
 import { toast } from "@/lib/toast";
-
-const LISTING_TAG: Record<ListingType, string> = {
-  [ListingType.sale]: "For Sale",
-  [ListingType.rent]: "For Rent",
-  [ListingType.pg]: "PG / Co-living",
-};
 
 function formatPriceINR(amount: number): string {
   return `₹${Math.round(amount).toLocaleString("en-IN")}`;

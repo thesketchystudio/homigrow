@@ -6,12 +6,12 @@
 
 import { useState } from "react";
 
+import { FONT_HEADING as sg, FONT_BODY as pj } from "@/lib/fonts";
+import { toast } from "@/lib/toast";
+
 const imgModernMansion = "/homepage/modern-mansion.png";
 const imgModernLivingRoom = "/homepage/modern-living-room.png";
 const imgProp3 = "/homepage/new-launch-3.png";
-
-const sg = "'Space Grotesk', sans-serif";
-const pj = "'Plus Jakarta Sans', sans-serif";
 
 const featured = {
   name: "Skyline One",
@@ -233,7 +233,11 @@ export default function NewLaunches() {
                 ))}
               </div>
               <button
-                onClick={() => setInterested(true)}
+                onClick={() => {
+                  // TODO: wire to a real site-visit-booking endpoint once one exists.
+                  setInterested(true);
+                  toast.info("Site visit booking isn't available yet — check back soon.");
+                }}
                 style={{
                   width: "100%",
                   padding: 16,

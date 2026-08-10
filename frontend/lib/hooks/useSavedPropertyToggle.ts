@@ -1,12 +1,12 @@
 // lib/hooks/useSavedPropertyToggle.ts
 // Shared saved/unsaved state + optimistic toggle for PropertyCard's heart
-// button (10_Phase_3.md P3-T40), used by both the /properties Listings
-// grid and the homepage Trending section — the only two places that
-// currently render property cards backed by GET /properties data.
+// button, used by both the /properties Listings grid and the homepage
+// Trending section — the only two places that currently render property
+// cards backed by GET /properties data.
 //
 // Fetches up to 50 saved ids (the backend's max page_size) just to know
 // membership for card display — not the full paginated saved list, which
-// is a separate, not-yet-built "Saved properties" screen (P3-T41).
+// is a separate "Saved properties" screen.
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -14,8 +14,8 @@ import { listSavedProperties, saveProperty, unsaveProperty } from "@/lib/api/end
 import { useAuthStore } from "@/lib/stores/auth";
 import { toast } from "@/lib/toast";
 
-// Exported so the Saved properties page (P3-T41) can invalidate this same
-// cache after an unsave — otherwise a heart icon on another page (Listings,
+// Exported so the Saved properties page can invalidate this same cache
+// after an unsave — otherwise a heart icon on another page (Listings,
 // homepage Trending) would keep showing "saved" until its own query refetches.
 export const SAVED_IDS_QUERY_KEY = ["saved-property-ids"];
 

@@ -1,7 +1,7 @@
 // features/auth/OtpVerifyStep.tsx
 // Step 3 of 3 — "Verify your identity" (Figma: node 418:874/877/878).
-// Six-digit code entry; distinguishes OTP_INVALID vs OTP_EXPIRED per
-// 05_API_Design.md so the two Figma error states render correctly.
+// Six-digit code entry; distinguishes OTP_INVALID vs OTP_EXPIRED so the
+// two Figma error states render correctly.
 
 "use client";
 

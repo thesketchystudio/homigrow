@@ -1,9 +1,8 @@
 // lib/validation/auth.ts
 // Zod schemas for the signup wizard, mirroring the backend Pydantic
 // schemas in app/schemas/auth.py so the user sees identical validation
-// client-side first (04_Frontend_Architecture.md forms pattern). The
-// server's zxcvbn score>=3 check is the source of truth for password
-// strength (14_Security.md) — the client-side MIN_PASSWORD_STRENGTH_SCORE
+// client-side first. The server's zxcvbn score>=3 check is the source of
+// truth for password strength — the client-side MIN_PASSWORD_STRENGTH_SCORE
 // below only drives the local strength meter/gate, a bypassable UX nicety.
 
 import { z } from "zod";

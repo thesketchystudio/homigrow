@@ -5,10 +5,9 @@
 // Account tab. There's no dedicated notification-preferences backend —
 // like the Account tab's Buyer Profile fields, these five channel
 // toggles live under a "notification_channels" key in the existing
-// free-form `preferences` JSONB (P2-T20), the same pattern T22
-// established for fields with no dedicated column. Every save spreads
-// the currently-loaded preferences first so this tab can't silently
-// wipe another tab's keys.
+// free-form `preferences` JSONB, the established convention for fields
+// with no dedicated column. Every save spreads the currently-loaded
+// preferences first so this tab can't silently wipe another tab's keys.
 
 "use client";
 

@@ -1675,6 +1675,41 @@ A reader should understand the code from the comment alone.
   the 3 real saved properties rendered with working checkboxes, selected
   2, clicked "Compare", landed on the real `/compare?ids=...` comparison
   table with correct data. Zero console errors.
+- **Full codebase standards cleanup, 2026-08-10** — a full audit of
+  everything built through Phase 3 (both `homigrow-backend-wt` and this
+  checkout) against this file's own coding standards, done in 5 phases
+  each independently verified (backend: full 195-test suite + `ruff`
+  clean before/after every step; frontend: `tsc`/`eslint`/`next build`
+  clean throughout, plus a live Playwright screenshot comparison for
+  the one visually-sensitive change). Pure cleanup — no API contract,
+  response shape, or visual/functional behavior changed anywhere.
+  Backend: stripped task-ID/doc-pointer/dated narration from comments
+  across `app/`; extracted the duplicated `_pg_enum` model helper, the
+  duplicated property list-item query logic, and the duplicated
+  pagination field into shared modules (`app/models/_helpers.py`,
+  `app/services/_property_query_helpers.py`,
+  `app/schemas/_pagination.py`); wired up the previously-unused
+  `RateLimited` exception class; moved the CSRF origin-check and the
+  compare-id count rule out of route files into their services, per
+  this file's own routes-call-services rule. Frontend: same comment
+  cleanup across 44 files; extracted 7 different pieces of duplicated
+  logic/constants into shared sources (`lib/utils.ts`,
+  `lib/property-media.ts`, `lib/enums.ts`, `lib/fonts.ts`,
+  `lib/stores/createPersistedStore.ts`,
+  `features/auth/preferences/options.ts`); replaced the homepage's
+  hand-copied `PropertyCard` with the real shared
+  `components/shared/PropertyCard.tsx` (the one direct "shared
+  components are built once" violation found — needed one small
+  additive `style` prop on `PropertyCardBadge`, not a fork); brought 4
+  homepage widgets that silently faked a successful submission in line
+  with the project's existing toast+`# TODO:` stub convention for
+  unbuilt-backend actions. Full findings + what was fixed documented in
+  `docs/implementation/backend/Phase_3_Implementation.md` and
+  `docs/implementation/frontend/Phase_3_Implementation.md`. Left
+  untouched, on purpose: an unrelated, already-in-progress nav-search
+  feature (`q` → `search`) sitting uncommitted in the backend worktree
+  from an earlier session — real feature work, not part of this pass.
+  Changes not yet committed — pending your review.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

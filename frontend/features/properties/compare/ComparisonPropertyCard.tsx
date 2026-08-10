@@ -14,21 +14,12 @@ import Link from "next/link";
 import { MapPin, X } from "lucide-react";
 
 import type { PropertyRead } from "@/lib/api/endpoints/properties";
-import { ListingType } from "@/lib/enums";
-import { formatINR } from "@/lib/utils";
+import { coverImageUrl } from "@/lib/property-media";
+import { formatListingPrice } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 
-function coverImageUrl(property: PropertyRead): string | undefined {
-  return property.media.find((item) => item.is_cover)?.url ?? property.media[0]?.url;
-}
-
-function formatPrice(property: PropertyRead): string {
-  if (property.listing_type === ListingType.sale) return formatINR(property.price);
-  return `₹${Math.round(property.price).toLocaleString("en-IN")}/mo`;
-}
-
 export function ComparisonPropertyCard({ property, onRemove }: { property: PropertyRead; onRemove: (id: string) => void }) {
-  const imageUrl = coverImageUrl(property);
+  const imageUrl = coverImageUrl(property.media);
 
   return (
     <div className="flex flex-col overflow-hidden rounded-xl border bg-background shadow-sm">
@@ -51,7 +42,7 @@ export function ComparisonPropertyCard({ property, onRemove }: { property: Prope
             <MapPin className="size-3 shrink-0" />
             {property.locality}, {property.city}
           </span>
-          <span className="font-heading text-brand-primary-400 text-[16px] font-bold">{formatPrice(property)}</span>
+          <span className="font-heading text-brand-primary-400 text-[16px] font-bold">{formatListingPrice(property)}</span>
         </div>
 
         <div className="flex gap-2">

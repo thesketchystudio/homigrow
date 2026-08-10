@@ -1,8 +1,7 @@
 // app/(client)/properties/page.tsx
-// Listings/search screen (Figma "Curated Listings", node 28:646;
-// 10_Phase_3.md P3-T10's frontend follow-up). Public route, no
-// AuthGuard — GET /properties is unauthenticated. Not yet linked from
-// PropertyCard elsewhere — that's a separate later task.
+// Listings/search screen (Figma "Curated Listings", node 28:646).
+// Public route, no AuthGuard — GET /properties is unauthenticated. Not
+// yet linked from PropertyCard elsewhere — that's a separate later task.
 //
 // Filter/sort/page state is synced to the URL query string (same param
 // names the API itself uses) so a filtered view is bookmarkable/

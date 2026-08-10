@@ -2,8 +2,8 @@
 // 3-bar strength meter matching the Figma signup form. zxcvbn is loaded
 // lazily (it's a sizeable library) since this only renders on password
 // fields, and only after the user has typed something. The backend's
-// zxcvbn score (14_Security.md, MIN_PASSWORD_STRENGTH_SCORE) is the real
-// gate — this is UX feedback only, not a validation source of truth.
+// zxcvbn score (MIN_PASSWORD_STRENGTH_SCORE) is the real gate — this is
+// UX feedback only, not a validation source of truth.
 
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";

@@ -1,5 +1,5 @@
 // app/(client)/profile/notifications/page.tsx
-// Notifications tab — channel preferences (P2-T23).
+// Notifications tab — channel preferences.
 
 import { NotificationsTab } from "@/features/profile/NotificationsTab";
 
