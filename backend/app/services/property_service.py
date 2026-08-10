@@ -11,7 +11,7 @@ of moderation.
 from typing import Literal, Optional
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import Text, func, or_, select
 from sqlalchemy.dialects.postgresql import array
 from sqlalchemy.orm import Session, joinedload
 
@@ -74,7 +74,7 @@ def list_properties(
     *,
     city: Optional[str] = None,
     locality: Optional[str] = None,
-    q: Optional[str] = None,
+    search: Optional[str] = None,
     listing_type: Optional[ListingType] = None,
     property_type: Optional[list[PropertyType]] = None,
     price_min: Optional[float] = None,
@@ -91,19 +91,33 @@ def list_properties(
     matches a property that has ANY of the given amenities (Postgres
     JSONB `?|`), matching the sidebar's multi-select checkbox UX. `city`/
     `locality` are exact (case-insensitive) matches, driven by dropdowns
-    and neighborhood links that already know the precise value. `q` is
-    separate: a free-text substring match against EITHER city OR locality,
-    for the nav search box — a typed "Whitefield" is a locality, not a
-    city, so an exact `city` match alone would silently return nothing.
+    and neighborhood links that already know the precise value. `search`
+    is separate: a free-text substring match against title, description,
+    city, locality, landmark, and amenities (matches ANY of them) — for
+    the nav search box, which can't know what kind of value was typed.
+    Deliberately just substring matching, not keyword/facet parsing (e.g.
+    detecting "villa" or "4bhk" as a structured filter) — that's already
+    covered precisely by the `property_type`/`bhk_min` params and the
+    Listings sidebar built on them; a second, fuzzier way to do the same
+    filtering would only be inconsistent with it.
     """
     conditions = [Property.status == PropertyStatus.active]
     if city:
         conditions.append(func.lower(Property.city) == city.lower())
     if locality:
         conditions.append(func.lower(Property.locality) == locality.lower())
-    if q:
-        pattern = f"%{q.lower()}%"
-        conditions.append(or_(func.lower(Property.city).like(pattern), func.lower(Property.locality).like(pattern)))
+    if search:
+        pattern = f"%{search.lower()}%"
+        conditions.append(
+            or_(
+                func.lower(Property.title).like(pattern),
+                func.lower(Property.description).like(pattern),
+                func.lower(Property.city).like(pattern),
+                func.lower(Property.locality).like(pattern),
+                func.lower(Property.landmark).like(pattern),
+                func.lower(Property.amenities.cast(Text)).like(pattern),
+            )
+        )
     if listing_type is not None:
         conditions.append(Property.listing_type == listing_type)
     if property_type:

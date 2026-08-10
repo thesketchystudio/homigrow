@@ -181,29 +181,85 @@ class TestListProperties:
         assert response.status_code == 200
         assert [item["title"] for item in response.json()["items"]] == ["Indiranagar Home"]
 
-    def test_q_matches_locality_not_just_city(self, client, db_session):
-        # A typed "whitefield" is a locality, not a city — q must match
-        # either column, unlike the exact `city`/`locality` filters above.
+    def test_search_matches_locality_not_just_city(self, client, db_session):
+        # A typed "whitefield" is a locality, not a city — search must
+        # match either column, unlike the exact `city`/`locality` filters
+        # above.
         locality = f"Whitefield-{uuid.uuid4().hex[:8]}"
         city = _unique_city()
         _make_property(db_session, title="Locality Match", city=city, locality=locality)
         _make_property(db_session, title="Unrelated", city=_unique_city(), locality="Somewhere Else")
 
-        response = client.get("/api/v1/properties", params={"q": locality.lower()})
+        response = client.get("/api/v1/properties", params={"search": locality.lower()})
 
         assert response.status_code == 200
         titles = {item["title"] for item in response.json()["items"]}
         assert "Locality Match" in titles
         assert "Unrelated" not in titles
 
-    def test_q_matches_city_too(self, client, db_session):
+    def test_search_matches_city_too(self, client, db_session):
         city = _unique_city()
         _make_property(db_session, title="City Match", city=city)
 
-        response = client.get("/api/v1/properties", params={"q": city[:6].upper()})
+        response = client.get("/api/v1/properties", params={"search": city[:6].upper()})
 
         assert response.status_code == 200
         assert "City Match" in {item["title"] for item in response.json()["items"]}
+
+    def test_search_matches_title(self, client, db_session):
+        city = _unique_city()
+        unique_word = f"Zenith{uuid.uuid4().hex[:8]}"
+        _make_property(db_session, title=f"The {unique_word} Residency", city=city)
+        _make_property(db_session, title="Unrelated Listing", city=city)
+
+        response = client.get("/api/v1/properties", params={"search": unique_word.lower()})
+
+        assert response.status_code == 200
+        titles = {item["title"] for item in response.json()["items"]}
+        assert f"The {unique_word} Residency" in titles
+        assert "Unrelated Listing" not in titles
+
+    def test_search_matches_description(self, client, db_session):
+        city = _unique_city()
+        unique_word = f"Skybridge{uuid.uuid4().hex[:8]}"
+        _make_property(db_session, title="Match", description=f"Features a private {unique_word} to the pool deck.", city=city)
+        _make_property(db_session, title="No Match", description="A plain, unremarkable home.", city=city)
+
+        response = client.get("/api/v1/properties", params={"search": unique_word.lower()})
+
+        assert response.status_code == 200
+        assert {"Match"} == {item["title"] for item in response.json()["items"]}
+
+    def test_search_matches_amenities(self, client, db_session):
+        city = _unique_city()
+        unique_word = f"Onsen{uuid.uuid4().hex[:8]}"
+        _make_property(db_session, title="Match", amenities=[f"Private {unique_word} Bath"], city=city)
+        _make_property(db_session, title="No Match", amenities=["Gym"], city=city)
+
+        response = client.get("/api/v1/properties", params={"search": unique_word.lower()})
+
+        assert response.status_code == 200
+        assert {"Match"} == {item["title"] for item in response.json()["items"]}
+
+    def test_search_matches_landmark(self, client, db_session):
+        city = _unique_city()
+        unique_word = f"Riverside{uuid.uuid4().hex[:8]}"
+        _make_property(db_session, title="Match", landmark=f"Opposite {unique_word} Park", city=city)
+        _make_property(db_session, title="No Match", landmark="Near the old mill", city=city)
+
+        response = client.get("/api/v1/properties", params={"search": unique_word.lower()})
+
+        assert response.status_code == 200
+        assert {"Match"} == {item["title"] for item in response.json()["items"]}
+
+    def test_search_finds_nothing_for_an_unrelated_term(self, client, db_session):
+        city = _unique_city()
+        _make_property(db_session, title="Match", city=city)
+
+        response = client.get("/api/v1/properties", params={"search": f"nonexistent{uuid.uuid4().hex[:8]}"})
+
+        assert response.status_code == 200
+        assert response.json()["items"] == []
 
     def test_listing_type_filter(self, client, db_session):
         city = _unique_city()
