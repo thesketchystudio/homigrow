@@ -95,11 +95,14 @@ export type PropertyListResponse = {
 export type PropertyListParams = {
   city?: string;
   locality?: string;
-  // Free-text match against EITHER city OR locality — for the nav search
-  // box, which can't know whether what's typed is a city or a locality.
-  // Distinct from city/locality above, which are exact matches driven by
-  // dropdowns and neighborhood links that already know the precise value.
-  q?: string;
+  // Free-text match against title, description, city, locality, landmark,
+  // or amenities (matches ANY of them) — for the nav search box, which
+  // can't know what kind of value was typed. Distinct from city/locality
+  // above, which are exact matches driven by dropdowns and neighborhood
+  // links that already know the precise value. Deliberately just
+  // substring matching, not keyword/facet parsing — property type/bedroom
+  // count already have precise dedicated filters below.
+  search?: string;
   listing_type?: ListingType;
   property_type?: PropertyType[];
   price_min?: number;
@@ -118,7 +121,7 @@ export function buildQueryString(params: PropertyListParams): string {
   const search = new URLSearchParams();
   if (params.city) search.set("city", params.city);
   if (params.locality) search.set("locality", params.locality);
-  if (params.q) search.set("q", params.q);
+  if (params.search) search.set("search", params.search);
   if (params.listing_type) search.set("listing_type", params.listing_type);
   for (const value of params.property_type ?? []) search.append("property_type", value);
   if (params.price_min !== undefined) search.set("price_min", String(params.price_min));
