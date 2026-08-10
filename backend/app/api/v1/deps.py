@@ -3,8 +3,8 @@ app/api/v1/deps.py
 
 FastAPI dependency callables for authentication and role-based access
 control. Every non-public route depends on CurrentUser or one of the
-RequireX role aliases defined here (03_Backend_Architecture.md
-§Authorization) rather than decoding tokens or checking roles inline.
+RequireX role aliases defined here, rather than decoding tokens or
+checking roles inline.
 """
 
 from typing import Annotated, Optional

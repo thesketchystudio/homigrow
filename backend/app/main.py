@@ -21,9 +21,9 @@ from app.core.middleware import limiter
 # Without a configured handler, stdlib logging silently drops every
 # INFO call (its "no handler" fallback only surfaces WARNING+) — this
 # is what every service-layer logger.info() call (dev-mode OTP/reset
-# token logging) relies on actually reaching the console. JSON
-# formatting for production (03_Backend_Architecture.md §Logging) is
-# still open work; this is the plain-in-dev half.
+# token logging) relies on actually reaching the console. Structured
+# JSON formatting for production is still open work; this is the
+# plain-in-dev half.
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 if settings.SENTRY_DSN:

@@ -8,11 +8,11 @@ never need to join properties.
 """
 
 from sqlalchemy import Column, DateTime, ForeignKey, Index, String, Text, text
-from sqlalchemy.dialects.postgresql import ENUM as PGEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base, TimestampMixin
+from app.models._helpers import _pg_enum
 from app.models.enums import LeadStatus
 
 
@@ -32,12 +32,7 @@ class Lead(Base, TimestampMixin):
     # postgresql.ENUM is used instead of the generic sa.Enum type — see
     # app/models/user.py for the reason.
     status = Column(
-        PGEnum(
-            LeadStatus,
-            name="lead_status",
-            create_type=False,
-            values_callable=lambda enum_cls: [member.value for member in enum_cls],
-        ),
+        _pg_enum(LeadStatus, "lead_status"),
         nullable=False,
         server_default=LeadStatus.new.value,
     )

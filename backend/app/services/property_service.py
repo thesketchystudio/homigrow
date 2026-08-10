@@ -1,8 +1,7 @@
 """
 app/services/property_service.py
 
-Public property-listing reads (05_API_Design.md §properties; 10_Phase_3.md
-P3-T04 detail + P3-T10 search). Only active listings are visible here —
+Public property-listing reads. Only active listings are visible here —
 there is no owner-preview path for pending/draft listings yet, since
 nothing today needs a broker to view their own unpublished property ahead
 of moderation.
@@ -11,15 +10,16 @@ of moderation.
 from typing import Literal, Optional
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import Text, func, or_
 from sqlalchemy.dialects.postgresql import array
 from sqlalchemy.orm import Session, joinedload
 
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import NotFoundError, ValidationFailed
 from app.models.enums import ListingType, PropertyStatus, PropertyType
 from app.models.property import Property, PropertyMedia
 from app.models.user import User
 from app.schemas.properties import NeighborhoodSummary, PropertyListItem
+from app.services._property_query_helpers import build_property_list_item, cover_image_subquery
 
 SortOption = Literal["newest", "price_asc", "price_desc"]
 
@@ -28,6 +28,10 @@ _SORT_CLAUSES = {
     "price_asc": Property.price.asc(),
     "price_desc": Property.price.desc(),
 }
+
+# Max ids GET /properties/compare accepts at once — a product rule (the
+# Comparison screen's own Figma copy says "up to 3"), not a parsing limit.
+MAX_COMPARE_IDS = 3
 
 
 def get_property_detail(db: Session, property_id: UUID) -> Property:
@@ -52,8 +56,11 @@ def compare_properties(db: Session, ids: list[UUID]) -> list[Property]:
     caller's requested order (SQL IN doesn't preserve it). Missing or
     non-active ids are silently dropped — same visibility rule
     get_property_detail uses, just without raising for a subset that isn't
-    found rather than a single lookup.
+    found rather than a single lookup. Enforces the product's max-compare-
+    count rule (at most MAX_COMPARE_IDS at once) before querying.
     """
+    if len(ids) > MAX_COMPARE_IDS:
+        raise ValidationFailed("TOO_MANY_COMPARE_IDS", f"You can compare at most {MAX_COMPARE_IDS} properties.")
     if not ids:
         return []
     rows = (
@@ -74,7 +81,7 @@ def list_properties(
     *,
     city: Optional[str] = None,
     locality: Optional[str] = None,
-    q: Optional[str] = None,
+    search: Optional[str] = None,
     listing_type: Optional[ListingType] = None,
     property_type: Optional[list[PropertyType]] = None,
     price_min: Optional[float] = None,
@@ -91,19 +98,33 @@ def list_properties(
     matches a property that has ANY of the given amenities (Postgres
     JSONB `?|`), matching the sidebar's multi-select checkbox UX. `city`/
     `locality` are exact (case-insensitive) matches, driven by dropdowns
-    and neighborhood links that already know the precise value. `q` is
-    separate: a free-text substring match against EITHER city OR locality,
-    for the nav search box — a typed "Whitefield" is a locality, not a
-    city, so an exact `city` match alone would silently return nothing.
+    and neighborhood links that already know the precise value. `search`
+    is separate: a free-text substring match against title, description,
+    city, locality, landmark, and amenities (matches ANY of them) — for
+    the nav search box, which can't know what kind of value was typed.
+    Deliberately just substring matching, not keyword/facet parsing (e.g.
+    detecting "villa" or "4bhk" as a structured filter) — that's already
+    covered precisely by the `property_type`/`bhk_min` params and the
+    Listings sidebar built on them; a second, fuzzier way to do the same
+    filtering would only be inconsistent with it.
     """
     conditions = [Property.status == PropertyStatus.active]
     if city:
         conditions.append(func.lower(Property.city) == city.lower())
     if locality:
         conditions.append(func.lower(Property.locality) == locality.lower())
-    if q:
-        pattern = f"%{q.lower()}%"
-        conditions.append(or_(func.lower(Property.city).like(pattern), func.lower(Property.locality).like(pattern)))
+    if search:
+        pattern = f"%{search.lower()}%"
+        conditions.append(
+            or_(
+                func.lower(Property.title).like(pattern),
+                func.lower(Property.description).like(pattern),
+                func.lower(Property.city).like(pattern),
+                func.lower(Property.locality).like(pattern),
+                func.lower(Property.landmark).like(pattern),
+                func.lower(Property.amenities.cast(Text)).like(pattern),
+            )
+        )
     if listing_type is not None:
         conditions.append(Property.listing_type == listing_type)
     if property_type:
@@ -119,13 +140,7 @@ def list_properties(
 
     total = db.query(func.count(Property.id)).filter(*conditions).scalar()
 
-    cover_image_subq = (
-        select(PropertyMedia.url)
-        .where(PropertyMedia.property_id == Property.id, PropertyMedia.is_cover.is_(True))
-        .correlate(Property)
-        .limit(1)
-        .scalar_subquery()
-    )
+    cover_image_subq = cover_image_subquery()
 
     rows = (
         db.query(Property, cover_image_subq.label("cover_image_url"))
@@ -137,21 +152,7 @@ def list_properties(
     )
 
     items = [
-        PropertyListItem(
-            id=property_.id,
-            title=property_.title,
-            listing_type=property_.listing_type,
-            property_type=property_.property_type,
-            price=property_.price,
-            bhk=property_.bhk,
-            bathrooms=property_.bathrooms,
-            area_sqft=property_.area_sqft,
-            furnishing=property_.furnishing,
-            city=property_.city,
-            locality=property_.locality,
-            cover_image_url=cover_image_url,
-            published_at=property_.published_at,
-        )
+        PropertyListItem(**build_property_list_item(property_, cover_image_url))
         for property_, cover_image_url in rows
     ]
     return items, total

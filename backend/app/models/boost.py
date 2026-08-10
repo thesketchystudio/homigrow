@@ -7,10 +7,10 @@ can change without a code deployment.
 """
 
 from sqlalchemy import Boolean, Column, DateTime, Numeric, SmallInteger, String, text
-from sqlalchemy.dialects.postgresql import ENUM as PGEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from app.db.base import Base
+from app.models._helpers import _pg_enum
 from app.models.enums import BoostTier
 
 
@@ -25,12 +25,7 @@ class BoostPlan(Base):
     # postgresql.ENUM is used instead of the generic sa.Enum type — see
     # app/models/user.py for the reason.
     tier = Column(
-        PGEnum(
-            BoostTier,
-            name="boost_tier",
-            create_type=False,
-            values_callable=lambda enum_cls: [member.value for member in enum_cls],
-        ),
+        _pg_enum(BoostTier, "boost_tier"),
         nullable=False,
     )
     price = Column(Numeric(10, 2), nullable=False)

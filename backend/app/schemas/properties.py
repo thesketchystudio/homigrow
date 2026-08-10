@@ -1,8 +1,7 @@
 """
 app/schemas/properties.py
 
-Pydantic read shapes for the public property listing resources
-(05_API_Design.md §properties; 10_Phase_3.md P3-T04 detail + P3-T10 search).
+Pydantic read shapes for the public property listing resources.
 """
 
 from datetime import datetime
@@ -18,6 +17,7 @@ from app.models.enums import (
     PropertyType,
     VerificationStatus,
 )
+from app.schemas._pagination import PaginatedResponse
 
 
 class PropertyMediaRead(BaseModel):
@@ -108,20 +108,8 @@ class PropertyListItem(BaseModel):
     published_at: Optional[datetime] = None
 
 
-class PropertyListResponse(BaseModel):
-    """Pagination envelope for GET /properties (05_API_Design.md pagination convention: page/page_size)."""
-
-    items: list[PropertyListItem]
-    page: int
-    page_size: int
-    total: int
-
-    @computed_field
-    @property
-    def total_pages(self) -> int:
-        if self.page_size <= 0:
-            return 0
-        return -(-self.total // self.page_size)
+class PropertyListResponse(PaginatedResponse[PropertyListItem]):
+    """Pagination envelope for GET /properties: page/page_size in, total/total_pages computed for the caller."""
 
 
 class PropertyCompareResponse(BaseModel):

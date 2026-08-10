@@ -40,8 +40,8 @@ def verify_password(password: str, password_hash: str) -> bool:
 def validate_password_strength(password: str) -> None:
     """
     Enforces a minimum zxcvbn strength score of 3 (of 0-4) server-side,
-    per 14_Security.md — independent of whatever a frontend meter shows,
-    since client-side validation can always be bypassed. Raises
+    independent of whatever a frontend meter shows, since client-side
+    validation can always be bypassed. Raises
     ValueError (not an AppError) so pydantic field_validators can call
     this directly and let it fold into the normal 422 validation-error
     envelope alongside every other field-level check.
@@ -52,9 +52,9 @@ def validate_password_strength(password: str) -> None:
 
 def create_access_token(user_id: UUID, role: str) -> str:
     """
-    Issues a signed access JWT. Claims per 14_Security.md token design:
-    sub (user id), role, exp, jti — jti lets a specific token be
-    identified later even though access tokens are never persisted.
+    Issues a signed access JWT. Claims: sub (user id), role, exp, jti —
+    jti lets a specific token be identified later even though access
+    tokens are never persisted.
     """
     now = datetime.now(timezone.utc)
     payload = {

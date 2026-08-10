@@ -1,9 +1,9 @@
 """
 app/api/v1/routes/saved_properties.py
 
-Client watchlist endpoints (05_API_Design.md §saved-properties). Every
-route depends on CurrentUser and acts on the caller's own saved list —
-there is no admin/broker access to another user's watchlist.
+Client watchlist endpoints. Every route depends on CurrentUser and acts
+on the caller's own saved list — there is no admin/broker access to
+another user's watchlist.
 """
 
 from uuid import UUID
