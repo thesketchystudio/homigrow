@@ -1,14 +1,12 @@
 """
 app/schemas/saved_properties.py
 
-Pydantic read shapes for the client watchlist resource (05_API_Design.md
-§saved-properties; 10_Phase_3.md P3-T40).
+Pydantic read shapes for the client watchlist resource.
 """
 
 from datetime import datetime
 
-from pydantic import BaseModel, computed_field
-
+from app.schemas._pagination import PaginatedResponse
 from app.schemas.properties import PropertyListItem
 
 
@@ -18,17 +16,5 @@ class SavedPropertyItem(PropertyListItem):
     saved_at: datetime
 
 
-class SavedPropertyListResponse(BaseModel):
-    """Pagination envelope for GET /saved-properties (same page/page_size convention as PropertyListResponse)."""
-
-    items: list[SavedPropertyItem]
-    page: int
-    page_size: int
-    total: int
-
-    @computed_field
-    @property
-    def total_pages(self) -> int:
-        if self.page_size <= 0:
-            return 0
-        return -(-self.total // self.page_size)
+class SavedPropertyListResponse(PaginatedResponse[SavedPropertyItem]):
+    """Pagination envelope for GET /saved-properties: page/page_size in, total/total_pages computed for the caller."""

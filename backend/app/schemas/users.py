@@ -2,8 +2,7 @@
 app/schemas/users.py
 
 Pydantic request/response shapes for the /users/me resource family:
-profile read/update, password change, and session listing
-(05_API_Design.md §users/me).
+profile read/update, password change, and session listing.
 """
 
 from datetime import datetime

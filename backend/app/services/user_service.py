@@ -3,10 +3,9 @@ app/services/user_service.py
 
 Self-service account management for the authenticated user: profile
 read/update, password change, active-session listing/revocation, and
-soft account deactivation (05_API_Design.md §users/me). Every function
-here operates on the CurrentUser row already resolved by
-api/v1/deps.py — none of it re-authenticates, it only authorizes and
-mutates.
+soft account deactivation. Every function here operates on the
+CurrentUser row already resolved by api/v1/deps.py — none of it
+re-authenticates, it only authorizes and mutates.
 """
 
 import logging
@@ -40,9 +39,9 @@ def update_me(
     """
     Applies only the fields the caller actually supplied (None means
     "leave unchanged", not "clear"). Changing email resets
-    is_email_verified — real verification-email delivery is P2-T30, so
-    for now (like the existing OTP/reset-token paths) this only logs
-    the notice in non-production environments.
+    is_email_verified — no verification-email delivery exists for this
+    path yet, so for now (like the existing OTP/reset-token paths) this
+    only logs the notice in non-production environments.
     """
     if email is not None and email != user.email:
         if db.query(User).filter(User.email == email, User.id != user.id).first() is not None:
@@ -123,10 +122,10 @@ def revoke_all_sessions(db: Session, user: User) -> None:
 def deactivate_account(db: Session, user: User) -> None:
     """
     Soft-deactivates the account (is_active=false) and revokes every
-    session, per 05_API_Design.md. A broker with a live (status=active)
-    listing is blocked with 409 until those listings are transferred or
-    closed via the broker flow — deactivating an account shouldn't be
-    able to silently orphan an active marketplace listing.
+    session. A broker with a live (status=active) listing is blocked
+    with 409 until those listings are transferred or closed via the
+    broker flow — deactivating an account shouldn't be able to silently
+    orphan an active marketplace listing.
     """
     if user.role == UserRole.broker:
         has_active_listing = (

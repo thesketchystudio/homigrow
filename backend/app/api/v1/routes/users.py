@@ -3,12 +3,11 @@ app/api/v1/routes/users.py
 
 Self-service account endpoints for the authenticated user: profile
 read/update, password change, session listing/revocation, and account
-deactivation (05_API_Design.md §users/me). Every route depends on
-CurrentUser — no role restriction, since these act on the caller's own
-account regardless of client/broker/admin. Routes only parse input and
-translate service results into responses; the actual rules
-(email-uniqueness, deactivation eligibility, etc.) live in
-user_service.py.
+deactivation. Every route depends on CurrentUser — no role restriction,
+since these act on the caller's own account regardless of
+client/broker/admin. Routes only parse input and translate service
+results into responses; the actual rules (email-uniqueness,
+deactivation eligibility, etc.) live in user_service.py.
 """
 
 from uuid import UUID

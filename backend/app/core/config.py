@@ -35,12 +35,13 @@ class Settings(BaseSettings):
 
     # Declared now so Settings() doesn't fail on the already-present .env
     # value (pydantic-settings forbids undeclared env vars by default).
-    # The sms_service.py MSG91 adapter itself is P2-T10, still on hold.
+    # The sms_service.py MSG91 adapter that would consume this is not
+    # currently wired up anywhere in the app.
     MSG91_AUTH_KEY: str = ""
 
     # Expected browser origin for the frontend SPA; used only to validate
     # the Origin header on the one cookie-authenticated endpoint
-    # (/auth/refresh) per 14_Security.md's CSRF stance.
+    # (/auth/refresh) as a CSRF defense.
     FRONTEND_ORIGIN: str = "http://localhost:3000"
 
     # OAuth 2.0 web client ID from Google Cloud Console, used to verify

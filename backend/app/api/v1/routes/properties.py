@@ -1,8 +1,8 @@
 """
 app/api/v1/routes/properties.py
 
-Public property-listing endpoints (05_API_Design.md §properties). No auth
-required — these serve the public Property Details and Listings screens.
+Public property-listing endpoints. No auth required — these serve the
+public Property Details and Listings screens.
 """
 
 from uuid import UUID
@@ -20,15 +20,17 @@ from app.schemas.properties import (
     PropertyRead,
 )
 from app.services import property_service
-from app.services.property_service import SortOption
-
-MAX_COMPARE_IDS = 3
+from app.services.property_service import MAX_COMPARE_IDS, SortOption
 
 router = APIRouter(prefix="/properties", tags=["properties"])
 
 
 def _parse_compare_ids(raw: str) -> list[UUID]:
-    """Parses the comma-separated `ids` query param, deduping while preserving order."""
+    """
+    Parses the comma-separated `ids` query param into UUIDs, deduping while
+    preserving order. Syntax-level validation only — the max-count product
+    rule lives in property_service.compare_properties.
+    """
     ids: list[UUID] = []
     for part in (segment.strip() for segment in raw.split(",")):
         if not part:
@@ -39,10 +41,6 @@ def _parse_compare_ids(raw: str) -> list[UUID]:
             raise ValidationFailed("INVALID_COMPARE_IDS", f"'{part}' is not a valid property id.")
         if parsed not in ids:
             ids.append(parsed)
-    if len(ids) > MAX_COMPARE_IDS:
-        raise ValidationFailed(
-            "TOO_MANY_COMPARE_IDS", f"You can compare at most {MAX_COMPARE_IDS} properties."
-        )
     return ids
 
 
@@ -62,7 +60,7 @@ def list_properties(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=50),
 ) -> PropertyListResponse:
-    """The search/listings grid endpoint. Filters are typed query params (05_API_Design.md §properties); unknown `sort` values 422 automatically via the Literal type."""
+    """The search/listings grid endpoint. Filters are typed query params; unknown `sort` values 422 automatically via the Literal type."""
     items, total = property_service.list_properties(
         db,
         city=city,
@@ -95,7 +93,7 @@ def compare_properties(
     ids: str = Query(..., description=f"Comma-separated property ids, max {MAX_COMPARE_IDS}"),
     db: Session = Depends(get_db),
 ) -> PropertyCompareResponse:
-    """Returns active properties matching `ids` for the /compare screen's spec table (05_API_Design.md)."""
+    """Returns active properties matching `ids` for the /compare screen's spec table."""
     id_list = _parse_compare_ids(ids)
     properties = property_service.compare_properties(db, id_list)
     return PropertyCompareResponse(items=[PropertyRead.model_validate(p) for p in properties])

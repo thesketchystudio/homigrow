@@ -4,7 +4,7 @@ app/core/exceptions.py
 The AppError hierarchy services raise for expected failures, plus the
 global FastAPI handlers that translate every error path (AppError,
 plain HTTPException, request validation, and unhandled exceptions)
-into the single standard envelope from 05_API_Design.md:
+into a single standard envelope:
 {"error": {"code", "message", "fields"?}}.
 """
 
@@ -58,7 +58,7 @@ class ForbiddenError(AppError):
 
 
 class LockedError(AppError):
-    """423 — used for account lockout (ACCOUNT_LOCKED), a standard code per 05_API_Design.md."""
+    """423 — used for account lockout (ACCOUNT_LOCKED)."""
 
     status_code = 423
 
@@ -113,7 +113,8 @@ def unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespons
 
 
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
-    return _error_response(429, "RATE_LIMITED", "Too many requests. Please try again shortly.")
+    """Translates slowapi's exception into a RateLimited AppError so its status/code/message flow through app_error_handler like every other AppError subclass, rather than being duplicated here as literals."""
+    return app_error_handler(request, RateLimited("RATE_LIMITED", "Too many requests. Please try again shortly."))
 
 
 def install_exception_handlers(app: FastAPI) -> None:
