@@ -110,8 +110,8 @@ export function PropertyHeader({ property }: { property: PropertyRead }) {
                 <TrainFront className="size-5 text-brand-primary-600" />
                 <div className="flex flex-col">
                   <span className="font-body text-[12px] uppercase tracking-[1.2px] text-brand-primary-600/80">Metro</span>
+                  <span className="font-heading text-[16px] font-bold text-brand-primary-600">{property.locality}</span>
                   <div className="flex items-center gap-1">
-                    <span className="font-heading text-[16px] font-bold text-brand-primary-600">{property.locality}</span>
                     <MapPin className="size-3 text-brand-green-700" />
                     <span className="font-heading text-[16px] font-bold text-brand-green-700">{property.metro_distance_km} kms</span>
                   </div>

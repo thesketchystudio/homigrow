@@ -7,11 +7,12 @@
 
 import { useState, type CSSProperties } from "react";
 import Link from "next/link";
-import { BedDouble, Check, Heart, MapPin, Ruler } from "lucide-react";
+import { BedDouble, Check, Heart, MapPin, Ruler, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { toast } from "@/lib/toast";
 import { PropertyStatus } from "@/lib/enums";
 
 const SOLD_STATUSES: readonly PropertyStatus[] = [PropertyStatus.sold, PropertyStatus.rented, PropertyStatus.expired];
@@ -51,6 +52,11 @@ export type PropertyCardProps = {
   isComparing?: boolean;
   onToggleCompare?: (id: string) => void;
   badge?: PropertyCardBadge;
+  // "View property"/"Enquire now"/"Check Vaastu" row (Figma "search" screen,
+  // node 28:735). "View property" is a plain span, not a nested link/button —
+  // the whole card is already the real Link to the details page, so clicking
+  // it triggers the same navigation without an invalid nested <a>.
+  showActions?: boolean;
 };
 
 export default function PropertyCard({
@@ -61,6 +67,7 @@ export default function PropertyCard({
   isComparing = false,
   onToggleCompare,
   badge,
+  showActions = false,
 }: PropertyCardProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const isSold = property.status !== undefined && SOLD_STATUSES.includes(property.status);
@@ -166,6 +173,39 @@ export default function PropertyCard({
                 {property.areaSqft.toLocaleString("en-IN")} sqft
               </span>
             )}
+          </div>
+        )}
+
+        {showActions && (
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-lg border border-black px-4 py-2 font-heading text-[14px] font-bold text-brand-primary-400">
+                View property
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toast.info("Enquiries aren't available yet — check back soon.");
+                }}
+                className="rounded-lg bg-[#565e74] px-4 py-2 font-heading text-[14px] font-bold text-[#f8f9fa]"
+              >
+                Enquire now
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toast.info("Vaastu compliance checking isn't available yet — check back soon.");
+              }}
+              className="flex items-center gap-1 font-heading text-[14px] font-bold text-[#575e70]"
+            >
+              <Sparkles className="size-3.5" />
+              Check Vaastu
+            </button>
           </div>
         )}
       </div>
