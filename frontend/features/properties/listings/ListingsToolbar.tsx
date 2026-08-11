@@ -10,6 +10,7 @@
 // map icon is the exact solid Figma glyph (not a Lucide stand-in) — a
 // stroke-outline icon at this size read as a faint dotted smudge.
 
+import type { ReactNode } from "react";
 import { Grid2x2, SlidersHorizontal } from "lucide-react";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,6 +44,10 @@ type ListingsToolbarProps = {
   sort: SortValue;
   onSortChange: (sort: SortValue) => void;
   onOpenFilters: () => void;
+  // Rendered right-aligned below the Grid/Sort row — the Listings page's
+  // own "Compare" button (Figma has it inline with "Selected: N
+  // Properties" instead, but this screen positions it under Sort).
+  compareSlot?: ReactNode;
 };
 
 function heading(city?: string | null, searchQuery?: string | null): string {
@@ -51,7 +56,7 @@ function heading(city?: string | null, searchQuery?: string | null): string {
   return "Curated Listings";
 }
 
-export function ListingsToolbar({ total, city, searchQuery, sort, onSortChange, onOpenFilters }: ListingsToolbarProps) {
+export function ListingsToolbar({ total, city, searchQuery, sort, onSortChange, onOpenFilters, compareSlot }: ListingsToolbarProps) {
   return (
     <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
       <div className="flex flex-col gap-1">
@@ -61,44 +66,48 @@ export function ListingsToolbar({ total, city, searchQuery, sort, onSortChange, 
         </p>
       </div>
 
-      <div className="flex items-center gap-4">
-        <button
-          type="button"
-          onClick={onOpenFilters}
-          className="flex items-center gap-2 rounded-lg bg-brand-secondary-400 px-4 py-2 font-heading text-[16px] font-bold text-brand-primary-400 lg:hidden"
-        >
-          <SlidersHorizontal className="size-3.5" />
-          Filters
-        </button>
-
-        <div className="hidden shrink-0 items-center gap-1 rounded-lg bg-brand-secondary-400 p-1 sm:flex">
-          <div className="flex items-center gap-2 rounded-md bg-background px-4 py-2 shadow-sm">
-            <Grid2x2 className="size-3.5" />
-            <span className="font-heading text-[16px] font-bold text-brand-primary-400">Grid</span>
-          </div>
+      <div className="flex flex-col items-end gap-3">
+        <div className="flex items-center gap-4">
           <button
             type="button"
-            onClick={() => toast.info("Map view isn't available yet.")}
-            className="flex items-center gap-2 whitespace-nowrap px-4 py-2 font-heading text-[16px] font-bold text-brand-primary-800/65"
+            onClick={onOpenFilters}
+            className="flex items-center gap-2 rounded-lg bg-brand-secondary-400 px-4 py-2 font-heading text-[16px] font-bold text-brand-primary-400 lg:hidden"
           >
-            <MapIcon className="size-3.5 shrink-0" />
-            Show on map
+            <SlidersHorizontal className="size-3.5" />
+            Filters
           </button>
+
+          <div className="hidden shrink-0 items-center gap-1 rounded-lg bg-brand-secondary-400 p-1 sm:flex">
+            <div className="flex items-center gap-2 rounded-md bg-background px-4 py-2 shadow-sm">
+              <Grid2x2 className="size-3.5" />
+              <span className="font-heading text-[16px] font-bold text-brand-primary-400">Grid</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => toast.info("Map view isn't available yet.")}
+              className="flex items-center gap-2 whitespace-nowrap px-4 py-2 font-heading text-[16px] font-bold text-brand-primary-800/65"
+            >
+              <MapIcon className="size-3.5 shrink-0" />
+              Show on map
+            </button>
+          </div>
+
+          <Select value={sort} onValueChange={(value) => onSortChange(value as SortValue)}>
+            <SelectTrigger className="rounded-tl-lg rounded-tr-lg border-brand-secondary-500 bg-brand-secondary-400 font-heading text-[16px] font-bold text-brand-primary-400">
+              <span>Sort by: </span>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SORT_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        <Select value={sort} onValueChange={(value) => onSortChange(value as SortValue)}>
-          <SelectTrigger className="rounded-tl-lg rounded-tr-lg border-brand-secondary-500 bg-brand-secondary-400 font-heading text-[16px] font-bold text-brand-primary-400">
-            <span>Sort by: </span>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SORT_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {compareSlot}
       </div>
     </div>
   );

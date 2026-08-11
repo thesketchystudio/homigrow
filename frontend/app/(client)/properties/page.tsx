@@ -19,7 +19,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import ErrorState from "@/components/shared/ErrorState";
 import Modal from "@/components/shared/Modal";
-import { CompareSelectionBar } from "@/features/properties/CompareSelectionBar";
+import { CompareButton, CompareSelectionBar } from "@/features/properties/CompareSelectionBar";
 import { FilterSidebar } from "@/features/properties/listings/FilterSidebar";
 import { ListingsToolbar } from "@/features/properties/listings/ListingsToolbar";
 import { ListingsGrid, ListingsGridSkeleton } from "@/features/properties/listings/ListingsGrid";
@@ -160,9 +160,10 @@ function PropertiesListingsContent() {
           sort={sort}
           onSortChange={updateSort}
           onOpenFilters={() => setMobileFiltersOpen(true)}
+          compareSlot={<CompareButton />}
         />
 
-        <CompareSelectionBar />
+        <CompareSelectionBar hideButton />
 
         {error ? (
           <ErrorState title="Couldn't load properties" body="Please try again in a moment." />
@@ -176,6 +177,7 @@ function PropertiesListingsContent() {
               onToggleSave={onToggleSave}
               compareIds={compareIds}
               onToggleCompare={toggleCompare}
+              showCardActions
             />
           </div>
         )}

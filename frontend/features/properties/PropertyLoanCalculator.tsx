@@ -5,7 +5,9 @@
 // but adapted to this screen's own controls (down-payment %, tenure
 // chips) and light-card visual language. "Apply for Loan" / "Get
 // Pre-Approved" have no backend (loan applications are a separate,
-// unbuilt Profile tab) — both just surface a toast.
+// unbuilt Profile tab) — both just surface a toast. Card padding is
+// symmetric (px-6 sm:px-12) to match Figma's equal 48px left/right inset —
+// content sits inside the card, not flush against its left edge.
 
 "use client";
 
@@ -74,7 +76,7 @@ export function PropertyLoanCalculator({ propertyPrice }: { propertyPrice: numbe
   const handleDeferred = (action: string) => toast.info(`${action} isn't available yet — check back soon.`);
 
   return (
-    <div className="flex flex-col gap-6 rounded-2xl bg-brand-secondary-400 pt-16 pr-6 pb-8 sm:pr-12">
+    <div className="flex flex-col gap-6 rounded-2xl bg-brand-secondary-400 pt-16 pb-8 px-6 sm:px-12">
       <div className="flex flex-col gap-2">
         <p className="font-heading text-[12px] uppercase tracking-[1.2px] text-brand-secondary-900">Plan your purchase</p>
         <h2 className="font-heading text-[28px] font-bold text-brand-primary-400">Home loan calculator</h2>
