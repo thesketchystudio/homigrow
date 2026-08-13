@@ -4,30 +4,10 @@
 
 import { AuthProgressBar } from "@/features/auth/AuthProgressBar";
 import { PreferenceWizardFooter } from "@/features/auth/preferences/PreferenceWizardFooter";
-import { ChecklistGroup, type ChecklistOption } from "@/features/auth/preferences/ChecklistGroup";
-import { ChipMultiSelect, type ChipOption } from "@/features/auth/preferences/ChipMultiSelect";
+import { ChecklistGroup } from "@/features/auth/preferences/ChecklistGroup";
+import { ChipMultiSelect } from "@/features/auth/preferences/ChipMultiSelect";
+import { DEVELOPMENT_STAGE_OPTIONS, AMENITY_OPTIONS } from "@/features/auth/preferences/options";
 import type { BuyerPreferences } from "@/features/auth/preferences/types";
-
-const DEVELOPMENT_STAGE_OPTIONS: ChecklistOption[] = [
-  { value: "ready_to_move", label: "Prioritize Ready-to-Move", sublabel: "High Maintenance Score" },
-  { value: "under_construction", label: "Prioritize Under Construction", sublabel: "Growth Potential" },
-  { value: "pre_launch", label: "Include Pre-Launch Opportunities", sublabel: "Early-Bird Pricing" },
-];
-
-const AMENITY_OPTIONS: ChipOption[] = [
-  { value: "swimming_pool", label: "Swimming Pool" },
-  { value: "24_7_security", label: "24/7 Security" },
-  { value: "gymnasium", label: "Gymnasium" },
-  { value: "clubhouse", label: "Clubhouse" },
-  { value: "underground_parking", label: "Underground Parking" },
-  { value: "ev_charging", label: "EV Charging" },
-  { value: "concierge_service", label: "Concierge Service" },
-  { value: "green_spaces_parks", label: "Green Spaces / Parks" },
-  { value: "school_proximity", label: "School Proximity" },
-  { value: "hospital_access", label: "Hospital Access" },
-  { value: "metro_connectivity", label: "Metro Connectivity" },
-  { value: "smart_home", label: "Smart Home" },
-];
 
 type DevelopmentStageStepProps = {
   preferences: BuyerPreferences;

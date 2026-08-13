@@ -4,6 +4,7 @@
 "use client";
 
 import { useState } from "react";
+import { Sparkles, Target, IndianRupee } from "lucide-react";
 
 export default function EarlyAccess() {
   const [formData, setFormData] = useState({
@@ -73,26 +74,12 @@ export default function EarlyAccess() {
   return (
     <section
       style={{
-        background: "linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)",
+        background: "linear-gradient(146deg, #1a1a1a 0%, #2d2d2d 100%)",
         paddingTop: "clamp(60px, 10vw, 120px)",
         paddingBottom: "clamp(60px, 10vw, 120px)",
         position: "relative",
-        overflow: "hidden",
       }}
     >
-      <div
-        style={{
-          position: "absolute",
-          top: "-50%",
-          right: "-10%",
-          width: "600px",
-          height: "600px",
-          background: "radial-gradient(circle, rgba(146, 245, 116, 0.1) 0%, transparent 70%)",
-          borderRadius: "50%",
-          pointerEvents: "none",
-        }}
-      />
-
       <div
         style={{
           maxWidth: "1400px",
@@ -115,9 +102,9 @@ export default function EarlyAccess() {
             <div
               style={{
                 display: "inline-block",
-                padding: "6px 16px",
+                padding: "7px 16px",
                 background: "rgba(146, 245, 116, 0.15)",
-                borderRadius: "100px",
+                borderRadius: "8px",
                 marginBottom: "24px",
               }}
             >
@@ -162,24 +149,24 @@ export default function EarlyAccess() {
 
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               {[
-                { icon: "✨", text: "Priority access to new listings" },
-                { icon: "🎯", text: "Personalized property recommendations" },
-                { icon: "💰", text: "Exclusive launch discounts and offers" },
+                { Icon: Sparkles, text: "Priority access to new listings" },
+                { Icon: Target, text: "Personalized property recommendations" },
+                { Icon: IndianRupee, text: "Exclusive launch discounts and offers" },
               ].map((item, idx) => (
                 <div key={idx} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                   <div
                     style={{
                       width: "40px",
                       height: "40px",
-                      background: "rgba(146, 245, 116, 0.1)",
+                      background: "#fefeff",
                       borderRadius: "8px",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      fontSize: "20px",
+                      flexShrink: 0,
                     }}
                   >
-                    {item.icon}
+                    <item.Icon size={20} color="#1a1a1a" />
                   </div>
                   <span
                     style={{
@@ -291,7 +278,7 @@ export default function EarlyAccess() {
                         placeholder="Enter your name"
                         style={{
                           width: "100%",
-                          padding: "14px 16px",
+                          padding: "15px 17px",
                           border: errors.name ? "2px solid #ff4444" : "1px solid #e0e0e0",
                           borderRadius: "8px",
                           fontFamily: "Plus Jakarta Sans",
@@ -348,7 +335,7 @@ export default function EarlyAccess() {
                         placeholder="your@email.com"
                         style={{
                           width: "100%",
-                          padding: "14px 16px",
+                          padding: "15px 17px",
                           border: errors.email ? "2px solid #ff4444" : "1px solid #e0e0e0",
                           borderRadius: "8px",
                           fontFamily: "Plus Jakarta Sans",
@@ -405,7 +392,7 @@ export default function EarlyAccess() {
                         placeholder="Enter your phone number"
                         style={{
                           width: "100%",
-                          padding: "14px 16px",
+                          padding: "15px 17px",
                           border: errors.phone ? "2px solid #ff4444" : "1px solid #e0e0e0",
                           borderRadius: "8px",
                           fontFamily: "Plus Jakarta Sans",
@@ -460,7 +447,7 @@ export default function EarlyAccess() {
                         onChange={handleChange}
                         style={{
                           width: "100%",
-                          padding: "14px 16px",
+                          padding: "15px 17px",
                           border: errors.interest ? "2px solid #ff4444" : "1px solid #e0e0e0",
                           borderRadius: "8px",
                           fontFamily: "Plus Jakarta Sans",

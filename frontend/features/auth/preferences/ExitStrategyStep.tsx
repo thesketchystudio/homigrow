@@ -6,38 +6,15 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { AuthProgressBar } from "@/features/auth/AuthProgressBar";
 import { PreferenceWizardFooter } from "@/features/auth/preferences/PreferenceWizardFooter";
-import { SelectableCardGroup, type SelectableCardOption } from "@/features/auth/preferences/SelectableCardGroup";
-import { PillGroup, type PillOption } from "@/features/auth/preferences/PillGroup";
+import { SelectableCardGroup } from "@/features/auth/preferences/SelectableCardGroup";
+import { PillGroup } from "@/features/auth/preferences/PillGroup";
 import type { BuyerPreferences } from "@/features/auth/preferences/types";
-
-const EXIT_OPTIONS: SelectableCardOption[] = [
-  { value: "hold_and_appreciate", label: "Hold & Appreciate", sublabel: "Ride capital growth long-term" },
-  { value: "rental_yield_exit", label: "Rental Yield Exit", sublabel: "Optimise recurring income, then sell" },
-  { value: "quick_flip", label: "Quick Flip", sublabel: "Buy → renovate → resell within 2 yrs" },
-  { value: "portfolio_rebalancing", label: "Portfolio Rebalancing", sublabel: "Exit one asset to fund the next" },
-  { value: "nri_repatriation", label: "NRI Repatriation", sublabel: "Repatriate funds to home currency" },
-  { value: "inheritance_estate", label: "Inheritance / Estate", sublabel: "Transfer wealth to next generation" },
-];
-
-const HOLD_PERIOD_OPTIONS: PillOption[] = [
-  { value: "under_2_years", label: "< 2 Years", sublabel: "Short-term flip" },
-  { value: "2_to_5_years", label: "2 – 5 Years", sublabel: "Medium hold" },
-  { value: "5_to_10_years", label: "5 – 10 Years", sublabel: "Growth horizon" },
-  { value: "10_plus_years", label: "10+ Years", sublabel: "Generational hold" },
-];
-
-const ROI_OPTIONS: PillOption[] = [
-  { value: "under_10", label: "< 10% p.a." },
-  { value: "10_to_20", label: "10 – 20% p.a." },
-  { value: "20_to_30", label: "20 – 30% p.a." },
-  { value: "30_plus", label: "30%+ p.a." },
-];
-
-const RISK_OPTIONS: PillOption[] = [
-  { value: "conservative", label: "Conservative", sublabel: "Ready-to-move, tier-1 only" },
-  { value: "moderate", label: "Moderate", sublabel: "Mix of ready & under-construction" },
-  { value: "aggressive", label: "Aggressive", sublabel: "Pre-launch & emerging micro-markets" },
-];
+import {
+  EXIT_STRATEGY_OPTIONS as EXIT_OPTIONS,
+  HOLD_PERIOD_OPTIONS,
+  ROI_OPTIONS,
+  RISK_TOLERANCE_OPTIONS as RISK_OPTIONS,
+} from "@/features/auth/preferences/options";
 
 type ExitStrategyStepProps = {
   preferences: BuyerPreferences;
