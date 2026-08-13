@@ -5,19 +5,9 @@
 import { AuthProgressBar } from "@/features/auth/AuthProgressBar";
 import { PreferenceWizardFooter } from "@/features/auth/preferences/PreferenceWizardFooter";
 import { PropertyTypeCardGrid } from "@/features/auth/preferences/PropertyTypeCardGrid";
-import { PillGroup, type PillOption } from "@/features/auth/preferences/PillGroup";
+import { PillGroup } from "@/features/auth/preferences/PillGroup";
+import { BEDROOM_OPTIONS } from "@/features/auth/preferences/options";
 import type { BuyerPreferences } from "@/features/auth/preferences/types";
-
-const BEDROOM_OPTIONS: PillOption[] = [
-  { value: "studio", label: "Studio" },
-  { value: "1_bhk", label: "1 BHK" },
-  { value: "1_rk", label: "1 RK" },
-  { value: "2_bhk", label: "2 BHK" },
-  { value: "3_bhk", label: "3 BHK" },
-  { value: "4_bhk", label: "4 BHK" },
-  { value: "5_plus_bhk", label: "5+ BHK" },
-  { value: "villa_entire_floor", label: "Villa / Entire Floor" },
-];
 
 type PropertyTypeStepProps = {
   preferences: BuyerPreferences;

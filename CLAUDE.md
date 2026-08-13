@@ -1710,6 +1710,61 @@ A reader should understand the code from the comment alone.
   feature (`q` → `search`) sitting uncommitted in the backend worktree
   from an earlier session — real feature work, not part of this pass.
   Changes not yet committed — pending your review.
+- **Preferences tab + logout + homepage Areas redesign shipped
+  2026-08-13** — three items pulled from Figma this session.
+  **Logout**: new `LogoutButton` in `features/profile/ProfileSidebar.tsx`
+  (Figma node 570:1972, red `#e24747`, below a divider under the Settings
+  nav group) — calls `POST /auth/logout` then clears `authStore`. Uses a
+  **hard navigation** (`window.location.href = "/"`), not `router.push` —
+  the page it's clicked from sits behind `AuthGuard`, so a client-side
+  push raced `AuthGuard`'s own redirect (it re-evaluates the now-cleared
+  store while still mounted and won, landing on `/login?returnTo=...`
+  instead of home); found and fixed via live Playwright testing, not
+  spotted by inspection. **Preferences tab** (Figma node 569:671,
+  "Preferences" nav item added between Account/My Properties): per your
+  explicit instruction, `AccountTab.tsx`'s entire "Buyer Profile" section
+  is now **removed** — the Preferences tab is the sole view+edit surface
+  for `preferences.buyer_preferences` (all 15 `BuyerPreferences` fields,
+  not just the 4 Account tab used to expose). New
+  `features/profile/preferences/`: `PreferencesTab.tsx` (view mode —
+  every field as a labeled `OverflowChipsSection`, Figma's own
+  dark-chip/"+N more"/"Show less" pattern generalized from Figma's 3
+  demo categories to all 15; an empty state if the user skipped the
+  wizard entirely), `OverflowChipsSection.tsx`, `PreferencesEditForm.tsx`
+  (edit mode — reuses the signup wizard's own input components verbatim:
+  `BudgetRangeSlider`, `CityMultiSelectChips` — the real city
+  search/dropdown — `PropertyTypeCardGrid`, `PillGroup`,
+  `SelectableCardGroup`, `ChecklistGroup`, `ChipMultiSelect` — rather than
+  building a second set of controls), `labels.ts` (value→label lookups
+  for the view). **Centralized `features/auth/preferences/options.ts`**
+  as part of this: 9 option lists that were previously locally-scoped
+  consts inside individual wizard step files (`ExitStrategyStep.tsx`,
+  `DevelopmentStageStep.tsx`, etc.) are now exported from `options.ts`
+  and imported by both the wizard steps and the new Preferences tab —
+  removes the duplication a second full copy would otherwise have
+  required. `lib/validation/profile.ts`'s `accountFormSchema` dropped its
+  `buyer_preferences` field entirely. **Homepage Areas section**
+  (`features/homepage/Areas.tsx`) redesigned to match the current Figma
+  frame (node 388:122): the colored top strip is gone — the price block
+  itself is now a colored box (`#f4fef1` mint / `#fef1f1` red) with the
+  trend text inside it; tags dropped to `4px` radius at full text
+  opacity; the CTA changed from a filled gray "VIEW ALL PROPERTIES"
+  button to an outlined "VIEW PROPERTIES" one; and the header button now
+  correctly reads **"More areas"** (was "More tools" — an unrelated
+  copy-paste leftover, unrelated to this section's own data). `tsc`/
+  `eslint`/`next build` all clean (`/profile/preferences` present in the
+  build's route table). Live-verified with Playwright against the real
+  backend + Supabase dev DB, logged in as the standing test account
+  (which already had real wizard-collected `buyer_preferences`): view
+  mode rendered all 15 fields with correct labels; edit mode's city
+  dropdown/search worked, added a city and toggled a bedroom option,
+  saved, and confirmed the change persisted via a fresh page load;
+  Account tab confirmed to no longer show any Buyer Profile content;
+  logout tested both before and after the hard-navigation fix (before:
+  bounced to `/login?returnTo=...`; after: clean landing on `/` showing
+  "Sign In"); homepage Areas section screenshot-compared against Figma at
+  normal desktop width, matches. Changes not yet committed — pending your
+  review.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

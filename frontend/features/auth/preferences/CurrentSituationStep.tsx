@@ -5,15 +5,9 @@
 
 import { AuthProgressBar } from "@/features/auth/AuthProgressBar";
 import { PreferenceWizardFooter } from "@/features/auth/preferences/PreferenceWizardFooter";
-import { ChecklistGroup, type ChecklistOption } from "@/features/auth/preferences/ChecklistGroup";
+import { ChecklistGroup } from "@/features/auth/preferences/ChecklistGroup";
+import { CURRENT_SITUATION_OPTIONS as SITUATION_OPTIONS } from "@/features/auth/preferences/options";
 import type { BuyerPreferences } from "@/features/auth/preferences/types";
-
-const SITUATION_OPTIONS: ChecklistOption[] = [
-  { value: "currently_renting", label: "I am currently renting", sublabel: "Enable EMI vs. Rent comparison" },
-  { value: "own_property_wants_management", label: "I own property & want management", sublabel: "Property management services" },
-  { value: "requires_nri_management", label: "I require NRI Property Management", sublabel: "Remote management & digital collection" },
-  { value: "first_time_buyer", label: "First-time buyer, no existing property", sublabel: "Full buyer-journey guidance" },
-];
 
 type CurrentSituationStepProps = {
   preferences: BuyerPreferences;

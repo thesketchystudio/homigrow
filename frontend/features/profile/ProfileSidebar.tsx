@@ -22,22 +22,32 @@
 // (Components/Section 3) they render immediately — only the user card
 // (avatar/name/status) skeletons while `getMe()` is still in flight,
 // instead of the whole sidebar disappearing behind a generic placeholder.
+//
+// The "Log out" row (Figma node 570:1972, red #e24747 — not a token,
+// no existing destructive color in globals.css is close enough to reuse)
+// sits below a divider under the Settings group, calling the existing
+// /auth/logout endpoint then clearing the local authStore. The local
+// store is cleared even if the network call fails, since a client-side
+// logout should never get stuck on a server round-trip.
 
 "use client";
 
 import type { ComponentType } from "react";
 import Link from "next/link";
-import { Bell, Building2, CreditCard, FileText, FolderOpen, History, Shield, User } from "lucide-react";
+import { Bell, Building2, CreditCard, FileText, FolderOpen, Heart, History, LogOut, Shield, User } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { logout as logoutRequest } from "@/lib/api/endpoints/auth";
 import type { UserRead } from "@/lib/api/endpoints/users";
+import { useAuthStore } from "@/lib/stores/auth";
 
 type NavItem = { label: string; href: string; icon: ComponentType<{ className?: string }> };
 
 const PROFILE_ITEMS: NavItem[] = [
   { label: "Account", href: "/profile/account", icon: User },
+  { label: "Preferences", href: "/profile/preferences", icon: Heart },
   { label: "My Properties", href: "/profile/my-properties", icon: Building2 },
   { label: "Purchase History", href: "/profile/purchase-history", icon: History },
   { label: "Loan Applications", href: "/profile/loan-applications", icon: FileText },
@@ -96,6 +106,10 @@ export function ProfileSidebar({ user, activeRoute }: { user?: UserRead; activeR
       <NavGroup label="Profile" items={PROFILE_ITEMS} activeRoute={activeRoute} />
       <NavGroup label="Settings" items={SETTINGS_ITEMS} activeRoute={activeRoute} />
 
+      <div className="flex flex-col gap-4 border-t-[0.8px] border-slate-100 pt-4">
+        <LogoutButton />
+      </div>
+
       <div className="bg-brand-green-100 flex flex-col gap-1 rounded-lg border border-slate-100 p-[18px]">
         <p className="font-body text-brand-primary-600 text-[12px] font-medium">Need help?</p>
         <p className="font-body text-[12px] text-slate-500">Reach out to our support team for anything account-related.</p>
@@ -104,6 +118,36 @@ export function ProfileSidebar({ user, activeRoute }: { user?: UserRead; activeR
         </a>
       </div>
     </aside>
+  );
+}
+
+function LogoutButton() {
+  const handleLogout = async () => {
+    try {
+      await logoutRequest();
+    } catch {
+      // A failed network call shouldn't block a client-side logout.
+    } finally {
+      useAuthStore.getState().clear();
+      // A hard navigation, not router.push: this page sits behind AuthGuard,
+      // so a client-side push races AuthGuard's own redirect (it re-evaluates
+      // the now-cleared store while still mounted and wins, landing on
+      // /login?returnTo=... instead of home). A full reload sidesteps the
+      // race entirely and matches the store's own memory-only design, which
+      // already treats a reload as the normal way to reset auth state.
+      window.location.href = "/";
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleLogout}
+      className="flex h-10 items-center gap-2 pl-3.5 font-heading text-[16px] font-bold text-[#e24747]"
+    >
+      <LogOut className="size-4" />
+      Log out
+    </button>
   );
 }
 

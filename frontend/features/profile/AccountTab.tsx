@@ -1,12 +1,12 @@
 // features/profile/AccountTab.tsx
-// Account tab content (Figma node 145:4686 → "Account Information" +
-// "Buyer Profile" sections). Colors/fonts/spacing pulled directly from
-// Figma's get_design_context output for this node: underline-style
-// fields (border-bottom only, not the boxed shadcn Input look), and
-// near-black (brand-primary-600, #1a1a1a) primary buttons/headings, not
-// the app's green --primary token — this screen's own design uses black
-// for its primary actions, matching the signup/login pages' black CTA
-// buttons rather than the shadcn scaffold default.
+// Account tab content (Figma node 145:4686 → "Account Information"
+// section). Colors/fonts/spacing pulled directly from Figma's
+// get_design_context output for this node: underline-style fields
+// (border-bottom only, not the boxed shadcn Input look), and near-black
+// (brand-primary-600, #1a1a1a) primary buttons/headings, not the app's
+// green --primary token — this screen's own design uses black for its
+// primary actions, matching the signup/login pages' black CTA buttons
+// rather than the shadcn scaffold default.
 //
 // Full Name/Email are real User columns; Phone Number has no update path
 // on the backend (User.phone is immutable post-signup) so it renders
@@ -14,16 +14,13 @@
 // displayed here as a single combined, non-editable "City, State" string
 // read from `preferences.city`/`.state`
 // (flat top-level keys, see auth_service.signup) rather than exposed as
-// editable fields. The Buyer Profile section reads/writes
-// `preferences.buyer_preferences` directly — the same structured object
-// the signup wizard's 6-screen buyer-preference flow saves
-// (features/auth/preferences/types.ts) — rather than maintaining its own
-// separate flat keys, so a user's wizard answers and Account-tab edits
-// are one shared dataset, not two disconnected copies. Only a subset of
-// BuyerPreferences is editable here (budget, cities, property types,
-// investment goals); the rest of the object (bedroom_preference,
-// buy_timeline, exit_strategies, etc.) is preserved on save by spreading
-// the existing object first.
+// editable fields.
+//
+// Figma's design also has a "Buyer Profile" section here — deliberately
+// dropped: buyer_preferences (the signup wizard's full structured object,
+// features/auth/preferences/types.ts) now has one canonical view+edit
+// surface, the Preferences tab (features/profile/preferences/), rather
+// than being split across two disconnected edit forms.
 // Figma also shows a "Last changed N months ago" note under Password —
 // dropped, since nothing on the User model tracks a password-specific
 // change timestamp (the generic updated_at column changes for unrelated
@@ -33,16 +30,11 @@
 
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm, type UseFormRegisterReturn } from "react-hook-form";
+import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChangePasswordDialog } from "@/features/profile/ChangePasswordDialog";
-import { BudgetRangeSlider, BUDGET_MIN, BUDGET_MAX } from "@/features/auth/preferences/BudgetRangeSlider";
-import { CityMultiSelectChips } from "@/features/auth/preferences/CityMultiSelectChips";
-import { ChipMultiSelect } from "@/features/auth/preferences/ChipMultiSelect";
-import { PROPERTY_TYPE_OPTIONS, INVESTMENT_GOAL_OPTIONS } from "@/features/auth/preferences/options";
-import type { BuyerPreferences } from "@/features/auth/preferences/types";
 import { ApiError } from "@/lib/api/client";
 import { getMe, updateMe, type UserRead } from "@/lib/api/endpoints/users";
 import { toast } from "@/lib/toast";
@@ -50,21 +42,9 @@ import { cn } from "@/lib/utils";
 import { accountFormSchema, type AccountFormValues } from "@/lib/validation/profile";
 
 function toFormValues(user: UserRead): AccountFormValues {
-  const prefs = user.preferences ?? {};
-  const buyerPreferences =
-    typeof prefs.buyer_preferences === "object" && prefs.buyer_preferences !== null
-      ? (prefs.buyer_preferences as BuyerPreferences)
-      : {};
   return {
     full_name: user.full_name ?? "",
     email: user.email ?? "",
-    buyer_preferences: {
-      budget_min: buyerPreferences.budget_min,
-      budget_max: buyerPreferences.budget_max,
-      preferred_cities: buyerPreferences.preferred_cities ?? [],
-      property_types: buyerPreferences.property_types ?? [],
-      investment_goals: buyerPreferences.investment_goals ?? [],
-    },
   };
 }
 
@@ -90,7 +70,6 @@ function AccountForm({ user }: { user: UserRead }) {
 
   const {
     register,
-    control,
     handleSubmit,
     setError,
     reset,
@@ -124,20 +103,9 @@ function AccountForm({ user }: { user: UserRead }) {
   });
 
   const onSubmit = (values: AccountFormValues) => {
-    const existingBuyerPreferences =
-      typeof user.preferences?.buyer_preferences === "object" && user.preferences.buyer_preferences !== null
-        ? (user.preferences.buyer_preferences as BuyerPreferences)
-        : {};
     mutation.mutate({
       full_name: values.full_name,
       email: values.email,
-      preferences: {
-        ...user.preferences,
-        buyer_preferences: {
-          ...existingBuyerPreferences,
-          ...values.buyer_preferences,
-        },
-      },
     });
   };
 
@@ -218,59 +186,6 @@ function AccountForm({ user }: { user: UserRead }) {
         </button>
       </section>
 
-      <div className="h-px border-t-[0.8px] border-b-[0.8px] border-[#e2e9ec]" />
-
-      <section className="flex flex-col gap-8">
-        <div className="flex flex-col gap-0.5">
-          <h2 className="font-heading text-brand-primary-400 text-[20px] leading-[28px] font-bold">Buyer Profile</h2>
-          <p className="font-body text-[12px] leading-[18px] text-slate-500">
-            Help us personalise property recommendations for you — the same preferences you set during signup.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <p className="font-heading text-brand-primary-400 text-[12px] font-bold tracking-[1.2px] uppercase">Budget Range</p>
-          <Controller
-            control={control}
-            name="buyer_preferences"
-            render={({ field }) => (
-              <BudgetRangeSlider
-                min={field.value.budget_min ?? BUDGET_MIN}
-                max={field.value.budget_max ?? BUDGET_MAX}
-                onChange={(budget_min, budget_max) => field.onChange({ ...field.value, budget_min, budget_max })}
-              />
-            )}
-          />
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <p className="font-heading text-brand-primary-400 text-[12px] font-bold tracking-[1.2px] uppercase">Preferred Locations</p>
-          <Controller
-            control={control}
-            name="buyer_preferences.preferred_cities"
-            render={({ field }) => <CityMultiSelectChips value={field.value} onChange={field.onChange} />}
-          />
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <p className="font-heading text-brand-primary-400 text-[12px] font-bold tracking-[1.2px] uppercase">Property Type</p>
-          <Controller
-            control={control}
-            name="buyer_preferences.property_types"
-            render={({ field }) => <ChipMultiSelect options={PROPERTY_TYPE_OPTIONS} value={field.value} onChange={field.onChange} />}
-          />
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <p className="font-heading text-brand-primary-400 text-[12px] font-bold tracking-[1.2px] uppercase">Buyer Intent</p>
-          <Controller
-            control={control}
-            name="buyer_preferences.investment_goals"
-            render={({ field }) => <ChipMultiSelect options={INVESTMENT_GOAL_OPTIONS} value={field.value} onChange={field.onChange} />}
-          />
-        </div>
-      </section>
-
       <div className="flex justify-end gap-3">
         <button
           type="button"
@@ -295,11 +210,11 @@ function AccountForm({ user }: { user: UserRead }) {
 }
 
 // Mirrors AccountForm's real section layout (heading, 2x2 field grid,
-// password row, Buyer Profile 2x2 grid, action buttons) so the loading
-// state doesn't collapse into a couple of generic bars — matches Figma's
-// own skeleton frame for this tab (Components/Section 3). Exported so
-// ProfileLayout's AuthGuard fallback can show the same shape immediately,
-// instead of swapping from a generic placeholder once auth resolves.
+// password row, action buttons) so the loading state doesn't collapse
+// into a couple of generic bars — matches Figma's own skeleton frame for
+// this tab (Components/Section 3). Exported so ProfileLayout's AuthGuard
+// fallback can show the same shape immediately, instead of swapping from
+// a generic placeholder once auth resolves.
 export function AccountTabSkeleton() {
   return (
     <div className="flex max-w-3xl flex-col gap-8">
@@ -328,23 +243,6 @@ export function AccountTabSkeleton() {
           <Skeleton className="h-4 w-56" />
         </div>
         <Skeleton className="h-10 w-40 rounded" />
-      </section>
-
-      <div className="h-px border-t-[0.8px] border-b-[0.8px] border-[#e2e9ec]" />
-
-      <section className="flex flex-col gap-8">
-        <div className="flex flex-col gap-1.5">
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-3 w-80" />
-        </div>
-        <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="flex flex-col gap-2">
-              <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-[26px] w-32" />
-            </div>
-          ))}
-        </div>
       </section>
 
       <div className="flex justify-end gap-3">

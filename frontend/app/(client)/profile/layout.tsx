@@ -23,6 +23,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AuthGuard } from "@/components/shared/AuthGuard";
 import { ProfileSidebar } from "@/features/profile/ProfileSidebar";
 import { AccountTabSkeleton } from "@/features/profile/AccountTab";
+import { PreferencesTabSkeleton } from "@/features/profile/preferences/PreferencesTab";
 import { NotificationsTabSkeleton } from "@/features/profile/NotificationsTab";
 import { MyPropertiesTabSkeleton } from "@/features/profile/MyPropertiesTabSkeleton";
 import { PurchaseHistoryTabSkeleton } from "@/features/profile/PurchaseHistoryTabSkeleton";
@@ -39,6 +40,8 @@ function tabSkeletonFor(pathname: string) {
   switch (pathname) {
     case "/profile/account":
       return <AccountTabSkeleton />;
+    case "/profile/preferences":
+      return <PreferencesTabSkeleton />;
     case "/profile/my-properties":
       return <MyPropertiesTabSkeleton />;
     case "/profile/purchase-history":
