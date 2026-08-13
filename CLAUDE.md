@@ -1769,6 +1769,20 @@ A reader should understand the code from the comment alone.
   `components/shared/TopNavBar.tsx` was a dead `<a href="#">`; now a real
   `next/link` `Link` to `/`. Live-verified: clicking it from `/properties`
   lands cleanly on the homepage.
+- **Homepage "Coming Soon" section matched to Figma, 2026-08-13** —
+  `features/homepage/EarlyAccess.tsx`'s 3-item feature list used raw emoji
+  (✨🎯💰) instead of real icons; pulled the actual Figma node (`388:924`)
+  and swapped in lucide-react's `Sparkles`/`Target`/`IndianRupee` (Figma's
+  `Sparkle`/`Target`/`CurrencyInr`, matched to the codebase's existing
+  icon library rather than adding a new one). Also corrected against the
+  same Figma pull: icon circles are white with dark icons, not
+  green-tinted with green icons; the "Coming Soon" badge is a rounded-8px
+  box, not a full pill; the background gradient angle was `135deg` vs
+  Figma's `146deg`; form field padding was `14px 16px` vs Figma's
+  `15px 17px`; and a decorative radial-gradient glow blob in the code had
+  no basis in the actual Figma design, so it was removed. Live-verified
+  with a fresh screenshot compared directly against Figma's own render —
+  matches. `tsc`/`eslint` clean, zero console errors.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
