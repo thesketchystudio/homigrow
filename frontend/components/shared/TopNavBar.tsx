@@ -121,12 +121,12 @@ export default function TopNavBar() {
           gap: "clamp(16px, 3vw, 40px)",
         }}
       >
-        <a href="#" style={{ display: "flex", alignItems: "center", flexShrink: 0, textDecoration: "none" }}>
+        <Link href="/" style={{ display: "flex", alignItems: "center", flexShrink: 0, textDecoration: "none" }}>
           <svg width="45" height="40" viewBox="0 0 45.4044 40.0834" fill="none" style={{ width: "clamp(35px, 8vw, 45px)", height: "auto" }}>
             <path d={svgPaths.p2b92b400} fill={scrolled ? "#090909" : "#fefeff"} />
             <path d={svgPaths.p29b4f280} fill={scrolled ? "#090909" : "#fefeff"} />
           </svg>
-        </a>
+        </Link>
 
         <div style={{ display: "flex", gap: 32, alignItems: "center" }} className="desktop-only">
           {["Discover", "AI Tools", "Compare", "Saved"].map((link) => (

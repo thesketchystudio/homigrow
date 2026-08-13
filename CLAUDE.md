@@ -1765,6 +1765,10 @@ A reader should understand the code from the comment alone.
   "Sign In"); homepage Areas section screenshot-compared against Figma at
   normal desktop width, matches. Changes not yet committed — pending your
   review.
+- **TopNavBar logo linked to homepage, 2026-08-13** — the "H" logomark in
+  `components/shared/TopNavBar.tsx` was a dead `<a href="#">`; now a real
+  `next/link` `Link` to `/`. Live-verified: clicking it from `/properties`
+  lands cleanly on the homepage.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
