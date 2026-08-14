@@ -114,3 +114,9 @@ export const OrderStatus = {
   refunded: "refunded",
 } as const;
 export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus];
+
+export const BrokerDocumentType = {
+  rera_certificate: "rera_certificate",
+  government_id: "government_id",
+} as const;
+export type BrokerDocumentType = (typeof BrokerDocumentType)[keyof typeof BrokerDocumentType];

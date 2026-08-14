@@ -1,9 +1,12 @@
 // features/auth/SignupWizard.tsx
-// Orchestrates the full 9-step signup flow (role -> form -> OTP verify ->
-// 6-screen buyer-preference wizard) as local component state rather than
+// Orchestrates the full signup flow as local component state rather than
 // separate routes — the Figma design treats it as one continuous flow
 // sharing a single progress bar, and no step after the first needs to be
-// independently linkable or refreshable.
+// independently linkable or refreshable. Two distinct post-verification
+// paths branch on role: a client enters the 6-screen buyer-preference
+// wizard (budget -> ... -> situation); a broker enters document upload
+// -> pending-review instead — the buyer-preference screens don't apply
+// to a broker at all, so they must never be reached for that role.
 
 "use client";
 
@@ -18,6 +21,8 @@ import { getMe, updateMe } from "@/lib/api/endpoints/users";
 import { RoleSelectStep } from "@/features/auth/RoleSelectStep";
 import { SignupFormStep } from "@/features/auth/SignupFormStep";
 import { OtpVerifyStep } from "@/features/auth/OtpVerifyStep";
+import { BrokerDocumentUploadStep } from "@/features/auth/BrokerDocumentUploadStep";
+import { BrokerPendingStep } from "@/features/auth/BrokerPendingStep";
 import { BudgetLocationStep } from "@/features/auth/preferences/BudgetLocationStep";
 import { PropertyTypeStep } from "@/features/auth/preferences/PropertyTypeStep";
 import { InvestmentGoalStep } from "@/features/auth/preferences/InvestmentGoalStep";
@@ -26,7 +31,18 @@ import { DevelopmentStageStep } from "@/features/auth/preferences/DevelopmentSta
 import { CurrentSituationStep } from "@/features/auth/preferences/CurrentSituationStep";
 import type { BuyerPreferences } from "@/features/auth/preferences/types";
 
-type WizardStep = "role" | "form" | "verify" | "budget" | "property" | "goal" | "exit" | "development" | "situation";
+type WizardStep =
+  | "role"
+  | "form"
+  | "verify"
+  | "documents"
+  | "pending"
+  | "budget"
+  | "property"
+  | "goal"
+  | "exit"
+  | "development"
+  | "situation";
 
 const PREFERENCE_STEP_ORDER: WizardStep[] = ["budget", "property", "goal", "exit", "development", "situation"];
 
@@ -60,9 +76,11 @@ export function SignupWizard() {
 
   const handleAuthenticated = (session: TokenResponse) => {
     setAuth(session.user, session.access_token);
-    // Enter the buyer-preference wizard instead of redirecting home —
-    // it needs the Bearer token setAuth just attached for getMe/updateMe.
-    setStep("budget");
+    // A broker has no buyer-preference wizard to fill out — goes
+    // straight to document upload instead. Both paths need the Bearer
+    // token setAuth just attached (getMe/updateMe for a client,
+    // the verification-documents upload for a broker).
+    setStep(role === UserRole.broker ? "documents" : "budget");
   };
 
   const updatePreferences = (patch: Partial<BuyerPreferences>) => setPreferences((prev) => ({ ...prev, ...patch }));
@@ -95,7 +113,23 @@ export function SignupWizard() {
   }
 
   if (step === "verify") {
-    return <OtpVerifyStep email={email} onVerified={handleAuthenticated} />;
+    return (
+      <OtpVerifyStep
+        email={email}
+        onVerified={handleAuthenticated}
+        totalSteps={role === UserRole.broker ? 4 : 3}
+      />
+    );
+  }
+
+  if (step === "documents") {
+    return (
+      <BrokerDocumentUploadStep onSubmitted={() => setStep("pending")} onExit={() => router.push("/")} />
+    );
+  }
+
+  if (step === "pending") {
+    return <BrokerPendingStep />;
   }
 
   if (step === "budget") {

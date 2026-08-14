@@ -1109,6 +1109,95 @@ A reader should understand the code from the comment alone.
   including the Billing plan card's white-tinted bars over its dark
   background.
 
+### Frontend Phase 2 — Broker signup (on `feature/phase_2_frontend_broker`,
+cut from `dev` 2026-08-14 — same empty-pointer-since-2026-07-21 situation
+as the backend broker branch, fast-forwarded to `dev`'s tip before
+starting)
+- **Broker verification-details form + document upload wizard shipped
+  2026-08-14** — frontend half of the backend work above, built against
+  the real `feature/phase_2_backend_broker` API. Two real,
+  pre-existing bugs in the shared `SignupWizard.tsx` fixed along the
+  way, found only by reading the actual wizard logic before extending
+  it, not by assuming it already branched on role: (1) after OTP
+  verify, **every** signed-up user — broker included — was routed
+  into the 6-screen buyer-preference wizard (budget/property/goal/
+  exit/development/situation), which has no meaning for a broker;
+  `handleAuthenticated` now branches on `role`, sending a broker to a
+  new `"documents"` step instead and a client down the unchanged
+  buyer-preference path; (2) `AuthProgressBar.tsx`'s eyebrow-label
+  logic was a binary `totalSteps === 3` heuristic (3 → "Onboarding
+  Sequence", anything else → "Personifying Your Experience") — a
+  broker's real Phase A is 4 steps (role/form/OTP/documents), which
+  would have silently fallen into the wrong branch and shown buyer-
+  preference copy on an onboarding screen. Fixed by adding an explicit
+  optional `phase` prop that overrides the heuristic; every existing
+  call site is unchanged (still infers from `totalSteps`), only the
+  new broker steps pass `phase="onboarding"` explicitly.
+  **Verification Details fields**: `SignupFormStep.tsx` now renders
+  Agency/Firm Name, License/RERA No., and City of Operation — matching
+  Figma's Step 2 form exactly — only when `role === "broker"`, appended
+  after the password fields with the same divider style Figma uses.
+  `signupFormSchema` (`lib/validation/auth.ts`) requires all three via
+  `.superRefine` when `role === "broker"` (RERA number 5–50 chars,
+  matching the backend's own sanity check) — the backend schema treats
+  these as fully optional, but the frontend enforces them since Figma
+  presents them as normal required inputs, not optional ones.
+  **Document upload** (`BrokerDocumentUploadStep.tsx`, new
+  `BrokerDocumentDropzone.tsx` — no file-upload form primitive existed
+  before this): two drop zones (License/RERA Certificate,
+  Government ID Proof), client-side 5MB check mirroring the backend's,
+  calls the new `POST /brokers/me/verification-documents` via a new
+  `apiRequestMultipart` in `lib/api/client.ts` (the client only
+  supported JSON bodies before — multipart needs no explicit
+  `Content-Type` header, since the browser sets the boundary itself;
+  setting one manually breaks the upload). Renders **"Step 3 of 4"**,
+  not Figma's static "Step 3 of 3" — Figma's own step-count label
+  doesn't account for the shared OTP-verify screen sitting between
+  form submission and this step, the same class of authoring gap
+  already documented for the client's Phase B buyer-preference wizard,
+  handled the same way (real numbers, not the literal Figma text).
+  **Pending screen** (`BrokerPendingStep.tsx`, Figma's
+  `BrokerPendingScreen`): badge + heading + a 3-state checklist (done/
+  in-progress/pending, matching Figma's exact color distinction, not
+  a simplified 2-state version). Figma's frame has no visible button
+  at all — a **deliberate small addition**, not a literal pull: added
+  a "Go to homepage" link, since this screen sits inside the `(auth)`
+  layout shell with no `TopNavBar`, and leaving a genuine dead end
+  read as worse than one small deviation from the source frame.
+  `--brand-green-300: #ddfcd4` added to `globals.css` (Figma's "Accent
+  Green/300", scale previously jumped 200→400) — same extend-as-needed
+  precedent as `brand-green-100`/`brand-green-700` in earlier sessions.
+  **Known gap, not addressed:** a broker who signs up via Google
+  Sign-In skips the manual form entirely (Google auth creates +
+  logs in directly), so they never see the Verification Details
+  fields — their `broker_profile` ends up with no `company_name`/
+  `rera_number`/`service_areas` until edited later via the P4-T10
+  profile-edit screen. Flagged, not silently worked around; fixing it
+  would mean either blocking Google sign-up for brokers or inserting a
+  follow-up details screen after Google auth, both real scope
+  decisions this session didn't make unilaterally.
+  **Rejected status screen (Figma's `BrokerStatusScreen`) deliberately
+  not built** — nothing can set `verification_status` to `rejected`
+  yet (no admin review exists, P4-T12), so it would be dead code with
+  no reachable path; building it now would be speculative, not real
+  coverage.
+  `tsc`/`eslint`/`next build` all clean (18 pre-existing warnings,
+  zero new). Live-verified end-to-end with Playwright against the real
+  backend worktree + Supabase dev DB + real Supabase Storage bucket:
+  full broker signup (role → form with verification details → real
+  city-dropdown selection → password strength "Strong" → OTP verify,
+  read from the backend's dev-mode log → real multipart upload of a
+  PDF + JPG → pending screen) confirmed via direct SQL that
+  `company_name`/`rera_number`/`service_areas`/`verification_documents`
+  all landed correctly, and via the real bucket that both files
+  genuinely exist; screenshot-compared the pending screen against the
+  Figma reference — close match. Separately re-verified the **client**
+  signup path end-to-end (role → form) to confirm the shared
+  `AuthProgressBar`/`SignupFormStep` changes caused no regression —
+  still shows "Step 2 of 3" with no Verification Details section, as
+  before. Test user, uploaded storage objects, and local test files
+  all deleted afterward.
+
 ### Backend Phase 3 (on `feature/phase_3_backend_client`, cut from `dev`)
 - **Property Details read API shipped 2026-07-29** — `GET /api/v1/properties/{id}`,
   the first Property CRUD/read work (P3-T04), built backend-first per this
