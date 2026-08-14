@@ -236,6 +236,9 @@ def signup(
     password: Optional[str],
     city: Optional[str] = None,
     state: Optional[str] = None,
+    company_name: Optional[str] = None,
+    rera_number: Optional[str] = None,
+    service_area: Optional[str] = None,
 ) -> User:
     """
     Creates a user (and a broker_profile row when role=broker), then
@@ -249,6 +252,14 @@ def signup(
     land in the same free-form preferences JSONB the profile Account tab
     reads/writes — left out entirely, not stored as empty strings, when
     the signup form didn't send them.
+
+    company_name/rera_number/service_area are the broker-only
+    "Verification Details" fields from Figma's Step 2 form; only
+    written when role=broker (silently dropped otherwise, same as a
+    client sending them). service_area seeds broker_profiles.
+    service_areas — a JSONB list a broker can expand later via profile
+    edit (P4) — as a one-item list; there's no dedicated single-city
+    column since Figma's one field is just this list's first entry.
     """
     if db.query(User).filter(User.phone == phone).first() is not None:
         raise ConflictError("PHONE_TAKEN", "This phone number is already registered.")
@@ -274,7 +285,14 @@ def signup(
     db.flush()  # assigns user.id for the broker_profile FK below
 
     if role == UserRole.broker:
-        db.add(BrokerProfile(user_id=user.id))
+        db.add(
+            BrokerProfile(
+                user_id=user.id,
+                company_name=company_name,
+                rera_number=rera_number,
+                **({"service_areas": [service_area]} if service_area else {}),
+            )
+        )
 
     _issue_otp(db, email, OTPPurpose.signup)
     db.commit()
