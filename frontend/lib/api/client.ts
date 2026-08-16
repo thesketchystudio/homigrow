@@ -81,6 +81,18 @@ function rawFetch(path: string, options: RequestOptions, accessToken: string | n
   });
 }
 
+// No Content-Type header here — the browser sets multipart/form-data with
+// the correct boundary itself when the body is a FormData instance; setting
+// it manually strips that boundary and the server can't parse the request.
+function rawFetchMultipart(path: string, formData: FormData, accessToken: string | null) {
+  return fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    credentials: "include",
+    body: formData,
+  });
+}
+
 let refreshPromise: Promise<string | null> | null = null;
 
 async function performRefresh(): Promise<string | null> {
@@ -131,17 +143,7 @@ export function refreshAccessToken(): Promise<string | null> {
   return refreshPromise;
 }
 
-export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const accessToken = useAuthStore.getState().accessToken;
-  let response = await rawFetch(path, options, accessToken);
-
-  if (response.status === 401 && !path.startsWith("/auth/")) {
-    const newToken = await refreshAccessToken();
-    if (newToken) {
-      response = await rawFetch(path, options, newToken);
-    }
-  }
-
+async function processResponse<T>(response: Response): Promise<T> {
   if (response.status === 204) {
     return undefined as T;
   }
@@ -159,4 +161,35 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
 
   return data as T;
+}
+
+export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const accessToken = useAuthStore.getState().accessToken;
+  let response = await rawFetch(path, options, accessToken);
+
+  if (response.status === 401 && !path.startsWith("/auth/")) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      response = await rawFetch(path, options, newToken);
+    }
+  }
+
+  return processResponse<T>(response);
+}
+
+// For multipart/file-upload endpoints (currently just broker verification
+// documents) — same auth-header/401-retry contract as apiRequest, just a
+// FormData body instead of a JSON one.
+export async function apiRequestMultipart<T>(path: string, formData: FormData): Promise<T> {
+  const accessToken = useAuthStore.getState().accessToken;
+  let response = await rawFetchMultipart(path, formData, accessToken);
+
+  if (response.status === 401 && !path.startsWith("/auth/")) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      response = await rawFetchMultipart(path, formData, newToken);
+    }
+  }
+
+  return processResponse<T>(response);
 }
