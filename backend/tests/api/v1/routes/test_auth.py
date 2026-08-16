@@ -85,6 +85,37 @@ class TestSignupRoute:
 
         assert response.status_code == 422
 
+    def test_broker_signup_accepts_verification_details(self, client):
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={
+                "phone": "+919876540007",
+                "role": "broker",
+                "full_name": "Test Broker",
+                "email": "testbroker7@example.com",
+                "password": "s3cure-pass",
+                "company_name": "Test Realty",
+                "rera_number": "RERA-KA-11223",
+                "service_area": "Bengaluru",
+            },
+        )
+
+        assert response.status_code == 201
+
+    def test_short_rera_number_returns_422(self, client):
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={
+                "phone": "+919876540008",
+                "role": "broker",
+                "email": "shortrera8@example.com",
+                "password": "s3cure-pass",
+                "rera_number": "AB1",
+            },
+        )
+
+        assert response.status_code == 422
+
 
 class TestOtpRoutes:
     def test_verify_route_flips_is_email_verified_and_logs_the_user_in(self, client, db_session, caplog):

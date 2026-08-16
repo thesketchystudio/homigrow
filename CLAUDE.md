@@ -1109,6 +1109,111 @@ A reader should understand the code from the comment alone.
   including the Billing plan card's white-tinted bars over its dark
   background.
 
+### Backend Phase 2 — Broker signup (on `feature/phase_2_backend_broker`, cut
+from `dev` 2026-08-14 — this branch existed as an empty pointer since the
+2026-07-21 portal split but had no commits until now; fast-forwarded 96
+commits to `dev` before starting)
+- **Broker verification-details signup + document upload shipped
+  2026-08-14** — pulled forward from its originally-scheduled P4 slot
+  (`11_Phase_4.md` P4-T11), same pattern as the homepage in Phase 1, per
+  your explicit call after reviewing the real Figma "Broker - Sign up"
+  section (node `431:279`, Onboarding page) and finding it fully
+  designed already: a 3-step wizard sharing the client signup shell,
+  Step 2 form with a broker-only "Verification Details" block (Agency/
+  Firm Name, License/RERA No., City of Operation) appended below the
+  usual fields, Step 3 a two-file document upload ("Broker
+  verification"), then two post-submit status screens
+  (`BrokerPendingScreen`/`BrokerStatusScreen`) with no client
+  equivalent. **Schema needed zero migration** — `broker_profiles`
+  already had `rera_number`, `company_name`, `verification_status`
+  (`unverified/pending/verified/rejected`), `verification_documents`
+  jsonb (`[{type, url, uploaded_at}]`), and `service_areas` jsonb since
+  M1; the architecture doc had already designed this exact shape, just
+  scheduled later. No dedicated "City of Operation" column exists —
+  seeds `service_areas` as a one-item list instead, since Figma's
+  single field is just that list's first entry (P4-T10's later profile
+  edit screen is where it'd grow to multiple areas).
+  `SignupRequest` gained 3 optional broker-only fields
+  (`company_name`/`rera_number`/`service_area`), written onto the
+  `broker_profile` row `signup()` already creates — same pattern as
+  the existing `city`/`state` fields, submitted in the same call as
+  the rest of the form (unlike the client Phase B buyer-preference
+  wizard, which is genuinely post-login; Figma bundles broker's
+  verification fields into the Step 2 form itself). **RERA numbers
+  have no fixed format** — confirmed each state RERA authority issues
+  its own scheme (Maharashtra, Karnataka, etc. all differ) — so
+  `rera_number` only gets a basic 5–50 character sanity check, not a
+  format/regex validation.
+  New `POST /api/v1/brokers/me/verification-documents`
+  (`app/api/v1/routes/brokers.py`, `app/services/broker_service.py`) —
+  authenticated, broker-only, accepts the two files as multipart,
+  uploads both, replaces `verification_documents` outright (not
+  append — same call handles first submit and resubmit-after-rejection),
+  and flips `verification_status` to `pending`. **No admin review or
+  content verification exists** — explicitly out of scope per your
+  instruction ("accept any documents uploaded to get to the next
+  part"); that's P4-T12, a separate later task.
+  New **`app/services/storage_service.py`** — uploads via the S3
+  protocol (boto3) against **Supabase Storage's S3-compatible
+  endpoint**, not Cloudflare R2 (the originally planned provider,
+  `00_Project_Overview.md`) — R2 requires a card on file to activate
+  even its free $0 tier, which wasn't available this session; flagged
+  in ClickUp (`need clarification` status, see below) rather than
+  silently substituted. Since the code talks to storage purely via the
+  S3 protocol, swapping to R2 later is a config/endpoint change, not a
+  rewrite. Bucket is private (`broker-documents`); the module returns
+  internal object keys, not fetchable URLs — presigned-GET generation
+  is a P4 concern (nothing reads these back yet). Validates content
+  type (PDF/JPG/PNG only) and a 5MB max, matching Figma's own upload
+  copy — this is input hygiene, not the "verification" that's out of
+  scope; new `BrokerDocumentType` enum (`app/models/enums.py`, not a
+  Postgres type — it only ever lives inside the JSONB, never a column).
+  New config: `SUPABASE_ACCESS_KEY_ID`/`SUPABASE_SECRET_ACCESS_KEY`/
+  `SUPABASE_S3_ENDPOINT`/`SUPABASE_S3_REGION`/`SUPABASE_S3_BUCKET`, all
+  default `""` (feature-gated, same pattern as `GOOGLE_CLIENT_ID`/
+  `MSG91_AUTH_KEY`, not fail-fast-required). New deps: `boto3==1.43.70`,
+  `python-multipart==0.0.20` (the latter needed for FastAPI's
+  `UploadFile`/`File(...)` params — first multipart route in the
+  codebase). 195→211 tests pass (16 new across
+  `tests/services/test_auth_service_signup.py`,
+  `tests/api/v1/routes/test_auth.py`,
+  `tests/services/test_storage_service.py`,
+  `tests/services/test_broker_service.py`,
+  `tests/api/v1/routes/test_brokers.py`); new autouse
+  `_mock_s3_client` fixture in `conftest.py` stubs only the boto3
+  client itself (not the whole `upload_broker_document` function), so
+  the real validation logic (content type/size) stays genuinely
+  exercised in tests, mirroring the existing `email_service` mocking
+  precedent. `ruff` clean.
+  **Two real bugs found only by live-verifying against the real
+  Supabase project, not by the passing test suite (which mocks the S3
+  client entirely):** (1) boto3 defaults to virtual-hosted-style S3
+  addressing (`bucket.endpoint/key`), but Supabase's S3-compatible
+  endpoint only supports path-style (`endpoint/bucket/key`) — every
+  real upload 500'd inside botocore with an empty error message until
+  `Config(s3={"addressing_style": "path"})` was added to the client;
+  (2) the bucket you'd created in the Supabase dashboard was actually
+  named `broker-dcouments` (typo — missing "u") while `.env` and the
+  code both expected `broker-documents` — `put_object` failed because
+  the target bucket genuinely didn't exist under that name;
+  `list_buckets()` surfaced the actual name directly. Fixed by you
+  creating a correctly-named bucket (your choice over renaming/config
+  workaround). Live-verified end-to-end against the real Supabase dev
+  DB + real Supabase Storage bucket via curl, using a throwaway
+  worktree server (`python -m uvicorn`, not the bare `uvicorn` shim —
+  same past gotcha): broker signup with verification-details fields →
+  201 → OTP verify → auto-login (existing P2-T11 behavior) → real
+  multipart upload of a PDF + JPG → `200 {"verification_status":
+  "pending"}` → confirmed via direct SQL that `company_name`/
+  `rera_number`/`service_areas`/`verification_documents` all landed
+  correctly → confirmed via `list_objects_v2` that both files
+  genuinely exist in the bucket → confirmed a client-role token gets
+  `403` and an unsupported file type (`.zip`) gets `422
+  UNSUPPORTED_FILE_TYPE`. Test user, throwaway client user, and both
+  uploaded objects deleted afterward.
+- **Frontend shipped separately** — see the "Frontend Phase 2 — Broker
+  signup" section directly below.
+
 ### Frontend Phase 2 — Broker signup (on `feature/phase_2_frontend_broker`,
 cut from `dev` 2026-08-14 — same empty-pointer-since-2026-07-21 situation
 as the backend broker branch, fast-forwarded to `dev`'s tip before

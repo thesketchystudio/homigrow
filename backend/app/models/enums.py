@@ -127,3 +127,15 @@ class OTPPurpose(str, Enum):
     login = "login"
     signup = "signup"
     broker_verification = "broker_verification"
+
+
+class BrokerDocumentType(str, Enum):
+    """
+    Kind of a broker verification document. Not a Postgres enum type —
+    it only ever appears as the "type" field inside broker_profiles.
+    verification_documents (JSONB), never as a table column, so there's
+    nothing to migrate.
+    """
+
+    rera_certificate = "rera_certificate"
+    government_id = "government_id"
