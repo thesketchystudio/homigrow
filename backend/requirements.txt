@@ -7,3 +7,32 @@ geoalchemy2==0.16.0
 python-dotenv==1.0.1
 pydantic-settings==2.7.1
 sentry-sdk[fastapi]==2.19.2
+
+# Auth (P2): password hashing + JWT. bcrypt pinned <4.1 — newer releases
+# dropped the __about__.__version__ attribute passlib's bcrypt backend
+# reads to detect the installed version.
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+PyJWT==2.10.1
+slowapi==0.1.10
+zxcvbn==4.5.0
+
+# Google Sign-In: verifies Identity Services ID tokens against Google's
+# public keys (google.oauth2.id_token). No client secret needed — the
+# ID-token flow never does a server-side code exchange. requests backs
+# google-auth's HTTP transport (fetching Google's public certs) — httpx
+# elsewhere in this file doesn't cover this, google-auth only ships an
+# adapter for requests/urllib3, not httpx.
+google-auth==2.37.0
+requests==2.32.3
+
+# Test tooling (pulled forward from T13 — T10's lifecycle tests need pytest
+# to run; T13 adds the fuller conftest.py/DB-fixture scaffolding on top).
+pytest==8.3.4
+
+# httpx also backs FastAPI's TestClient above, but is now a runtime
+# dependency too: app/services/email_service.py's Resend adapter.
+httpx==0.28.1
+
+# Lint (T14 backend CI)
+ruff==0.15.20

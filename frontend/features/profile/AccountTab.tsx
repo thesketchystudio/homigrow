@@ -1,0 +1,290 @@
+// features/profile/AccountTab.tsx
+// Account tab content (Figma node 145:4686 → "Account Information"
+// section). Colors/fonts/spacing pulled directly from Figma's
+// get_design_context output for this node: underline-style fields
+// (border-bottom only, not the boxed shadcn Input look), and near-black
+// (brand-primary-600, #1a1a1a) primary buttons/headings, not the app's
+// green --primary token — this screen's own design uses black for its
+// primary actions, matching the signup/login pages' black CTA buttons
+// rather than the shadcn scaffold default.
+//
+// Full Name/Email are real User columns; Phone Number has no update path
+// on the backend (User.phone is immutable post-signup) so it renders
+// read-only, same as Location — the city/state collected at signup,
+// displayed here as a single combined, non-editable "City, State" string
+// read from `preferences.city`/`.state`
+// (flat top-level keys, see auth_service.signup) rather than exposed as
+// editable fields.
+//
+// Figma's design also has a "Buyer Profile" section here — deliberately
+// dropped: buyer_preferences (the signup wizard's full structured object,
+// features/auth/preferences/types.ts) now has one canonical view+edit
+// surface, the Preferences tab (features/profile/preferences/), rather
+// than being split across two disconnected edit forms.
+// Figma also shows a "Last changed N months ago" note under Password —
+// dropped, since nothing on the User model tracks a password-specific
+// change timestamp (the generic updated_at column changes for unrelated
+// edits too, so showing it here would be misleading).
+
+"use client";
+
+import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm, type UseFormRegisterReturn } from "react-hook-form";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { Skeleton } from "@/components/ui/skeleton";
+import { ChangePasswordDialog } from "@/features/profile/ChangePasswordDialog";
+import { ApiError } from "@/lib/api/client";
+import { getMe, updateMe, type UserRead } from "@/lib/api/endpoints/users";
+import { toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
+import { accountFormSchema, type AccountFormValues } from "@/lib/validation/profile";
+
+function toFormValues(user: UserRead): AccountFormValues {
+  return {
+    full_name: user.full_name ?? "",
+    email: user.email ?? "",
+  };
+}
+
+export function AccountTab() {
+  const { data: user, isLoading } = useQuery({ queryKey: ["me"], queryFn: getMe });
+
+  if (isLoading || !user) {
+    return <AccountTabSkeleton />;
+  }
+
+  // Keyed on user.id and only mounted once `user` is real: the form's
+  // defaultValues are baked in at construction time instead of synced in
+  // after the fact (react-hook-form's `values` option), since that sync
+  // raced against Controller-bound fields (the Preferred Language select)
+  // registering on the very first render — the Select would come up empty
+  // even though the underlying data was correct.
+  return <AccountForm key={user.id} user={user} />;
+}
+
+function AccountForm({ user }: { user: UserRead }) {
+  const queryClient = useQueryClient();
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    setError,
+    reset,
+    formState: { errors, isDirty },
+  } = useForm<AccountFormValues>({
+    resolver: zodResolver(accountFormSchema),
+    defaultValues: toFormValues(user),
+  });
+
+  const mutation = useMutation({
+    mutationFn: updateMe,
+    onSuccess: (updated, variables) => {
+      queryClient.setQueryData(["me"], updated);
+      reset(toFormValues(updated));
+      toast.success("Profile updated.");
+      if (user.is_email_verified && variables.email !== user.email) {
+        toast.info("Your new email needs to be verified.");
+      }
+    },
+    onError: (error: ApiError) => {
+      if (error.code === "EMAIL_TAKEN") {
+        setError("email", { message: error.message });
+      } else if (error.fields) {
+        for (const [field, message] of Object.entries(error.fields)) {
+          setError(field as keyof AccountFormValues, { message });
+        }
+      } else {
+        toast.error(error.message);
+      }
+    },
+  });
+
+  const onSubmit = (values: AccountFormValues) => {
+    mutation.mutate({
+      full_name: values.full_name,
+      email: values.email,
+    });
+  };
+
+  const city = typeof user.preferences?.city === "string" ? user.preferences.city : "";
+  const state = typeof user.preferences?.state === "string" ? user.preferences.state : "";
+  const locationLabel = [city, state].filter(Boolean).join(", ");
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="flex max-w-3xl flex-col gap-8">
+      <div className="flex flex-col gap-1.5">
+        <h1 className="font-heading text-brand-primary-400 text-[36px] leading-[44px] font-bold">Settings</h1>
+        <p className="font-body text-brand-primary-600/70 text-[16px] leading-[26px]">
+          Manage your profile and account security.
+        </p>
+      </div>
+
+      <section className="flex flex-col gap-6">
+        <h2 className="font-heading text-brand-primary-400 text-[20px] leading-[28px] font-bold">Account Information</h2>
+        <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
+          <UnderlineField
+            label="Full Name"
+            id="full_name"
+            register={register("full_name")}
+            error={errors.full_name?.message}
+          />
+          <UnderlineField
+            label="Email Address"
+            id="email"
+            type="email"
+            register={register("email")}
+            error={errors.email?.message}
+          />
+          <div className="flex flex-col gap-2">
+            <label htmlFor="phone" className="font-heading text-brand-primary-400 text-[12px] font-bold tracking-[1.2px] uppercase">
+              Phone Number
+            </label>
+            <input
+              id="phone"
+              value={user.phone ?? ""}
+              placeholder="Not provided"
+              disabled
+              readOnly
+              className="font-body text-brand-primary-400/50 border-b-[0.8px] border-[rgba(38,38,38,0.5)] bg-transparent px-4 py-3 text-[16px] leading-[26px] outline-none"
+            />
+            <p className="font-body text-[12px] text-slate-500">
+              {user.phone ? "Contact support to change your phone number." : "No phone number on file (signed in with Google)."}
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <label htmlFor="location" className="font-heading text-brand-primary-400 text-[12px] font-bold tracking-[1.2px] uppercase">
+              Location
+            </label>
+            <input
+              id="location"
+              value={locationLabel}
+              placeholder="Not provided"
+              disabled
+              readOnly
+              className="font-body text-brand-primary-400/50 border-b-[0.8px] border-[rgba(38,38,38,0.5)] bg-transparent px-4 py-3 text-[16px] leading-[26px] outline-none"
+            />
+          </div>
+        </div>
+      </section>
+
+      <div className="h-px border-t-[0.8px] border-b-[0.8px] border-[#e2e9ec]" />
+
+      <section className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="font-heading text-brand-primary-400 text-[16px] leading-[24px] font-bold">Password</h2>
+          <p className="font-body text-[14px] leading-[22px] text-slate-500">Keep your account secure with a strong password.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setPasswordDialogOpen(true)}
+          className="bg-brand-secondary-500 text-brand-primary-400 font-heading rounded px-6 py-2.5 text-[16px] font-bold whitespace-nowrap"
+        >
+          Change Password
+        </button>
+      </section>
+
+      <div className="flex justify-end gap-3">
+        <button
+          type="button"
+          onClick={() => reset()}
+          disabled={!isDirty || mutation.isPending}
+          className="font-heading rounded border border-[rgba(38,38,38,0.3)] px-6 py-2.5 text-[16px] font-bold text-slate-500 disabled:opacity-50"
+        >
+          Discard Changes
+        </button>
+        <button
+          type="submit"
+          disabled={!isDirty || mutation.isPending}
+          className="bg-brand-primary-600 text-background font-heading rounded px-6 py-2.5 text-[16px] font-bold disabled:opacity-50"
+        >
+          {mutation.isPending ? "Saving…" : "Save Changes"}
+        </button>
+      </div>
+
+      <ChangePasswordDialog open={passwordDialogOpen} onClose={() => setPasswordDialogOpen(false)} />
+    </form>
+  );
+}
+
+// Mirrors AccountForm's real section layout (heading, 2x2 field grid,
+// password row, action buttons) so the loading state doesn't collapse
+// into a couple of generic bars — matches Figma's own skeleton frame for
+// this tab (Components/Section 3). Exported so ProfileLayout's AuthGuard
+// fallback can show the same shape immediately, instead of swapping from
+// a generic placeholder once auth resolves.
+export function AccountTabSkeleton() {
+  return (
+    <div className="flex max-w-3xl flex-col gap-8">
+      <div className="flex flex-col gap-1.5">
+        <Skeleton className="h-9 w-48" />
+        <Skeleton className="h-5 w-72" />
+      </div>
+
+      <section className="flex flex-col gap-6">
+        <Skeleton className="h-4 w-full" />
+        <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="flex flex-col gap-2">
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-[26px] w-40" />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="h-px border-t-[0.8px] border-b-[0.8px] border-[#e2e9ec]" />
+
+      <section className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-1.5">
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="h-4 w-56" />
+        </div>
+        <Skeleton className="h-10 w-40 rounded" />
+      </section>
+
+      <div className="flex justify-end gap-3">
+        <Skeleton className="h-[45px] w-40 rounded" />
+        <Skeleton className="h-11 w-36 rounded" />
+      </div>
+    </div>
+  );
+}
+
+function UnderlineField({
+  label,
+  id,
+  type = "text",
+  placeholder,
+  register,
+  error,
+}: {
+  label: string;
+  id: string;
+  type?: string;
+  placeholder?: string;
+  register: UseFormRegisterReturn;
+  error?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <label htmlFor={id} className="font-heading text-brand-primary-400 text-[12px] font-bold tracking-[1.2px] uppercase">
+        {label}
+      </label>
+      <input
+        id={id}
+        type={type}
+        placeholder={placeholder}
+        aria-invalid={Boolean(error)}
+        className={cn(
+          "font-body text-brand-primary-400 border-b-[0.8px] bg-transparent px-4 py-3 text-[16px] leading-[26px] outline-none placeholder:text-slate-400",
+          error ? "border-destructive" : "border-[rgba(38,38,38,0.5)] focus:border-brand-primary-600",
+        )}
+        {...register}
+      />
+      {error && <p className="text-destructive font-body text-[12px]">{error}</p>}
+    </div>
+  );
+}

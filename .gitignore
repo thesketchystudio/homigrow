@@ -3,6 +3,7 @@ frontend/node_modules/
 frontend/.next/
 frontend/next-env.d.ts
 frontend/npm-debug.log*
+Enhance Homepage Sections
 
 # Backend
 backend/venv/
@@ -23,8 +24,12 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Playwright MCP test artifacts
+.playwright-mcp/
+.codegraph
+
 # Sentry
 .sentryclirc
 
 # Docs
-plan_init_docs/
+docs/

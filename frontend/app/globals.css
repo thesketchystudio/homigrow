@@ -1,8 +1,146 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap");
 @import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
 
+/*
+ * Homigrow brand tokens, pulled from the Figma design file's published
+ * Variables (Primary/Secondary neutral scales + Accent Green, and the
+ * Heading/Body/Label type scale). Primary/Secondary are neutral grayscales
+ * (Primary = near-black text tones, Secondary = near-white surface tones);
+ * Accent Green is the actual brand action color used for CTAs. The
+ * homepage sections in features/homepage set their own colors/fonts
+ * directly and do not consume these tokens. No destructive/error or
+ * dark-mode brand colors were defined in Figma yet, so those keep their
+ * shadcn placeholder values.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --font-size: 16px;
+  --background: #fefeff;
+  --foreground: #090909;
+  --card: #ffffff;
+  --card-foreground: #090909;
+  --popover: #ffffff;
+  --popover-foreground: #090909;
+  --primary: #83dd68;
+  --primary-foreground: #090909;
+  --secondary: #f8f9fa;
+  --secondary-foreground: #090909;
+  --muted: #f8f9fa;
+  --muted-foreground: #707070;
+  --accent: #effeea;
+  --accent-foreground: #426e34;
+  --destructive: #d4183d;
+  --destructive-foreground: #ffffff;
+  --border: #dfe0e1;
+  --input: transparent;
+  --input-background: #f8f9fa;
+  --switch-background: #c6c7c8;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: #83dd68;
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: #fefeff;
+  --sidebar-foreground: #090909;
+  --sidebar-primary: #83dd68;
+  --sidebar-primary-foreground: #090909;
+  --sidebar-accent: #effeea;
+  --sidebar-accent-foreground: #426e34;
+  --sidebar-border: #dfe0e1;
+  --sidebar-ring: #83dd68;
+
+  /* Full brand color scales, for one-off utility usage beyond the semantic tokens above */
+  --brand-primary-100: #9c9c9c;
+  --brand-primary-200: #888888;
+  --brand-primary-300: #707070;
+  --brand-primary-400: #232323;
+  --brand-primary-500: #1e1e1e;
+  --brand-primary-600: #1a1a1a;
+  --brand-primary-700: #0c0c0c;
+  --brand-primary-800: #090909;
+  --brand-secondary-100: #fefeff;
+  --brand-secondary-300: #fdfdfd;
+  --brand-secondary-400: #f8f9fa;
+  --brand-secondary-500: #dfe0e1;
+  --brand-secondary-600: #c6c7c8;
+  --brand-secondary-700: #babbbc;
+  --brand-secondary-800: #959596;
+  --brand-secondary-900: #707070;
+  --brand-green-100: #f4fef1;
+  --brand-green-200: #effeea;
+  --brand-green-400: #92f574;
+  --brand-green-500: #83dd68;
+  --brand-green-600: #75c45d;
+  --brand-green-700: #6eb857;
+  --brand-green-800: #589346;
+  --brand-green-900: #426e34;
+
+  /* Type scale (Space Grotesk headings/labels, Plus Jakarta Sans body) */
+  --font-heading: "Space Grotesk", sans-serif;
+  --font-body: "Plus Jakarta Sans", sans-serif;
+  --text-h1: 48px;
+  --text-h1--line-height: 60px;
+  --text-h2: 36px;
+  --text-h2--line-height: 44px;
+  --text-h3: 28px;
+  --text-h3--line-height: 36px;
+  --text-h4: 20px;
+  --text-h4--line-height: 28px;
+  --text-h5: 16px;
+  --text-h5--line-height: 24px;
+  --text-body-xl: 18px;
+  --text-body-xl--line-height: 28px;
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 26px;
+  --text-body-md: 14px;
+  --text-body-md--line-height: 22px;
+  --text-body-sm: 12px;
+  --text-body-sm--line-height: 18px;
+  --text-label-lg: 14px;
+  --text-label-lg--line-height: 20px;
+  --text-label-md: 12px;
+  --text-label-md--line-height: 16px;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
 }
 
 @theme inline {
@@ -10,17 +148,116 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-brand-primary-100: var(--brand-primary-100);
+  --color-brand-primary-200: var(--brand-primary-200);
+  --color-brand-primary-300: var(--brand-primary-300);
+  --color-brand-primary-400: var(--brand-primary-400);
+  --color-brand-primary-500: var(--brand-primary-500);
+  --color-brand-primary-600: var(--brand-primary-600);
+  --color-brand-primary-700: var(--brand-primary-700);
+  --color-brand-primary-800: var(--brand-primary-800);
+  --color-brand-secondary-100: var(--brand-secondary-100);
+  --color-brand-secondary-300: var(--brand-secondary-300);
+  --color-brand-secondary-400: var(--brand-secondary-400);
+  --color-brand-secondary-500: var(--brand-secondary-500);
+  --color-brand-secondary-600: var(--brand-secondary-600);
+  --color-brand-secondary-700: var(--brand-secondary-700);
+  --color-brand-secondary-800: var(--brand-secondary-800);
+  --color-brand-secondary-900: var(--brand-secondary-900);
+  --color-brand-green-100: var(--brand-green-100);
+  --color-brand-green-200: var(--brand-green-200);
+  --color-brand-green-400: var(--brand-green-400);
+  --color-brand-green-500: var(--brand-green-500);
+  --color-brand-green-600: var(--brand-green-600);
+  --color-brand-green-700: var(--brand-green-700);
+  --color-brand-green-800: var(--brand-green-800);
+  --color-brand-green-900: var(--brand-green-900);
+
+  --font-heading: var(--font-heading);
+  --font-body: var(--font-body);
+  --text-h1: var(--text-h1);
+  --text-h1--line-height: var(--text-h1--line-height);
+  --text-h2: var(--text-h2);
+  --text-h2--line-height: var(--text-h2--line-height);
+  --text-h3: var(--text-h3);
+  --text-h3--line-height: var(--text-h3--line-height);
+  --text-h4: var(--text-h4);
+  --text-h4--line-height: var(--text-h4--line-height);
+  --text-h5: var(--text-h5);
+  --text-h5--line-height: var(--text-h5--line-height);
+  --text-body-xl: var(--text-body-xl);
+  --text-body-xl--line-height: var(--text-body-xl--line-height);
+  --text-body-lg: var(--text-body-lg);
+  --text-body-lg--line-height: var(--text-body-lg--line-height);
+  --text-body-md: var(--text-body-md);
+  --text-body-md--line-height: var(--text-body-md--line-height);
+  --text-body-sm: var(--text-body-sm);
+  --text-body-sm--line-height: var(--text-body-sm--line-height);
+  --text-label-lg: var(--text-label-lg);
+  --text-label-lg--line-height: var(--text-label-lg--line-height);
+  --text-label-md: var(--text-label-md);
+  --text-label-md--line-height: var(--text-label-md--line-height);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  /* Tailwind v3.4+ dropped the old Preflight default that made every
+     <button> show a pointer cursor on hover, reverting to the native
+     browser default (a plain arrow) instead. Restoring it here so every
+     button in the app — the shared shadcn Button, raw <button>s, Radix
+     triggers (Select, Sidebar, etc., all real <button> elements under
+     the hood) — behaves the way users expect, without needing
+     cursor-pointer repeated on every individual button. */
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
 }

@@ -1,0 +1,189 @@
+/* features/homepage/homepage.css */
+/* Responsive grid/layout classes shared across the homepage sections
+   and the shared Footer component. */
+
+/* ─── Horizontal padding ───────────────────────────────── */
+.section-px {
+  padding-left:  clamp(20px, 5vw, 150px);
+  padding-right: clamp(20px, 5vw, 150px);
+}
+
+/* ─── Vertical spacing ─────────────────────────────────── */
+.section-py {
+  padding-top:    clamp(60px, 10vw, 100px);
+  padding-bottom: clamp(60px, 10vw, 100px);
+}
+
+/* ─── Full section wrap (inner container) ──────────────── */
+.section-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding-left:  clamp(20px, 5vw, 150px);
+  padding-right: clamp(20px, 5vw, 150px);
+  padding-top:    clamp(60px, 10vw, 100px);
+  padding-bottom: clamp(60px, 10vw, 100px);
+}
+
+/* ─── 2-column → 1-column ──────────────────────────────── */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(32px, 5vw, 64px);
+}
+@media (min-width: 769px) {
+  .grid-2 { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ─── 3-column → 1-column ──────────────────────────────── */
+.grid-3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(16px, 2.5vw, 24px);
+}
+@media (min-width: 640px) {
+  .grid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1024px) {
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ─── 4-column → 2 → 1 ─────────────────────────────────── */
+.grid-4 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(12px, 2vw, 16px);
+}
+@media (min-width: 640px) {
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1024px) {
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* ─── 60/40 split → 1-column ───────────────────────────── */
+.grid-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(24px, 4vw, 48px);
+}
+@media (min-width: 769px) {
+  .grid-split { grid-template-columns: 1.5fr 1fr; }
+}
+
+/* ─── Equal 2-col + large gap (agent, trust, alerts) ───── */
+.grid-2-wide {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(32px, 5vw, 80px);
+}
+@media (min-width: 769px) {
+  .grid-2-wide { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ─── Testimonials: feature quote auto-col ─────────────── */
+.testimonial-feature {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  align-items: center;
+}
+@media (min-width: 769px) {
+  .testimonial-feature { grid-template-columns: 1fr auto; gap: 48px; }
+}
+
+/* ─── Cities mosaic (6-col → 3-col → 2-col) ────────────── */
+.cities-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+@media (min-width: 640px) {
+  .cities-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 1024px) {
+  .cities-grid { grid-template-columns: repeat(6, 1fr); }
+}
+
+/* ─── Cities: span classes only apply on large screens ─── */
+@media (max-width: 1023px) {
+  .city-span-2  { grid-column: span 1 !important; grid-row: span 1 !important; }
+  .city-span-3  { grid-column: span 1 !important; }
+}
+@media (min-width: 1024px) {
+  .city-span-2  { grid-column: span 2; grid-row: span 2; }
+  .city-span-3  { grid-column: span 3; }
+  .city-span-2s { grid-column: span 2; }
+}
+
+/* ─── How-it-works stepper (2-col → 1-col) ─────────────── */
+.grid-stepper {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(24px, 5vw, 64px);
+  align-items: start;
+}
+@media (min-width: 769px) {
+  .grid-stepper { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ─── Footer newsletter row ─────────────────────────────── */
+/* Horizontal padding maxes at 100px (not the general .section-inner's
+   150px) — matches Figma's real homepage Footer instance (node 388:984),
+   where every band's content starts at x=100 within the 1400px frame. */
+.footer-newsletter {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+  padding: clamp(48px, 8vw, 80px) clamp(20px, 5vw, 100px) clamp(40px, 6vw, 65px);
+  border-bottom: 1px solid rgba(198,198,205,0.1);
+}
+@media (min-width: 769px) {
+  .footer-newsletter { flex-direction: row; gap: 105px; }
+}
+
+/* ─── Footer nav columns (4 → 2 → 1) ───────────────────── */
+.footer-nav {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: clamp(24px, 4vw, 32px);
+  padding: clamp(32px, 5vw, 40px) clamp(20px, 5vw, 100px);
+}
+@media (min-width: 769px) {
+  .footer-nav { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* ─── Footer bottom bar ─────────────────────────────────── */
+.footer-bottom {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+  padding: clamp(24px, 4vw, 40px) clamp(20px, 5vw, 100px);
+  border-top: 1px solid rgba(198,198,205,0.05);
+}
+@media (min-width: 769px) {
+  .footer-bottom { flex-direction: row; justify-content: space-between; align-items: center; gap: 16px; }
+}
+
+/* ─── Section header row (title left, link right) ───────── */
+.section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: clamp(24px, 4vw, 32px);
+}
+@media (min-width: 640px) {
+  .section-header { flex-direction: row; align-items: flex-end; justify-content: space-between; }
+}
+
+/* ─── Hide on mobile ─────────────────────────────────────── */
+@media (max-width: 768px) {
+  .hide-mobile { display: none !important; }
+}
+@media (min-width: 769px) {
+  .hide-desktop { display: none !important; }
+}
