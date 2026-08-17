@@ -8,12 +8,13 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.models.enums import (
     Furnishing,
     ListingType,
     MediaType,
+    PropertyStatus,
     PropertyType,
     VerificationStatus,
 )
@@ -55,6 +56,7 @@ class PropertyRead(BaseModel):
     id: UUID
     title: str
     description: Optional[str] = None
+    status: PropertyStatus
     listing_type: ListingType
     property_type: PropertyType
     price: float
@@ -125,3 +127,38 @@ class NeighborhoodSummary(BaseModel):
     city: str
     property_count: int
     cover_image_url: Optional[str] = None
+
+
+class PropertyCreateRequest(BaseModel):
+    """
+    The Post Property wizard's full submission — Step 1 (Property Info) +
+    Step 3 (Pricing) fields together in one request. Steps 1 and 2 only
+    collect data client-side; nothing is persisted until this fires,
+    because `Property.price` is NOT NULL with a `price > 0` check
+    constraint, so a valid row can't exist before pricing is known.
+    Scoped to residential listings (apartment/villa/independent_house)
+    sold or rented directly by the broker — the schema itself doesn't
+    enforce that subset (the Property model and PropertyType/ListingType
+    enums already support plot/land/pg/commercial for future phases),
+    the wizard's frontend does by only offering those options.
+    """
+
+    title: str = Field(min_length=1, max_length=200)
+    listing_type: ListingType
+    property_type: PropertyType
+    bhk: Optional[int] = None
+    bathrooms: Optional[int] = None
+    area_sqft: Optional[float] = Field(default=None, gt=0)
+    furnishing: Optional[Furnishing] = None
+    built_year: Optional[int] = None
+    amenities: list[str] = []
+    address_line: str = Field(min_length=1, max_length=255)
+    locality: str = Field(min_length=1, max_length=100)
+    city: str = Field(min_length=1, max_length=100)
+    state: str = Field(min_length=1, max_length=100)
+    pincode: str = Field(min_length=1, max_length=6)
+    landmark: Optional[str] = None
+    price: float = Field(gt=0)
+    maintenance_monthly: Optional[float] = Field(default=None, gt=0)
+    deposit: Optional[float] = Field(default=None, gt=0)
+    is_negotiable: bool = False
