@@ -12,6 +12,16 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// react-hook-form's `valueAsNumber: true` runs the raw string through
+// `Number()`, which turns a blank input into NaN rather than undefined —
+// NaN then fails an `.optional()` zod number field's base type check
+// with a confusing "expected number, received NaN" instead of being
+// treated as legitimately empty. Use as `register("field", { setValueAs:
+// toOptionalNumber })` for any optional numeric form field.
+export function toOptionalNumber(value: string): number | undefined {
+  return value === "" ? undefined : Number(value);
+}
+
 // Formats a rupee amount using Indian lakh/crore short-scale notation
 // (e.g. 7500000 -> "₹75L", 130000000 -> "₹13Cr"), matching the buyer
 // preference wizard's price-range display.
