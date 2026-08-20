@@ -1,16 +1,22 @@
 """
 app/services/storage_service.py
 
-Uploads broker verification documents to a private bucket via the S3
-protocol (boto3), currently pointed at Supabase Storage's S3-compatible
-endpoint rather than Cloudflare R2 — R2 is the originally planned
-provider (00_Project_Overview.md) but requires a card on file to
-activate even its free tier, which wasn't available when this was
+Uploads broker verification documents and property listing photos via
+the S3 protocol (boto3), currently pointed at Supabase Storage's
+S3-compatible endpoint rather than Cloudflare R2 — R2 is the originally
+planned provider (00_Project_Overview.md) but requires a card on file
+to activate even its free tier, which wasn't available when this was
 built. Talking to storage purely through the S3 protocol means
 swapping to R2 later is a config change (endpoint/region/keys), not a
-rewrite. The bucket is private: this module returns internal object
-keys, not fetchable URLs — generating a presigned GET is a P4 concern
-(admin document review), not needed while nothing reads these back yet.
+rewrite.
+
+Two buckets, two access models: broker verification documents go to a
+private bucket and this module returns internal object keys, not
+fetchable URLs (generating a presigned GET is a P4 concern — admin
+document review — not needed while nothing reads these back yet).
+Property photos go to a separate public bucket, since listings must be
+publicly viewable on the client site with no auth, so that path returns
+a real public URL instead.
 """
 
 from uuid import UUID, uuid4
@@ -25,10 +31,19 @@ from app.models.enums import BrokerDocumentType
 ALLOWED_CONTENT_TYPES = {"application/pdf", "image/jpeg", "image/png"}
 MAX_DOCUMENT_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB, matches the Figma upload copy
 
+ALLOWED_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB, higher than docs since these are hero/interior photos
+
 _EXTENSION_BY_CONTENT_TYPE = {
     "application/pdf": ".pdf",
     "image/jpeg": ".jpg",
     "image/png": ".png",
+}
+
+_IMAGE_EXTENSION_BY_CONTENT_TYPE = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
 }
 
 _client = None
@@ -88,3 +103,40 @@ def upload_broker_document(
         ContentType=content_type,
     )
     return object_key
+
+
+def upload_property_image(
+    property_id: UUID,
+    content: bytes,
+    content_type: str,
+) -> str:
+    """
+    Validates and uploads one property listing photo to the public
+    property-media bucket, returning a fetchable public URL (unlike
+    upload_broker_document, since listing photos are shown unauthenticated
+    on the client site). Raises 422 on an unsupported content type or a
+    file over 10MB.
+    """
+    if content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
+        raise ValidationFailed(
+            "UNSUPPORTED_FILE_TYPE",
+            "Only JPG, PNG, or WEBP images are accepted.",
+            {"file": "Only JPG, PNG, or WEBP images are accepted."},
+        )
+    if len(content) > MAX_IMAGE_SIZE_BYTES:
+        raise ValidationFailed(
+            "FILE_TOO_LARGE",
+            "File must be 10 MB or smaller.",
+            {"file": "File must be 10 MB or smaller."},
+        )
+
+    extension = _IMAGE_EXTENSION_BY_CONTENT_TYPE[content_type]
+    object_key = f"{property_id}/{uuid4().hex}{extension}"
+
+    _get_client().put_object(
+        Bucket=settings.SUPABASE_S3_BUCKET_PROPERTY_MEDIA,
+        Key=object_key,
+        Body=content,
+        ContentType=content_type,
+    )
+    return f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.SUPABASE_S3_BUCKET_PROPERTY_MEDIA}/{object_key}"
