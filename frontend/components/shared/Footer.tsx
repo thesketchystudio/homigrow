@@ -7,9 +7,8 @@
 import { useState } from "react";
 
 import svgPaths from "@/lib/homepage-svg-paths";
-
-const sg = "'Space Grotesk', sans-serif";
-const pj = "'Plus Jakarta Sans', sans-serif";
+import { FONT_HEADING as sg, FONT_BODY as pj } from "@/lib/fonts";
+import { toast } from "@/lib/toast";
 
 const navColumns = [
   {
@@ -37,7 +36,7 @@ export default function Footer() {
   return (
     <footer style={{ background: "#232323" }}>
       <div style={{ borderBottom: "1px solid rgba(198,198,205,0.1)" }}>
-        <div className="footer-newsletter" style={{ maxWidth: 1280, margin: "0 auto" }}>
+        <div className="footer-newsletter" style={{ maxWidth: 1400, margin: "0 auto" }}>
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 20 }}>
             <svg width="45" height="40" viewBox="0 0 45.4044 40.0834" fill="none">
               <path d={svgPaths.p2b92b400} fill="#fefeff" />
@@ -123,7 +122,12 @@ export default function Footer() {
                     />
                   </div>
                   <button
-                    onClick={() => email && setSubscribed(true)}
+                    onClick={() => {
+                      if (!email) return;
+                      // TODO: wire to a real newsletter-subscribe endpoint once one exists.
+                      setSubscribed(true);
+                      toast.info("Newsletter signup isn't available yet — check back soon.");
+                    }}
                     style={{
                       background: "#fefeff",
                       border: "none",

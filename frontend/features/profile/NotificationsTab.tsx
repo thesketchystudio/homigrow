@@ -5,10 +5,9 @@
 // Account tab. There's no dedicated notification-preferences backend —
 // like the Account tab's Buyer Profile fields, these five channel
 // toggles live under a "notification_channels" key in the existing
-// free-form `preferences` JSONB (P2-T20), the same pattern T22
-// established for fields with no dedicated column. Every save spreads
-// the currently-loaded preferences first so this tab can't silently
-// wipe another tab's keys.
+// free-form `preferences` JSONB, the established convention for fields
+// with no dedicated column. Every save spreads the currently-loaded
+// preferences first so this tab can't silently wipe another tab's keys.
 
 "use client";
 
@@ -94,11 +93,6 @@ export function NotificationsTab() {
 export function NotificationsTabSkeleton() {
   return (
     <div className="flex max-w-3xl flex-col gap-8">
-      <div className="flex flex-col gap-1.5">
-        <Skeleton className="h-9 w-48" />
-        <Skeleton className="h-5 w-72" />
-      </div>
-
       <section className="flex flex-col gap-6">
         <div className="flex flex-col gap-0.5">
           <Skeleton className="h-4 w-full" />
@@ -180,13 +174,6 @@ function NotificationsForm({ user }: { user: UserRead }) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex max-w-3xl flex-col gap-8">
-      <div className="flex flex-col gap-1.5">
-        <h1 className="font-heading text-brand-primary-400 text-[36px] leading-[44px] font-bold">Settings</h1>
-        <p className="font-body text-brand-primary-600/70 text-[16px] leading-[26px]">
-          Manage your profile and account security.
-        </p>
-      </div>
-
       <section className="flex flex-col gap-6">
         <div className="flex flex-col gap-0.5">
           <h2 className="font-heading text-brand-primary-400 text-[20px] leading-[28px] font-bold">

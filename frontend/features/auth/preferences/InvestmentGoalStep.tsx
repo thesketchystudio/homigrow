@@ -4,25 +4,10 @@
 
 import { AuthProgressBar } from "@/features/auth/AuthProgressBar";
 import { PreferenceWizardFooter } from "@/features/auth/preferences/PreferenceWizardFooter";
-import { SelectableCardGroup, type SelectableCardOption } from "@/features/auth/preferences/SelectableCardGroup";
-import { PillGroup, type PillOption } from "@/features/auth/preferences/PillGroup";
+import { SelectableCardGroup } from "@/features/auth/preferences/SelectableCardGroup";
+import { PillGroup } from "@/features/auth/preferences/PillGroup";
 import type { BuyerPreferences } from "@/features/auth/preferences/types";
-
-const GOAL_OPTIONS: SelectableCardOption[] = [
-  { value: "rent_to_ownership", eyebrow: "First Home", label: "Rent to Ownership" },
-  { value: "long_term_investment", eyebrow: "Wealth Asset", label: "Long-term Investment" },
-  { value: "joint_investment_projects", eyebrow: "Family Legacy", label: "Joint-investment Projects" },
-  { value: "capital_appreciation_play", eyebrow: "Flip / Resale", label: "Capital Appreciation Play" },
-  { value: "steady_yield_generation", eyebrow: "Rental Income", label: "Steady Yield Generation" },
-  { value: "business_infrastructure", eyebrow: "Commercial / Office", label: "Business Infrastructure" },
-];
-
-const TIMELINE_OPTIONS: PillOption[] = [
-  { value: "immediately", label: "Immediately", sublabel: "Within 3 months" },
-  { value: "6_months", label: "6 Months", sublabel: "Mid-term search" },
-  { value: "1_year", label: "~1 Year", sublabel: "Planned acquisition" },
-  { value: "3_plus_years", label: "3+ Years", sublabel: "Long-horizon planning" },
-];
+import { INVESTMENT_GOAL_OPTIONS as GOAL_OPTIONS, BUY_TIMELINE_OPTIONS as TIMELINE_OPTIONS } from "@/features/auth/preferences/options";
 
 type InvestmentGoalStepProps = {
   preferences: BuyerPreferences;

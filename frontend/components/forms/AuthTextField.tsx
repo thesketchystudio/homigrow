@@ -2,7 +2,7 @@
 // Underline-style labeled text input bound to react-hook-form, matching
 // the Homigrow auth/onboarding Figma flow (label + full-width underline,
 // no boxed border). Shared across auth/post-property/profile forms that
-// use this visual language (04_Frontend_Architecture.md forms pattern).
+// use this visual language.
 
 import { type UseFormRegisterReturn } from "react-hook-form";
 import { cn } from "@/lib/utils";

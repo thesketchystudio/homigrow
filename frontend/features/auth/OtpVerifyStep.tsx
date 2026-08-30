@@ -1,7 +1,7 @@
 // features/auth/OtpVerifyStep.tsx
 // Step 3 of 3 — "Verify your identity" (Figma: node 418:874/877/878).
-// Six-digit code entry; distinguishes OTP_INVALID vs OTP_EXPIRED per
-// 05_API_Design.md so the two Figma error states render correctly.
+// Six-digit code entry; distinguishes OTP_INVALID vs OTP_EXPIRED so the
+// two Figma error states render correctly.
 
 "use client";
 
@@ -18,9 +18,10 @@ import { cn } from "@/lib/utils";
 type OtpVerifyStepProps = {
   email: string;
   onVerified: (session: TokenResponse) => void;
+  totalSteps?: number;
 };
 
-export function OtpVerifyStep({ email, onVerified }: OtpVerifyStepProps) {
+export function OtpVerifyStep({ email, onVerified, totalSteps = 3 }: OtpVerifyStepProps) {
   const [code, setCode] = useState("");
 
   const verifyMutation = useMutation({
@@ -46,7 +47,7 @@ export function OtpVerifyStep({ email, onVerified }: OtpVerifyStepProps) {
 
   return (
     <div className="flex w-full flex-col gap-8">
-      <AuthProgressBar step={3} />
+      <AuthProgressBar step={3} totalSteps={totalSteps} phase="onboarding" />
 
       <div className="flex flex-col items-center gap-6 text-center">
         <div className="flex flex-col items-center gap-0">

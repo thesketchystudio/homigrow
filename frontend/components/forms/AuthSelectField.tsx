@@ -7,12 +7,17 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
+type SelectOption = string | { value: string; label: string };
+
 type AuthSelectFieldProps = {
   label: string;
   placeholder?: string;
   value?: string;
   onValueChange: (value: string) => void;
-  options: string[];
+  // Plain strings when the value and its display label are the same
+  // (e.g. a city name); { value, label } pairs when they diverge (e.g.
+  // an enum key like "independent_house" displayed as "Independent House").
+  options: SelectOption[];
   error?: string;
   disabled?: boolean;
   className?: string;
@@ -42,11 +47,14 @@ export function AuthSelectField({
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option} value={option}>
-              {option}
-            </SelectItem>
-          ))}
+          {options.map((option) => {
+            const { value: optionValue, label: optionLabel } = typeof option === "string" ? { value: option, label: option } : option;
+            return (
+              <SelectItem key={optionValue} value={optionValue}>
+                {optionLabel}
+              </SelectItem>
+            );
+          })}
         </SelectContent>
       </Select>
       {error && <p className="text-[12px] text-destructive">{error}</p>}

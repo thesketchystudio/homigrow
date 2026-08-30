@@ -2,11 +2,9 @@
 // Trust/verification stats, a testimonial highlight, and press logos.
 
 import svgPaths from "@/lib/homepage-svg-paths";
+import { FONT_HEADING as sg, FONT_BODY as pj } from "@/lib/fonts";
 
 const imgTestimonial2 = "/homepage/testimonial-2.png";
-
-const sg = "'Space Grotesk', sans-serif";
-const pj = "'Plus Jakarta Sans', sans-serif";
 
 const stats = [
   { value: "40-point", label: "Verification checklist per listing" },

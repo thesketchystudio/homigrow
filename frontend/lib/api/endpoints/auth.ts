@@ -1,6 +1,6 @@
 // lib/api/endpoints/auth.ts
-// Typed functions for the /auth resource (05_API_Design.md). Components
-// never call fetch directly — they go through these.
+// Typed functions for the /auth resource. Components never call fetch
+// directly — they go through these.
 
 import { apiRequest } from "@/lib/api/client";
 import type { OTPPurpose, UserRole } from "@/lib/enums";
@@ -13,6 +13,10 @@ export type SignupPayload = {
   password: string;
   city?: string;
   state?: string;
+  // Broker-only "Verification Details" fields (Figma Step 2 form).
+  company_name?: string;
+  rera_number?: string;
+  service_area?: string;
 };
 
 export type SignupResponse = {

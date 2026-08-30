@@ -1,8 +1,8 @@
 // app/(client)/properties/[id]/page.tsx
-// Property Details screen (Figma node 31:1845, "property details";
-// 10_Phase_3.md P3-T04's frontend follow-up). Public route, no AuthGuard —
-// GET /properties/{id} is unauthenticated. Not yet linked from the
-// homepage or PropertyCard — that's a separate, later task.
+// Property Details screen (Figma node 31:1845, "property details").
+// Public route, no AuthGuard — GET /properties/{id} is unauthenticated.
+// Not yet linked from the homepage or PropertyCard — that's a separate,
+// later task.
 
 "use client";
 
@@ -13,6 +13,7 @@ import ErrorState from "@/components/shared/ErrorState";
 import { PropertyHeroGallery } from "@/features/properties/PropertyHeroGallery";
 import { PropertyHeader } from "@/features/properties/PropertyHeader";
 import { PropertyDescription } from "@/features/properties/PropertyDescription";
+import { PropertyVaastuChecker } from "@/features/properties/PropertyVaastuChecker";
 import { PropertyAmenities } from "@/features/properties/PropertyAmenities";
 import { PropertyContactCard } from "@/features/properties/PropertyContactCard";
 import { PropertyLoanCalculator } from "@/features/properties/PropertyLoanCalculator";
@@ -52,6 +53,7 @@ export default function PropertyDetailsPage() {
       <div className="flex flex-col gap-16 lg:flex-row lg:gap-10">
         <div className="flex min-w-0 flex-1 flex-col gap-16">
           <PropertyHeader property={property} />
+          <PropertyVaastuChecker />
           <PropertyDescription description={property.description} />
           <PropertyAmenities amenities={property.amenities} />
         </div>

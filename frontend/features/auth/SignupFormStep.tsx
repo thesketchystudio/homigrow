@@ -1,8 +1,7 @@
 // features/auth/SignupFormStep.tsx
 // Step 2 of 3 — "Welcome to the inner circle." signup form (Figma:
 // SignUpScreen, node 416:913). Submits POST /auth/signup; server 422
-// field errors are mapped back into react-hook-form via setError,
-// per the forms pattern in 04_Frontend_Architecture.md.
+// field errors are mapped back into react-hook-form via setError.
 
 "use client";
 
@@ -30,6 +29,11 @@ type SignupFormStepProps = {
 };
 
 export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onBack }: SignupFormStepProps) {
+  const isBroker = role === UserRole.broker;
+  // A broker's Phase A has a 4th step (document upload) that doesn't
+  // exist for a client — see AuthProgressBar.tsx.
+  const totalSteps = isBroker ? 4 : 3;
+
   const {
     register,
     handleSubmit,
@@ -73,12 +77,19 @@ export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onBack }:
       password: values.password,
       city: values.city,
       state: values.state,
+      ...(isBroker
+        ? {
+            company_name: values.company_name,
+            rera_number: values.rera_number,
+            service_area: values.service_area,
+          }
+        : {}),
     });
   });
 
   return (
     <form onSubmit={onSubmit} className="flex w-full flex-col gap-10">
-      <AuthProgressBar step={2} />
+      <AuthProgressBar step={2} totalSteps={totalSteps} phase="onboarding" />
 
       <div className="flex flex-col gap-10">
         <div className="flex flex-col gap-2">
@@ -143,6 +154,38 @@ export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onBack }:
               error={errors.confirm_password?.message}
             />
           </div>
+
+          {isBroker && (
+            <div className="flex flex-col gap-6">
+              <div className="flex items-center gap-4">
+                <div className="h-px flex-1 bg-black/10" />
+                <span className="font-heading text-[16px] tracking-[1.5px] text-brand-secondary-800">
+                  Verification Details
+                </span>
+                <div className="h-px flex-1 bg-black/10" />
+              </div>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                <AuthTextField
+                  label="Agency / Firm Name"
+                  placeholder="Vance Realty Group"
+                  register={register("company_name")}
+                  error={errors.company_name?.message}
+                />
+                <AuthTextField
+                  label="License / RERA No."
+                  placeholder="RERA-MH-12345"
+                  register={register("rera_number")}
+                  error={errors.rera_number?.message}
+                />
+                <AuthTextField
+                  label="City of Operation"
+                  placeholder="Mumbai"
+                  register={register("service_area")}
+                  error={errors.service_area?.message}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <AuthCheckboxField

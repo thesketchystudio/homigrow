@@ -1,7 +1,7 @@
 // app/(admin)/admin/layout.tsx
 // Sidebar shell for every Admin Portal page, gated by AuthGuard: a
 // logged-out visitor is redirected to /login, and a non-admin visitor is
-// redirected home (P2-T18).
+// redirected home.
 
 "use client";
 

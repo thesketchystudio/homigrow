@@ -2,11 +2,10 @@
 // Resident/client testimonial quotes: one large featured quote plus two
 // smaller quotes side by side.
 
+import { FONT_HEADING as sg, FONT_BODY as pj } from "@/lib/fonts";
+
 const imgAnitaDesai = "/homepage/anita-desai.png";
 const imgTestimonial2 = "/homepage/testimonial-2.png";
-
-const sg = "'Space Grotesk', sans-serif";
-const pj = "'Plus Jakarta Sans', sans-serif";
 
 const testimonials = [
   {

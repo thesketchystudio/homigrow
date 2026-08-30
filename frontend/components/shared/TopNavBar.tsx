@@ -17,15 +17,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, Search } from "lucide-react";
 
 import { ensureAuthResolved } from "@/lib/auth/session";
 import svgPaths from "@/lib/homepage-svg-paths";
 import { useAuthStore } from "@/lib/stores/auth";
+import { useSearchHistoryStore } from "@/lib/stores/searchHistory";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { SearchOverlay } from "@/features/search/SearchOverlay";
+import { FONT_HEADING as sg } from "@/lib/fonts";
 
-const sg = "'Space Grotesk', sans-serif";
+// "Saved", "Compare", and "Discover" (the Listings/search page) have real
+// destinations — AI Tools stays a dead "#" link until that feature exists.
+const NAV_LINK_HREFS: Record<string, string> = { Discover: "/properties", Saved: "/saved", Compare: "/compare" };
 
 function initials(name?: string) {
   if (!name) return "?";
@@ -42,8 +48,38 @@ export default function TopNavBar() {
   const router = useRouter();
   const pathname = usePathname();
   const { status, user } = useAuthStore();
+  const { record } = useSearchHistoryStore();
   const [scrolledPast, setScrolledPast] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+
+  // TopNavBar is mounted once in the (client) layout and persists across
+  // route changes — searchOpen must reset on every navigation, not just the
+  // ones initiated from inside SearchOverlay itself (nav links, browser
+  // back/forward, etc. would otherwise leave the overlay floating over
+  // whatever page is landed on next). Adjusting state during render (React's
+  // documented escape hatch for "reset state when a prop changes") rather
+  // than an effect, since a plain useEffect here trips
+  // react-hooks/set-state-in-effect.
+  const [pathnameForSearchReset, setPathnameForSearchReset] = useState(pathname);
+  if (pathname !== pathnameForSearchReset) {
+    setPathnameForSearchReset(pathname);
+    setSearchOpen(false);
+  }
+
+  const runSearch = () => {
+    const query = searchValue.trim();
+    if (!query) return;
+    // `search` (free-text, matches title/description/city/locality/
+    // landmark/amenities) rather than `city` (exact match) — a typed
+    // "Whitefield" is a locality and "pool" is an amenity, neither of
+    // which an exact city match would ever catch.
+    const href = `/properties?search=${encodeURIComponent(query)}`;
+    record({ label: query, subtitle: "Search", href });
+    setSearchOpen(false);
+    router.push(href);
+  };
 
   const isHeroPage = pathname === "/";
   const scrolled = !isHeroPage || scrolledPast;
@@ -85,18 +121,18 @@ export default function TopNavBar() {
           gap: "clamp(16px, 3vw, 40px)",
         }}
       >
-        <a href="#" style={{ display: "flex", alignItems: "center", flexShrink: 0, textDecoration: "none" }}>
+        <Link href="/" style={{ display: "flex", alignItems: "center", flexShrink: 0, textDecoration: "none" }}>
           <svg width="45" height="40" viewBox="0 0 45.4044 40.0834" fill="none" style={{ width: "clamp(35px, 8vw, 45px)", height: "auto" }}>
             <path d={svgPaths.p2b92b400} fill={scrolled ? "#090909" : "#fefeff"} />
             <path d={svgPaths.p29b4f280} fill={scrolled ? "#090909" : "#fefeff"} />
           </svg>
-        </a>
+        </Link>
 
         <div style={{ display: "flex", gap: 32, alignItems: "center" }} className="desktop-only">
           {["Discover", "AI Tools", "Compare", "Saved"].map((link) => (
-            <a
+            <Link
               key={link}
-              href="#"
+              href={NAV_LINK_HREFS[link] ?? "#"}
               style={{
                 fontFamily: sg,
                 fontWeight: 500,
@@ -107,7 +143,7 @@ export default function TopNavBar() {
               }}
             >
               {link}
-            </a>
+            </Link>
           ))}
         </div>
 
@@ -127,7 +163,18 @@ export default function TopNavBar() {
           <Search size={16} color="#707070" style={{ flexShrink: 0 }} />
           <input
             type="text"
-            placeholder="Search locations..."
+            placeholder="Search properties, locations..."
+            value={searchValue}
+            onChange={(event) => setSearchValue(event.target.value)}
+            onFocus={() => setSearchOpen(true)}
+            // Escape (below) closes the overlay without blurring the input,
+            // so a plain re-focus never fires on the next click — onClick
+            // reopens it explicitly regardless of prior focus state.
+            onClick={() => setSearchOpen(true)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") runSearch();
+              if (event.key === "Escape") setSearchOpen(false);
+            }}
             style={{
               border: "none",
               outline: "none",
@@ -200,9 +247,10 @@ export default function TopNavBar() {
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {["Discover", "AI Tools", "Compare", "Saved"].map((link) => (
-              <a
+              <Link
                 key={link}
-                href="#"
+                href={NAV_LINK_HREFS[link] ?? "#"}
+                onClick={() => setMobileOpen(false)}
                 style={{
                   fontFamily: sg,
                   fontWeight: 500,
@@ -213,7 +261,7 @@ export default function TopNavBar() {
                 }}
               >
                 {link}
-              </a>
+              </Link>
             ))}
           </div>
         </div>
@@ -234,6 +282,8 @@ export default function TopNavBar() {
           }
         }
       `}</style>
+
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
     </nav>
   );
 }

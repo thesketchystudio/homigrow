@@ -9,9 +9,9 @@
  * (Primary = near-black text tones, Secondary = near-white surface tones);
  * Accent Green is the actual brand action color used for CTAs. The
  * homepage sections in features/homepage set their own colors/fonts
- * directly and do not consume these tokens (tracked separately, not part
- * of P1-T20). No destructive/error or dark-mode brand colors were defined
- * in Figma yet, so those keep their shadcn placeholder values.
+ * directly and do not consume these tokens. No destructive/error or
+ * dark-mode brand colors were defined in Figma yet, so those keep their
+ * shadcn placeholder values.
  */
 :root {
   --font-size: 16px;
@@ -72,6 +72,7 @@
   --brand-secondary-900: #707070;
   --brand-green-100: #f4fef1;
   --brand-green-200: #effeea;
+  --brand-green-300: #ddfcd4;
   --brand-green-400: #92f574;
   --brand-green-500: #83dd68;
   --brand-green-600: #75c45d;
@@ -203,6 +204,7 @@
   --color-brand-secondary-900: var(--brand-secondary-900);
   --color-brand-green-100: var(--brand-green-100);
   --color-brand-green-200: var(--brand-green-200);
+  --color-brand-green-300: var(--brand-green-300);
   --color-brand-green-400: var(--brand-green-400);
   --color-brand-green-500: var(--brand-green-500);
   --color-brand-green-600: var(--brand-green-600);

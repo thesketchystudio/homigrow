@@ -8,17 +8,7 @@
 import Image from "next/image";
 import { Check, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const PROPERTY_TYPES = [
-  { value: "modernist_villas", label: "Modernist Villas" },
-  { value: "luxury_penthouses", label: "Luxury Penthouses" },
-  { value: "estates_mansions", label: "Estates & Mansions" },
-  { value: "studio_lofts", label: "Studio Lofts" },
-  { value: "serviced_apartments", label: "Serviced Apartments" },
-  { value: "plots_land", label: "Plots & Land" },
-  { value: "commercial_spaces", label: "Commercial Spaces" },
-  { value: "farmhouses", label: "Farmhouses" },
-] as const;
+import { PROPERTY_TYPE_OPTIONS as PROPERTY_TYPES } from "@/features/auth/preferences/options";
 
 type PropertyTypeCardGridProps = {
   value: string[];

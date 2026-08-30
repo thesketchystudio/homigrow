@@ -35,6 +35,16 @@ export const ListingType = {
 } as const;
 export type ListingType = (typeof ListingType)[keyof typeof ListingType];
 
+// Human-readable labels for each ListingType, shared by PropertyHeader
+// (Details page) and the homepage Listings section's card badge. Callers
+// that also need per-badge color styling keep their own wrapper around
+// this label.
+export const LISTING_TYPE_LABELS: Record<ListingType, string> = {
+  [ListingType.sale]: "For Sale",
+  [ListingType.rent]: "For Rent",
+  [ListingType.pg]: "PG / Co-living",
+};
+
 export const PropertyType = {
   apartment: "apartment",
   villa: "villa",
@@ -45,6 +55,19 @@ export const PropertyType = {
   pg_colive: "pg_colive",
 } as const;
 export type PropertyType = (typeof PropertyType)[keyof typeof PropertyType];
+
+// Human-readable labels for each PropertyType, shared by the Listings
+// filter sidebar and the Comparison table so both render identical
+// category names.
+export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
+  [PropertyType.apartment]: "Apartment",
+  [PropertyType.villa]: "Villa",
+  [PropertyType.independent_house]: "Independent House",
+  [PropertyType.plot]: "Plot",
+  [PropertyType.office]: "Office",
+  [PropertyType.shop]: "Shop",
+  [PropertyType.pg_colive]: "PG / Co-living",
+};
 
 export const Furnishing = {
   unfurnished: "unfurnished",
@@ -91,3 +114,9 @@ export const OrderStatus = {
   refunded: "refunded",
 } as const;
 export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus];
+
+export const BrokerDocumentType = {
+  rera_certificate: "rera_certificate",
+  government_id: "government_id",
+} as const;
+export type BrokerDocumentType = (typeof BrokerDocumentType)[keyof typeof BrokerDocumentType];

@@ -68,7 +68,7 @@ export default function AppSidebar({ groups, activeRoute, header, footer, onNavi
                           }}
                         >
                           {Icon && <Icon />}
-                          <span>{item.label}</span>
+                          <span className="font-heading text-[16px] font-medium">{item.label}</span>
                         </a>
                       </SidebarMenuButton>
                       {item.badge !== undefined && <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>}

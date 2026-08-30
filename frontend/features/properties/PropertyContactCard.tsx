@@ -1,8 +1,10 @@
 // features/properties/PropertyContactCard.tsx
-// Sidebar contact card + map placeholder (Figma node 31:1991, "Aside -
-// Right Column: Sidebar"). The Market Context / "Download Market Report"
-// card from the same Figma frame is intentionally not built — deferred in
-// 10_Phase_3.md P3-T04 alongside the Vaastu checker and "Redesign with AI".
+// Sidebar contact card, map placeholder, and Market Context card (Figma
+// node 31:1991, "Aside - Right Column: Sidebar"). Figma's market card
+// shows property-specific commentary ("14% YOY appreciation..." etc.) —
+// there's no real market-data source behind that, so the copy here is
+// generic rather than fabricated per-property stats; "Download Market
+// Report" just toasts, same as the other unbuilt actions below.
 //
 // POST /properties/{id}/enquire doesn't exist yet (same deferred list), so
 // the form collects input locally but both actions just surface a toast —
@@ -123,6 +125,21 @@ export function PropertyContactCard({ property }: { property: PropertyRead }) {
             </p>
           </div>
         </div>
+      </div>
+
+      <div className="flex flex-col gap-2 rounded bg-[#090909] p-8">
+        <p className="font-heading text-[20px] font-bold text-brand-secondary-100">Investment View</p>
+        <p className="font-body text-[14px] text-brand-secondary-100/70">
+          Market trends and pricing comparisons for {property.locality} are on the way — this card will show real
+          area-level insights once that data is in.
+        </p>
+        <button
+          type="button"
+          onClick={() => toast.info("Market reports aren't available yet — check back soon.")}
+          className="mt-2 w-fit font-heading text-[12px] font-bold uppercase tracking-[1.2px] text-[#30c91f]"
+        >
+          Download Market Report →
+        </button>
       </div>
     </div>
   );

@@ -50,6 +50,30 @@ class Settings(BaseSettings):
     # exchange.
     GOOGLE_CLIENT_ID: str = ""
 
+    # Broker verification document storage. Points at Supabase Storage's
+    # S3-compatible endpoint rather than Cloudflare R2 (the originally
+    # planned provider, per 00_Project_Overview.md) — R2 requires a card
+    # on file to activate even on its free tier, which wasn't available
+    # when this was built. storage_service.py talks to this purely via
+    # the S3 protocol (boto3), so swapping to R2 later is a config change,
+    # not a rewrite.
+    SUPABASE_ACCESS_KEY_ID: str = ""
+    SUPABASE_SECRET_ACCESS_KEY: str = ""
+    SUPABASE_S3_ENDPOINT: str = ""
+    SUPABASE_S3_REGION: str = ""
+    SUPABASE_S3_BUCKET: str = ""
+
+    # Project base URL, used only to build public object URLs for property
+    # media (https://<ref>.supabase.co/storage/v1/object/public/<bucket>/<key>)
+    # — distinct from SUPABASE_S3_ENDPOINT, which points at the storage
+    # subdomain's S3-compatible API and isn't the public object host.
+    SUPABASE_URL: str = ""
+
+    # Public bucket for broker-uploaded listing photos — separate from
+    # SUPABASE_S3_BUCKET (private, verification documents only), since
+    # listing photos must be publicly viewable on the client site.
+    SUPABASE_S3_BUCKET_PROPERTY_MEDIA: str = "property-media"
+
     @computed_field
     @property
     def DATABASE_URL(self) -> str:

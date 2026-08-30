@@ -1,46 +1,116 @@
 // features/homepage/Hero.tsx
 // Homepage hero: full-bleed background image, headline, and the
 // Buy/Rent/Commercial search widget with property type, price range,
-// and location filters.
+// and location filters. "Explore" pushes the selections onto the real
+// /properties search (lib/api/endpoints/properties.ts's buildQueryString
+// — same param names GET /properties and the Listings page both use),
+// so this is a real search, not a decorative widget. Property Type
+// options are the real PropertyType enum values, relabeled per tab
+// (Figma's own copy — e.g. "Villas & Estates", "Fully Furnished" — has
+// no backing field; furnishing in particular isn't a filter GET
+// /properties supports today), matching the precedent already set by
+// the Listings page's own FilterSidebar.
 
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import svgPaths from "@/lib/homepage-svg-paths";
+import { buildQueryString, type PropertyListParams } from "@/lib/api/endpoints/properties";
+import { ListingType, PropertyType } from "@/lib/enums";
+import { FONT_HEADING as sg } from "@/lib/fonts";
 
 const imgLuxuryVilla = "/homepage/luxury-villa.png";
 
-const sg = "'Space Grotesk', sans-serif";
-
 type Tab = "Buy" | "Rent" | "Commercial";
 
-const propertyTypes: Record<Tab, string[]> = {
-  Buy: ["Villas & Estates", "Apartments", "Penthouses", "Plots"],
-  Rent: ["Fully Furnished", "Semi Furnished", "Bare Shell", "Serviced"],
-  Commercial: ["Office Space", "Retail Shop", "Warehouse", "Co-Working"],
+const TAB_LISTING_TYPE: Record<Tab, ListingType | null> = {
+  Buy: ListingType.sale,
+  Rent: ListingType.rent,
+  // Commercial spans both sale and rent listings on the real data model —
+  // there's no single ListingType for it, so it's left unfiltered here.
+  Commercial: null,
 };
 
-const priceRanges: Record<Tab, string[]> = {
-  Buy: ["Under ₹50L", "₹50L – 1Cr", "₹1Cr – 3Cr", "₹3Cr – 5Cr", "₹5Cr+"],
-  Rent: ["Under ₹20K/mo", "₹20K – 50K", "₹50K – 1L", "₹1L – 3L", "₹3L+"],
-  Commercial: ["Under ₹1L/mo", "₹1L – 5L", "₹5L – 20L", "₹20L+"],
+const propertyTypes: Record<Tab, { value: PropertyType; label: string }[]> = {
+  Buy: [
+    { value: PropertyType.apartment, label: "Apartment" },
+    { value: PropertyType.villa, label: "Villa" },
+    { value: PropertyType.independent_house, label: "Independent House" },
+    { value: PropertyType.plot, label: "Plot" },
+  ],
+  Rent: [
+    { value: PropertyType.apartment, label: "Apartment" },
+    { value: PropertyType.villa, label: "Villa" },
+    { value: PropertyType.independent_house, label: "Independent House" },
+    { value: PropertyType.pg_colive, label: "PG / Co-living" },
+  ],
+  Commercial: [
+    { value: PropertyType.office, label: "Office Space" },
+    { value: PropertyType.shop, label: "Retail Shop" },
+  ],
 };
+
+const ANY_TYPE = "Any Type";
+
+type PriceRange = { min?: number; max?: number };
+
+const priceRanges: Record<Tab, { label: string; range: PriceRange }[]> = {
+  Buy: [
+    { label: "Under ₹50L", range: { max: 50_00_000 } },
+    { label: "₹50L – 1Cr", range: { min: 50_00_000, max: 1_00_00_000 } },
+    { label: "₹1Cr – 3Cr", range: { min: 1_00_00_000, max: 3_00_00_000 } },
+    { label: "₹3Cr – 5Cr", range: { min: 3_00_00_000, max: 5_00_00_000 } },
+    { label: "₹5Cr+", range: { min: 5_00_00_000 } },
+  ],
+  Rent: [
+    { label: "Under ₹20K/mo", range: { max: 20_000 } },
+    { label: "₹20K – 50K", range: { min: 20_000, max: 50_000 } },
+    { label: "₹50K – 1L", range: { min: 50_000, max: 1_00_000 } },
+    { label: "₹1L – 3L", range: { min: 1_00_000, max: 3_00_000 } },
+    { label: "₹3L+", range: { min: 3_00_000 } },
+  ],
+  Commercial: [
+    { label: "Under ₹1L/mo", range: { max: 1_00_000 } },
+    { label: "₹1L – 5L", range: { min: 1_00_000, max: 5_00_000 } },
+    { label: "₹5L – 20L", range: { min: 5_00_000, max: 20_00_000 } },
+    { label: "₹20L+", range: { min: 20_00_000 } },
+  ],
+};
+
+const ANY_BUDGET = "Any Budget";
 
 export default function Hero() {
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("Buy");
-  const [propType, setPropType] = useState("Villas & Estates");
-  const [price, setPrice] = useState("Any Budget");
+  const [propType, setPropType] = useState(ANY_TYPE);
+  const [price, setPrice] = useState(ANY_BUDGET);
   const [location, setLocation] = useState("");
   const [propOpen, setPropOpen] = useState(false);
   const [priceOpen, setPriceOpen] = useState(false);
 
   const handleTab = (t: Tab) => {
     setTab(t);
-    setPropType(propertyTypes[t][0]);
-    setPrice("Any Budget");
+    setPropType(ANY_TYPE);
+    setPrice(ANY_BUDGET);
     setPropOpen(false);
     setPriceOpen(false);
+  };
+
+  const handleExplore = () => {
+    const selectedType = propertyTypes[tab].find((opt) => opt.label === propType);
+    const selectedRange = priceRanges[tab].find((opt) => opt.label === price)?.range;
+
+    const params: PropertyListParams = {
+      city: location.trim() || undefined,
+      listing_type: TAB_LISTING_TYPE[tab] ?? undefined,
+      property_type: selectedType ? [selectedType.value] : undefined,
+      price_min: selectedRange?.min,
+      price_max: selectedRange?.max,
+    };
+
+    router.push(`/properties${buildQueryString(params)}`);
   };
 
   return (
@@ -235,7 +305,7 @@ export default function Hero() {
                     overflow: "hidden",
                   }}
                 >
-                  {propertyTypes[tab].map((opt) => (
+                  {[ANY_TYPE, ...propertyTypes[tab].map((opt) => opt.label)].map((opt) => (
                     <button
                       key={opt}
                       onClick={() => {
@@ -316,7 +386,7 @@ export default function Hero() {
                     overflow: "hidden",
                   }}
                 >
-                  {["Any Budget", ...priceRanges[tab]].map((opt) => (
+                  {[ANY_BUDGET, ...priceRanges[tab].map((opt) => opt.label)].map((opt) => (
                     <button
                       key={opt}
                       onClick={() => {
@@ -378,6 +448,7 @@ export default function Hero() {
             </div>
 
             <button
+              onClick={handleExplore}
               style={{
                 background: "#090909",
                 borderRadius: 8,

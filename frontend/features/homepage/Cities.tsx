@@ -4,15 +4,14 @@
 
 "use client";
 
+import { FONT_HEADING as sg, FONT_BODY as pj } from "@/lib/fonts";
+
 const imgCityMumbai = "/homepage/city-mumbai.png";
 const imgCityBengaluru = "/homepage/city-bengaluru.png";
 const imgCityChennai = "/homepage/city-chennai.png";
 const imgCityAgra = "/homepage/city-agra.png";
 const imgCityHyderabad = "/homepage/city-hyderabad.png";
 const imgCityAhmedabad = "/homepage/city-ahmedabad.png";
-
-const sg = "'Space Grotesk', sans-serif";
-const pj = "'Plus Jakarta Sans', sans-serif";
 
 const cities = [
   { name: "Bengaluru", listings: "2,400+", img: imgCityBengaluru },

@@ -1,93 +1,57 @@
 // features/profile/AccountTab.tsx
-// Account tab content (Figma node 145:4686 → "Account Information" +
-// "Buyer Profile" sections). Colors/fonts/spacing pulled directly from
-// Figma's get_design_context output for this node: underline-style
-// fields (border-bottom only, not the boxed shadcn Input look), and
-// near-black (brand-primary-600, #1a1a1a) primary buttons/headings, not
-// the app's green --primary token — this screen's own design uses black
-// for its primary actions, matching the signup/login pages' black CTA
-// buttons rather than the shadcn scaffold default.
+// Account tab content (Figma node 145:4686 → "Account Information"
+// section). Colors/fonts/spacing pulled directly from Figma's
+// get_design_context output for this node: underline-style fields
+// (border-bottom only, not the boxed shadcn Input look), and near-black
+// (brand-primary-600, #1a1a1a) primary buttons/headings, not the app's
+// green --primary token — this screen's own design uses black for its
+// primary actions, matching the signup/login pages' black CTA buttons
+// rather than the shadcn scaffold default.
 //
 // Full Name/Email are real User columns; Phone Number has no update path
 // on the backend (User.phone is immutable post-signup) so it renders
-// read-only, same as Location — the city/state collected at signup
-// (P2-T21's City/State fields), displayed here as a single combined,
-// non-editable "City, State" string read from `preferences.city`/`.state`
+// read-only, same as Location — the city/state collected at signup,
+// displayed here as a single combined, non-editable "City, State" string
+// read from `preferences.city`/`.state`
 // (flat top-level keys, see auth_service.signup) rather than exposed as
-// editable fields. The Buyer Profile section reads/writes
-// `preferences.buyer_preferences` directly — the same structured object
-// the signup wizard's 6-screen buyer-preference flow saves
-// (features/auth/preferences/types.ts) — rather than maintaining its own
-// separate flat keys, so a user's wizard answers and Account-tab edits
-// are one shared dataset, not two disconnected copies. Only a subset of
-// BuyerPreferences is editable here (budget, cities, property types,
-// investment goals); the rest of the object (bedroom_preference,
-// buy_timeline, exit_strategies, etc.) is preserved on save by spreading
-// the existing object first.
+// editable fields.
+//
+// Figma's design also has a "Buyer Profile" section here — deliberately
+// dropped: buyer_preferences (the signup wizard's full structured object,
+// features/auth/preferences/types.ts) now has one canonical view+edit
+// surface, the Preferences tab (features/profile/preferences/), rather
+// than being split across two disconnected edit forms.
 // Figma also shows a "Last changed N months ago" note under Password —
 // dropped, since nothing on the User model tracks a password-specific
 // change timestamp (the generic updated_at column changes for unrelated
 // edits too, so showing it here would be misleading).
+//
+// The back-arrow + "Settings" title row itself lives in the shared
+// app/(client)/profile/layout.tsx, not here (see that file's header
+// comment) — this tab only registers its own right-aligned Discard/Save
+// buttons into that shared header via useProfileHeaderActions, shown only
+// while the form is dirty.
 
 "use client";
 
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm, type UseFormRegisterReturn } from "react-hook-form";
+import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChangePasswordDialog } from "@/features/profile/ChangePasswordDialog";
-import { BudgetRangeSlider, BUDGET_MIN, BUDGET_MAX } from "@/features/auth/preferences/BudgetRangeSlider";
-import { CityMultiSelectChips } from "@/features/auth/preferences/CityMultiSelectChips";
-import { ChipMultiSelect, type ChipOption } from "@/features/auth/preferences/ChipMultiSelect";
-import type { BuyerPreferences } from "@/features/auth/preferences/types";
+import { useProfileHeaderActions } from "@/features/profile/ProfileHeaderActions";
 import { ApiError } from "@/lib/api/client";
 import { getMe, updateMe, type UserRead } from "@/lib/api/endpoints/users";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { accountFormSchema, type AccountFormValues } from "@/lib/validation/profile";
 
-// Mirrors the option values PropertyTypeCardGrid/InvestmentGoalStep use
-// (features/auth/preferences), as plain chips rather than the wizard's
-// full-screen image cards/eyebrow labels — a compact settings form, not
-// a dedicated preference screen.
-const PROPERTY_TYPE_OPTIONS: ChipOption[] = [
-  { value: "modernist_villas", label: "Modernist Villas" },
-  { value: "luxury_penthouses", label: "Luxury Penthouses" },
-  { value: "estates_mansions", label: "Estates & Mansions" },
-  { value: "studio_lofts", label: "Studio Lofts" },
-  { value: "serviced_apartments", label: "Serviced Apartments" },
-  { value: "plots_land", label: "Plots & Land" },
-  { value: "commercial_spaces", label: "Commercial Spaces" },
-  { value: "farmhouses", label: "Farmhouses" },
-];
-
-const INVESTMENT_GOAL_OPTIONS: ChipOption[] = [
-  { value: "rent_to_ownership", label: "Rent to Ownership" },
-  { value: "long_term_investment", label: "Long-term Investment" },
-  { value: "joint_investment_projects", label: "Joint-investment Projects" },
-  { value: "capital_appreciation_play", label: "Capital Appreciation Play" },
-  { value: "steady_yield_generation", label: "Steady Yield Generation" },
-  { value: "business_infrastructure", label: "Business Infrastructure" },
-];
-
 function toFormValues(user: UserRead): AccountFormValues {
-  const prefs = user.preferences ?? {};
-  const buyerPreferences =
-    typeof prefs.buyer_preferences === "object" && prefs.buyer_preferences !== null
-      ? (prefs.buyer_preferences as BuyerPreferences)
-      : {};
   return {
     full_name: user.full_name ?? "",
     email: user.email ?? "",
-    buyer_preferences: {
-      budget_min: buyerPreferences.budget_min,
-      budget_max: buyerPreferences.budget_max,
-      preferred_cities: buyerPreferences.preferred_cities ?? [],
-      property_types: buyerPreferences.property_types ?? [],
-      investment_goals: buyerPreferences.investment_goals ?? [],
-    },
   };
 }
 
@@ -113,7 +77,6 @@ function AccountForm({ user }: { user: UserRead }) {
 
   const {
     register,
-    control,
     handleSubmit,
     setError,
     reset,
@@ -147,20 +110,9 @@ function AccountForm({ user }: { user: UserRead }) {
   });
 
   const onSubmit = (values: AccountFormValues) => {
-    const existingBuyerPreferences =
-      typeof user.preferences?.buyer_preferences === "object" && user.preferences.buyer_preferences !== null
-        ? (user.preferences.buyer_preferences as BuyerPreferences)
-        : {};
     mutation.mutate({
       full_name: values.full_name,
       email: values.email,
-      preferences: {
-        ...user.preferences,
-        buyer_preferences: {
-          ...existingBuyerPreferences,
-          ...values.buyer_preferences,
-        },
-      },
     });
   };
 
@@ -168,15 +120,31 @@ function AccountForm({ user }: { user: UserRead }) {
   const state = typeof user.preferences?.state === "string" ? user.preferences.state : "";
   const locationLabel = [city, state].filter(Boolean).join(", ");
 
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex max-w-3xl flex-col gap-8">
-      <div className="flex flex-col gap-1.5">
-        <h1 className="font-heading text-brand-primary-400 text-[36px] leading-[44px] font-bold">Settings</h1>
-        <p className="font-body text-brand-primary-600/70 text-[16px] leading-[26px]">
-          Manage your profile and account security.
-        </p>
+  useProfileHeaderActions(
+    isDirty ? (
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => reset()}
+          disabled={mutation.isPending}
+          className="font-heading rounded border border-[rgba(38,38,38,0.3)] px-6 py-2.5 text-[16px] font-bold text-slate-500 disabled:opacity-50"
+        >
+          Discard Changes
+        </button>
+        <button
+          type="submit"
+          form="account-form"
+          disabled={mutation.isPending}
+          className="bg-brand-primary-600 text-background font-heading rounded px-6 py-2.5 text-[16px] font-bold disabled:opacity-50"
+        >
+          {mutation.isPending ? "Saving…" : "Save Changes"}
+        </button>
       </div>
+    ) : null,
+  );
 
+  return (
+    <form id="account-form" onSubmit={handleSubmit(onSubmit)} className="flex max-w-3xl flex-col gap-8">
       <section className="flex flex-col gap-6">
         <h2 className="font-heading text-brand-primary-400 text-[20px] leading-[28px] font-bold">Account Information</h2>
         <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
@@ -241,96 +209,20 @@ function AccountForm({ user }: { user: UserRead }) {
         </button>
       </section>
 
-      <div className="h-px border-t-[0.8px] border-b-[0.8px] border-[#e2e9ec]" />
-
-      <section className="flex flex-col gap-8">
-        <div className="flex flex-col gap-0.5">
-          <h2 className="font-heading text-brand-primary-400 text-[20px] leading-[28px] font-bold">Buyer Profile</h2>
-          <p className="font-body text-[12px] leading-[18px] text-slate-500">
-            Help us personalise property recommendations for you — the same preferences you set during signup.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <p className="font-heading text-brand-primary-400 text-[12px] font-bold tracking-[1.2px] uppercase">Budget Range</p>
-          <Controller
-            control={control}
-            name="buyer_preferences"
-            render={({ field }) => (
-              <BudgetRangeSlider
-                min={field.value.budget_min ?? BUDGET_MIN}
-                max={field.value.budget_max ?? BUDGET_MAX}
-                onChange={(budget_min, budget_max) => field.onChange({ ...field.value, budget_min, budget_max })}
-              />
-            )}
-          />
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <p className="font-heading text-brand-primary-400 text-[12px] font-bold tracking-[1.2px] uppercase">Preferred Locations</p>
-          <Controller
-            control={control}
-            name="buyer_preferences.preferred_cities"
-            render={({ field }) => <CityMultiSelectChips value={field.value} onChange={field.onChange} />}
-          />
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <p className="font-heading text-brand-primary-400 text-[12px] font-bold tracking-[1.2px] uppercase">Property Type</p>
-          <Controller
-            control={control}
-            name="buyer_preferences.property_types"
-            render={({ field }) => <ChipMultiSelect options={PROPERTY_TYPE_OPTIONS} value={field.value} onChange={field.onChange} />}
-          />
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <p className="font-heading text-brand-primary-400 text-[12px] font-bold tracking-[1.2px] uppercase">Buyer Intent</p>
-          <Controller
-            control={control}
-            name="buyer_preferences.investment_goals"
-            render={({ field }) => <ChipMultiSelect options={INVESTMENT_GOAL_OPTIONS} value={field.value} onChange={field.onChange} />}
-          />
-        </div>
-      </section>
-
-      <div className="flex justify-end gap-3">
-        <button
-          type="button"
-          onClick={() => reset()}
-          disabled={!isDirty || mutation.isPending}
-          className="font-heading rounded border border-[rgba(38,38,38,0.3)] px-6 py-2.5 text-[16px] font-bold text-slate-500 disabled:opacity-50"
-        >
-          Discard Changes
-        </button>
-        <button
-          type="submit"
-          disabled={!isDirty || mutation.isPending}
-          className="bg-brand-primary-600 text-background font-heading rounded px-6 py-2.5 text-[16px] font-bold disabled:opacity-50"
-        >
-          {mutation.isPending ? "Saving…" : "Save Changes"}
-        </button>
-      </div>
-
       <ChangePasswordDialog open={passwordDialogOpen} onClose={() => setPasswordDialogOpen(false)} />
     </form>
   );
 }
 
 // Mirrors AccountForm's real section layout (heading, 2x2 field grid,
-// password row, Buyer Profile 2x2 grid, action buttons) so the loading
-// state doesn't collapse into a couple of generic bars — matches Figma's
-// own skeleton frame for this tab (Components/Section 3). Exported so
-// ProfileLayout's AuthGuard fallback can show the same shape immediately,
-// instead of swapping from a generic placeholder once auth resolves.
+// password row, action buttons) so the loading state doesn't collapse
+// into a couple of generic bars — matches Figma's own skeleton frame for
+// this tab (Components/Section 3). Exported so ProfileLayout's AuthGuard
+// fallback can show the same shape immediately, instead of swapping from
+// a generic placeholder once auth resolves.
 export function AccountTabSkeleton() {
   return (
     <div className="flex max-w-3xl flex-col gap-8">
-      <div className="flex flex-col gap-1.5">
-        <Skeleton className="h-9 w-48" />
-        <Skeleton className="h-5 w-72" />
-      </div>
-
       <section className="flex flex-col gap-6">
         <Skeleton className="h-4 w-full" />
         <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
@@ -352,28 +244,6 @@ export function AccountTabSkeleton() {
         </div>
         <Skeleton className="h-10 w-40 rounded" />
       </section>
-
-      <div className="h-px border-t-[0.8px] border-b-[0.8px] border-[#e2e9ec]" />
-
-      <section className="flex flex-col gap-8">
-        <div className="flex flex-col gap-1.5">
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-3 w-80" />
-        </div>
-        <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="flex flex-col gap-2">
-              <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-[26px] w-32" />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <div className="flex justify-end gap-3">
-        <Skeleton className="h-[45px] w-40 rounded" />
-        <Skeleton className="h-11 w-36 rounded" />
-      </div>
     </div>
   );
 }

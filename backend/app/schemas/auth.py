@@ -30,6 +30,13 @@ class SignupRequest(BaseModel):
     city: Optional[str] = None
     state: Optional[str] = None
 
+    # Broker-only "Verification Details" fields from the Figma signup
+    # form (Step 2) — ignored by the service for role=client, same as
+    # how a client sending them would just have them silently dropped.
+    company_name: Optional[str] = None
+    rera_number: Optional[str] = None
+    service_area: Optional[str] = None
+
     @field_validator("role")
     @classmethod
     def role_must_be_signupable(cls, value: UserRole) -> UserRole:
@@ -39,6 +46,18 @@ class SignupRequest(BaseModel):
         """
         if value == UserRole.admin:
             raise ValueError("role must be client or broker")
+        return value
+
+    @field_validator("rera_number")
+    @classmethod
+    def rera_number_sane_length(cls, value: Optional[str]) -> Optional[str]:
+        """
+        RERA numbers have no single national format — each state
+        authority issues its own scheme — so this is a basic sanity
+        check, not a format/checksum validation.
+        """
+        if value is not None and not (5 <= len(value) <= 50):
+            raise ValueError("RERA number must be between 5 and 50 characters")
         return value
 
     @field_validator("password")

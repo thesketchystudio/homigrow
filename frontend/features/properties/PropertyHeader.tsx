@@ -10,14 +10,8 @@ import { useState } from "react";
 import { Bath, BedDouble, CalendarDays, Car, MapPin, Ruler, Share2, TrainFront } from "lucide-react";
 
 import type { PropertyRead } from "@/lib/api/endpoints/properties";
-import { ListingType } from "@/lib/enums";
+import { ListingType, LISTING_TYPE_LABELS as LISTING_TAG } from "@/lib/enums";
 import { toast } from "@/lib/toast";
-
-const LISTING_TAG: Record<ListingType, string> = {
-  [ListingType.sale]: "For Sale",
-  [ListingType.rent]: "For Rent",
-  [ListingType.pg]: "PG / Co-living",
-};
 
 function formatPriceINR(amount: number): string {
   return `₹${Math.round(amount).toLocaleString("en-IN")}`;
@@ -116,8 +110,8 @@ export function PropertyHeader({ property }: { property: PropertyRead }) {
                 <TrainFront className="size-5 text-brand-primary-600" />
                 <div className="flex flex-col">
                   <span className="font-body text-[12px] uppercase tracking-[1.2px] text-brand-primary-600/80">Metro</span>
+                  <span className="font-heading text-[16px] font-bold text-brand-primary-600">{property.locality}</span>
                   <div className="flex items-center gap-1">
-                    <span className="font-heading text-[16px] font-bold text-brand-primary-600">{property.locality}</span>
                     <MapPin className="size-3 text-brand-green-700" />
                     <span className="font-heading text-[16px] font-bold text-brand-green-700">{property.metro_distance_km} kms</span>
                   </div>
