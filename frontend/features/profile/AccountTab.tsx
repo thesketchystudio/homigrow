@@ -25,6 +25,12 @@
 // dropped, since nothing on the User model tracks a password-specific
 // change timestamp (the generic updated_at column changes for unrelated
 // edits too, so showing it here would be misleading).
+//
+// The back-arrow + "Settings" title row itself lives in the shared
+// app/(client)/profile/layout.tsx, not here (see that file's header
+// comment) — this tab only registers its own right-aligned Discard/Save
+// buttons into that shared header via useProfileHeaderActions, shown only
+// while the form is dirty.
 
 "use client";
 
@@ -35,6 +41,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChangePasswordDialog } from "@/features/profile/ChangePasswordDialog";
+import { useProfileHeaderActions } from "@/features/profile/ProfileHeaderActions";
 import { ApiError } from "@/lib/api/client";
 import { getMe, updateMe, type UserRead } from "@/lib/api/endpoints/users";
 import { toast } from "@/lib/toast";
@@ -113,15 +120,31 @@ function AccountForm({ user }: { user: UserRead }) {
   const state = typeof user.preferences?.state === "string" ? user.preferences.state : "";
   const locationLabel = [city, state].filter(Boolean).join(", ");
 
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex max-w-3xl flex-col gap-8">
-      <div className="flex flex-col gap-1.5">
-        <h1 className="font-heading text-brand-primary-400 text-[36px] leading-[44px] font-bold">Settings</h1>
-        <p className="font-body text-brand-primary-600/70 text-[16px] leading-[26px]">
-          Manage your profile and account security.
-        </p>
+  useProfileHeaderActions(
+    isDirty ? (
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => reset()}
+          disabled={mutation.isPending}
+          className="font-heading rounded border border-[rgba(38,38,38,0.3)] px-6 py-2.5 text-[16px] font-bold text-slate-500 disabled:opacity-50"
+        >
+          Discard Changes
+        </button>
+        <button
+          type="submit"
+          form="account-form"
+          disabled={mutation.isPending}
+          className="bg-brand-primary-600 text-background font-heading rounded px-6 py-2.5 text-[16px] font-bold disabled:opacity-50"
+        >
+          {mutation.isPending ? "Saving…" : "Save Changes"}
+        </button>
       </div>
+    ) : null,
+  );
 
+  return (
+    <form id="account-form" onSubmit={handleSubmit(onSubmit)} className="flex max-w-3xl flex-col gap-8">
       <section className="flex flex-col gap-6">
         <h2 className="font-heading text-brand-primary-400 text-[20px] leading-[28px] font-bold">Account Information</h2>
         <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
@@ -186,24 +209,6 @@ function AccountForm({ user }: { user: UserRead }) {
         </button>
       </section>
 
-      <div className="flex justify-end gap-3">
-        <button
-          type="button"
-          onClick={() => reset()}
-          disabled={!isDirty || mutation.isPending}
-          className="font-heading rounded border border-[rgba(38,38,38,0.3)] px-6 py-2.5 text-[16px] font-bold text-slate-500 disabled:opacity-50"
-        >
-          Discard Changes
-        </button>
-        <button
-          type="submit"
-          disabled={!isDirty || mutation.isPending}
-          className="bg-brand-primary-600 text-background font-heading rounded px-6 py-2.5 text-[16px] font-bold disabled:opacity-50"
-        >
-          {mutation.isPending ? "Saving…" : "Save Changes"}
-        </button>
-      </div>
-
       <ChangePasswordDialog open={passwordDialogOpen} onClose={() => setPasswordDialogOpen(false)} />
     </form>
   );
@@ -218,11 +223,6 @@ function AccountForm({ user }: { user: UserRead }) {
 export function AccountTabSkeleton() {
   return (
     <div className="flex max-w-3xl flex-col gap-8">
-      <div className="flex flex-col gap-1.5">
-        <Skeleton className="h-9 w-48" />
-        <Skeleton className="h-5 w-72" />
-      </div>
-
       <section className="flex flex-col gap-6">
         <Skeleton className="h-4 w-full" />
         <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
@@ -244,11 +244,6 @@ export function AccountTabSkeleton() {
         </div>
         <Skeleton className="h-10 w-40 rounded" />
       </section>
-
-      <div className="flex justify-end gap-3">
-        <Skeleton className="h-[45px] w-40 rounded" />
-        <Skeleton className="h-11 w-36 rounded" />
-      </div>
     </div>
   );
 }

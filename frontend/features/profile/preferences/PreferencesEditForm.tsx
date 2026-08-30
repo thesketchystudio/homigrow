@@ -5,13 +5,14 @@
 // (the real city search/dropdown), PropertyTypeCardGrid, PillGroup,
 // SelectableCardGroup, ChecklistGroup, ChipMultiSelect — just without
 // each step's own progress bar/Skip/Continue chrome, since this is one
-// flat form rather than a multi-step wizard. Local `preferences` state +
-// `onChange` patch-merge mirrors the wizard steps' own prop contract
-// exactly, so these controls drop in unmodified.
+// flat form rather than a multi-step wizard. Controlled (`value`/`onChange`)
+// rather than owning its own state — the Figma "Enhance filter sidebar
+// features" edit-mode header (node 569:633) puts Discard/Save above the
+// form next to a back arrow, so PreferencesTab owns the draft state and
+// renders those controls itself.
 
 "use client";
 
-import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BudgetRangeSlider, BUDGET_MIN, BUDGET_MAX } from "@/features/auth/preferences/BudgetRangeSlider";
 import { CityMultiSelectChips } from "@/features/auth/preferences/CityMultiSelectChips";
@@ -39,18 +40,13 @@ function SectionHeading({ children }: { children: string }) {
 }
 
 export function PreferencesEditForm({
-  initialValue,
-  onSave,
-  onDiscard,
-  isSaving,
+  value: preferences,
+  onChange,
 }: {
-  initialValue: BuyerPreferences;
-  onSave: (value: BuyerPreferences) => void;
-  onDiscard: () => void;
-  isSaving: boolean;
+  value: BuyerPreferences;
+  onChange: (value: BuyerPreferences) => void;
 }) {
-  const [preferences, setPreferences] = useState<BuyerPreferences>(initialValue);
-  const patch = (next: Partial<BuyerPreferences>) => setPreferences((prev) => ({ ...prev, ...next }));
+  const patch = (next: Partial<BuyerPreferences>) => onChange({ ...preferences, ...next });
 
   return (
     <div className="flex max-w-3xl flex-col gap-8">
@@ -182,25 +178,6 @@ export function PreferencesEditForm({
           onChange={(current_situation) => patch({ current_situation })}
         />
       </section>
-
-      <div className="flex justify-end gap-3">
-        <button
-          type="button"
-          onClick={onDiscard}
-          disabled={isSaving}
-          className="font-heading rounded border border-[rgba(38,38,38,0.3)] px-6 py-2.5 text-[16px] font-bold text-slate-500 disabled:opacity-50"
-        >
-          Discard Changes
-        </button>
-        <button
-          type="button"
-          onClick={() => onSave(preferences)}
-          disabled={isSaving}
-          className="bg-brand-primary-600 text-background font-heading rounded px-6 py-2.5 text-[16px] font-bold disabled:opacity-50"
-        >
-          {isSaving ? "Saving…" : "Save Preferences"}
-        </button>
-      </div>
     </div>
   );
 }
