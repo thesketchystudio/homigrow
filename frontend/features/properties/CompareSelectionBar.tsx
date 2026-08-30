@@ -44,13 +44,22 @@ export function CompareButton({ className }: { className?: string }) {
   );
 }
 
-export function CompareSelectionBar({ hideButton = false }: { hideButton?: boolean }) {
+export function CompareSelectionBar({
+  hideButton = false,
+  spread = false,
+}: {
+  hideButton?: boolean;
+  // Pushes the button to the far right of the row instead of sitting right
+  // next to the "Selected: N Properties" text — the Saved page's own Figma
+  // frame shows them inline, so this stays opt-in rather than the default.
+  spread?: boolean;
+}) {
   const ids = useCompareStore((state) => state.ids);
   const count = ids.length;
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-4">
+      <div className={cn("flex items-center gap-4", spread && "justify-between")}>
         <span className="font-body text-[14px] font-medium whitespace-nowrap text-[#586064]">
           Selected: <span className="text-[#2b3437]">{count} {count === 1 ? "Property" : "Properties"}</span>
         </span>

@@ -112,9 +112,12 @@ export function ProfileSidebar({ user, activeRoute }: { user?: UserRead; activeR
       </div>
 
       <NavGroup label="Profile" items={PROFILE_ITEMS} activeRoute={activeRoute} />
+
+      <div className="border-brand-secondary-500 border-t-[0.8px]" />
+
       <NavGroup label="Settings" items={SETTINGS_ITEMS} activeRoute={activeRoute} />
 
-      <div className="flex flex-col gap-4 border-t-[0.8px] border-slate-100 pt-4">
+      <div className="border-brand-secondary-500 flex flex-col gap-4 border-t-[0.8px] pt-4">
         <LogoutButton />
       </div>
 

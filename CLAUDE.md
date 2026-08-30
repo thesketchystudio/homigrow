@@ -1312,6 +1312,44 @@ A reader should understand the code from the comment alone.
   end-to-end afterward against the real Supabase dev DB: villa filter,
   commercial filter, and both price sorts all returned exactly the
   expected subset/order.
+- **Nav search now parses "type in area" queries, 2026-08-30** — the
+  existing `search` param on `GET /properties` (added earlier this
+  session per git history: locality/free-text search, then broadened to
+  title/description/landmark/amenities) previously did one whole-string
+  substring match, so a real nav-search query like "villas in
+  indiranagar" matched nothing — no single column contains that literal
+  phrase. New `property_service._parse_search_query()`: tokenizes the
+  query, pulls a known `PropertyType` out of it via a name/plural alias
+  map (`villa`/`villas`, `apartment`/`apartments`/`flat`/`flats`,
+  `house`/`houses`, `plot`/`plots`/`land`, `office`, `shop`/`store`,
+  `pg`/`coliving`, plus multi-word `independent house`/`co-living`
+  checked first since PropertyType's own two-word values don't
+  tokenize), drops connective stopwords ("in", "at", "near", "for", ...),
+  and returns the remaining words as an area phrase. `list_properties`
+  then filters by the structured `property_type` column (not text) plus
+  a substring match on the area words against city/locality/landmark —
+  or falls back to the original plain substring match when no type
+  token is found, so a bare keyword search (title word, amenity, ...)
+  is unaffected. A bare type word with no area (`search=villa`) also now
+  correctly matches every villa by its actual `property_type`, not just
+  ones with "Villa" literally in the title — stricter than the old
+  accidental-substring behavior. No frontend changes needed — the nav
+  search box already sends whatever's typed straight through the same
+  `search` param. 198/198 tests pass (3 new:
+  `test_search_combines_property_type_and_area`,
+  `test_search_property_type_alone_matches_by_type_not_title_text`,
+  `test_search_falls_back_to_substring_when_no_type_token`); `ruff`
+  clean. Live-verified against the real backend + Supabase dev DB + real
+  seeded demo properties: `search=villas in indiranagar` → exactly "The
+  Obsidian Estate"; `search=apartment in whitefield` → exactly
+  "Whitefield Tech Loft"; `search=villa` alone → all 3 real villas;
+  `search=indiranagar` alone (no type) → unchanged old substring
+  behavior, matching both properties in that locality regardless of
+  type. Hit the same stale-orphaned-`--reload`-worker class of bug
+  documented above while restarting the worktree server to verify (a
+  `multiprocessing` child from an earlier session had outlived its
+  parent and was still holding port 8000); killed it and started fresh
+  from this worktree before testing.
 
 ### Frontend Phase 3 (on `feature/phase_3_frontend_client`, cut from `dev`)
 - **Property Details page shipped 2026-07-29** — new `/properties/[id]`

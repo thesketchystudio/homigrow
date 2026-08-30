@@ -21,7 +21,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Heart } from "lucide-react";
 
@@ -45,7 +45,7 @@ import {
   PROPERTY_TYPE_OPTIONS,
 } from "@/features/auth/preferences/options";
 import type { BuyerPreferences } from "@/features/auth/preferences/types";
-import { formatINR } from "@/lib/utils";
+import { cn, formatINR } from "@/lib/utils";
 import { getMe, updateMe, type UserRead } from "@/lib/api/endpoints/users";
 import { toast } from "@/lib/toast";
 
@@ -56,6 +56,22 @@ function extractBuyerPreferences(user: UserRead): BuyerPreferences {
 
 function hasAnyPreference(preferences: BuyerPreferences): boolean {
   return Object.values(preferences).some((value) => (Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null));
+}
+
+// Groups the flat BuyerPreferences fields into the same 6 categories the
+// signup wizard collects them in (BudgetLocationStep..CurrentSituationStep),
+// so the read-only view mirrors how the user actually entered the data
+// instead of one long undifferentiated list. Figma's own mock for this tab
+// only shows 3 example categories with no group chrome specified, so the
+// group heading + 2-column field grid below is a layout decision built on
+// top of that mock, not a literal pull.
+function PreferenceGroup({ title, columns = 2, children }: { title: string; columns?: 1 | 2; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-4">
+      <h3 className="font-heading text-[16px] font-bold text-[#1a1a1a]">{title}</h3>
+      <div className={cn("grid gap-x-6 gap-y-6", columns === 2 && "sm:grid-cols-2")}>{children}</div>
+    </section>
+  );
 }
 
 export function PreferencesTab() {
@@ -133,36 +149,71 @@ function PreferencesForm({ user }: { user: UserRead }) {
       {mode === "edit" ? (
         <PreferencesEditForm value={draft} onChange={setDraft} />
       ) : hasAnyPreference(preferences) ? (
-        <div className="flex flex-col gap-8">
-          {(preferences.budget_min !== undefined || preferences.budget_max !== undefined) && (
-            <SingleChipSection
-              label="Budget Range"
-              value={`${formatINR(preferences.budget_min ?? 0)} – ${formatINR(preferences.budget_max ?? 0)}`}
-            />
+        <div className="flex flex-col gap-10">
+          {(preferences.budget_min !== undefined ||
+            preferences.budget_max !== undefined ||
+            (preferences.preferred_cities?.length ?? 0) > 0) && (
+            <PreferenceGroup title="Budget & Location">
+              {(preferences.budget_min !== undefined || preferences.budget_max !== undefined) && (
+                <SingleChipSection
+                  label="Budget Range"
+                  value={`${formatINR(preferences.budget_min ?? 0)} – ${formatINR(preferences.budget_max ?? 0)}`}
+                />
+              )}
+              <OverflowChipsSection label="Preferred Cities/Towns" items={preferences.preferred_cities ?? []} />
+            </PreferenceGroup>
           )}
-          <OverflowChipsSection label="Preferred Cities/Towns" items={preferences.preferred_cities ?? []} />
-          <OverflowChipsSection label="Preferred Type of Home" items={labelsFor(PROPERTY_TYPE_OPTIONS, preferences.property_types)} />
-          <OverflowChipsSection label="Number of Bedrooms" items={labelsFor(BEDROOM_OPTIONS, preferences.bedroom_preference)} />
-          <OverflowChipsSection label="Investment Goals" items={labelsFor(INVESTMENT_GOAL_OPTIONS, preferences.investment_goals)} />
-          {labelFor(BUY_TIMELINE_OPTIONS, preferences.buy_timeline) && (
-            <SingleChipSection label="Buy Timeline" value={labelFor(BUY_TIMELINE_OPTIONS, preferences.buy_timeline)!} />
+
+          {((preferences.property_types?.length ?? 0) > 0 || (preferences.bedroom_preference?.length ?? 0) > 0) && (
+            <PreferenceGroup title="Property Type">
+              <OverflowChipsSection label="Preferred Type of Home" items={labelsFor(PROPERTY_TYPE_OPTIONS, preferences.property_types)} />
+              <OverflowChipsSection label="Number of Bedrooms" items={labelsFor(BEDROOM_OPTIONS, preferences.bedroom_preference)} />
+            </PreferenceGroup>
           )}
-          <OverflowChipsSection label="Exit Strategy" items={labelsFor(EXIT_STRATEGY_OPTIONS, preferences.exit_strategies)} />
-          {labelFor(HOLD_PERIOD_OPTIONS, preferences.target_hold_period) && (
-            <SingleChipSection label="Target Hold Period" value={labelFor(HOLD_PERIOD_OPTIONS, preferences.target_hold_period)!} />
+
+          {((preferences.investment_goals?.length ?? 0) > 0 || labelFor(BUY_TIMELINE_OPTIONS, preferences.buy_timeline)) && (
+            <PreferenceGroup title="Investment Goal">
+              <OverflowChipsSection label="Investment Goals" items={labelsFor(INVESTMENT_GOAL_OPTIONS, preferences.investment_goals)} />
+              {labelFor(BUY_TIMELINE_OPTIONS, preferences.buy_timeline) && (
+                <SingleChipSection label="Buy Timeline" value={labelFor(BUY_TIMELINE_OPTIONS, preferences.buy_timeline)!} />
+              )}
+            </PreferenceGroup>
           )}
-          {labelFor(ROI_OPTIONS, preferences.target_roi) && (
-            <SingleChipSection label="Target Return on Investment" value={labelFor(ROI_OPTIONS, preferences.target_roi)!} />
+
+          {((preferences.exit_strategies?.length ?? 0) > 0 ||
+            labelFor(HOLD_PERIOD_OPTIONS, preferences.target_hold_period) ||
+            labelFor(ROI_OPTIONS, preferences.target_roi) ||
+            labelFor(RISK_TOLERANCE_OPTIONS, preferences.risk_tolerance) ||
+            typeof preferences.notify_market_timing === "boolean") && (
+            <PreferenceGroup title="Exit Strategy">
+              <OverflowChipsSection label="Exit Strategy" items={labelsFor(EXIT_STRATEGY_OPTIONS, preferences.exit_strategies)} />
+              {labelFor(HOLD_PERIOD_OPTIONS, preferences.target_hold_period) && (
+                <SingleChipSection label="Target Hold Period" value={labelFor(HOLD_PERIOD_OPTIONS, preferences.target_hold_period)!} />
+              )}
+              {labelFor(ROI_OPTIONS, preferences.target_roi) && (
+                <SingleChipSection label="Target Return on Investment" value={labelFor(ROI_OPTIONS, preferences.target_roi)!} />
+              )}
+              {labelFor(RISK_TOLERANCE_OPTIONS, preferences.risk_tolerance) && (
+                <SingleChipSection label="Risk Tolerance" value={labelFor(RISK_TOLERANCE_OPTIONS, preferences.risk_tolerance)!} />
+              )}
+              {typeof preferences.notify_market_timing === "boolean" && (
+                <SingleChipSection label="Market Timing Alerts" value={preferences.notify_market_timing ? "On" : "Off"} />
+              )}
+            </PreferenceGroup>
           )}
-          {labelFor(RISK_TOLERANCE_OPTIONS, preferences.risk_tolerance) && (
-            <SingleChipSection label="Risk Tolerance" value={labelFor(RISK_TOLERANCE_OPTIONS, preferences.risk_tolerance)!} />
+
+          {((preferences.development_stage?.length ?? 0) > 0 || (preferences.amenities?.length ?? 0) > 0) && (
+            <PreferenceGroup title="Development Stage">
+              <OverflowChipsSection label="Development Stage" items={labelsFor(DEVELOPMENT_STAGE_OPTIONS, preferences.development_stage)} />
+              <OverflowChipsSection label="Must-Have Amenities" items={labelsFor(AMENITY_OPTIONS, preferences.amenities)} />
+            </PreferenceGroup>
           )}
-          {typeof preferences.notify_market_timing === "boolean" && (
-            <SingleChipSection label="Market Timing Alerts" value={preferences.notify_market_timing ? "On" : "Off"} />
+
+          {(preferences.current_situation?.length ?? 0) > 0 && (
+            <PreferenceGroup title="Current Situation" columns={1}>
+              <OverflowChipsSection label="Current Situation" items={labelsFor(CURRENT_SITUATION_OPTIONS, preferences.current_situation)} />
+            </PreferenceGroup>
           )}
-          <OverflowChipsSection label="Development Stage" items={labelsFor(DEVELOPMENT_STAGE_OPTIONS, preferences.development_stage)} />
-          <OverflowChipsSection label="Must-Have Amenities" items={labelsFor(AMENITY_OPTIONS, preferences.amenities)} />
-          <OverflowChipsSection label="Current Situation" items={labelsFor(CURRENT_SITUATION_OPTIONS, preferences.current_situation)} />
         </div>
       ) : (
         <EmptyState
