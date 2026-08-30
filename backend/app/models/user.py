@@ -17,11 +17,11 @@ from sqlalchemy import (
     Text,
     text,
 )
-from sqlalchemy.dialects.postgresql import ENUM as PGEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base, TimestampMixin
+from app.models._helpers import _pg_enum
 from app.models.enums import UserRole
 
 
@@ -48,17 +48,13 @@ class User(Base, TimestampMixin):
     # Postgres dialect, so it would attempt to recreate a type this
     # column's migration already creates explicitly.
     role = Column(
-        PGEnum(
-            UserRole,
-            name="user_role",
-            create_type=False,
-            values_callable=lambda enum_cls: [member.value for member in enum_cls],
-        ),
+        _pg_enum(UserRole, "user_role"),
         nullable=False,
         server_default=UserRole.client.value,
     )
 
     is_active = Column(Boolean, nullable=False, server_default=text("true"))
+    # TODO: never set to true anywhere in the codebase today — phone is not actually verified in any current signup/login flow, so this flag is effectively dead/always-false.
     is_phone_verified = Column(Boolean, nullable=False, server_default=text("false"))
     is_email_verified = Column(Boolean, nullable=False, server_default=text("false"))
 
@@ -70,9 +66,9 @@ class User(Base, TimestampMixin):
 
     avatar_url = Column(Text, nullable=True)
 
-    # Notification/privacy/display prefs read by the profile tabs
-    # (02_Database_Design.md M2 note); an opaque bag the API layer
-    # merges shallowly rather than validating field-by-field here.
+    # Notification/privacy/display prefs read by the profile tabs; an
+    # opaque bag the API layer merges shallowly rather than validating
+    # field-by-field here.
     preferences = Column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
 
     # uselist=False: a user has at most one broker profile, lazily

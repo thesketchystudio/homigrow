@@ -3,9 +3,9 @@ app/models/refresh_token.py
 
 A single issued refresh token, identified by the hash of its opaque
 value (the raw value is never stored). Powers session listing/
-revocation and rotation-on-refresh (P2-T05) — presenting an
-already-revoked token's hash is the theft signal that revokes every
-session belonging to that user.
+revocation and rotation-on-refresh — presenting an already-revoked
+token's hash is the theft signal that revokes every session belonging
+to that user.
 """
 
 from sqlalchemy import Column, DateTime, ForeignKey, Index, String, Text, text

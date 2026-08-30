@@ -3,8 +3,8 @@
 // GET /properties/{id} serves the public Property Details screen,
 // GET /properties serves the Listings search grid.
 
-import { apiRequest } from "@/lib/api/client";
-import type { Furnishing, ListingType, MediaType, PropertyType, VerificationStatus } from "@/lib/enums";
+import { apiRequest, apiRequestMultipart } from "@/lib/api/client";
+import type { Furnishing, ListingType, MediaType, PropertyStatus, PropertyType, VerificationStatus } from "@/lib/enums";
 
 export type PropertyMediaRead = {
   id: string;
@@ -29,6 +29,7 @@ export type PropertyRead = {
   id: string;
   title: string;
   description?: string;
+  status: PropertyStatus;
   listing_type: ListingType;
   property_type: PropertyType;
   price: number;
@@ -180,4 +181,46 @@ export type NeighborhoodSummary = {
 
 export function getNeighborhoods(limit = 4): Promise<NeighborhoodSummary[]> {
   return apiRequest<NeighborhoodSummary[]>(`/properties/neighborhoods?limit=${limit}`);
+}
+
+// Broker-authenticated Post Property wizard. createProperty fires once,
+// at the wizard's final step — Steps 1 (info) and 2 (media) are only
+// collected client-side until then, since the backend can't create a
+// valid row before price is known (Property.price is NOT NULL with a
+// `price > 0` check). See PropertyCreateRequest's docstring in
+// app/schemas/properties.py for the full reasoning.
+export type PropertyCreateInput = {
+  title: string;
+  listing_type: ListingType;
+  property_type: PropertyType;
+  bhk?: number;
+  bathrooms?: number;
+  area_sqft?: number;
+  furnishing?: Furnishing;
+  built_year?: number;
+  amenities: string[];
+  address_line: string;
+  locality: string;
+  city: string;
+  state: string;
+  pincode: string;
+  landmark?: string;
+  price: number;
+  maintenance_monthly?: number;
+  deposit?: number;
+  is_negotiable: boolean;
+};
+
+export function createProperty(data: PropertyCreateInput): Promise<PropertyRead> {
+  return apiRequest<PropertyRead>("/properties", { method: "POST", body: data });
+}
+
+export function uploadPropertyMedia(propertyId: string, images: File[]): Promise<PropertyMediaRead[]> {
+  const formData = new FormData();
+  for (const image of images) formData.append("images", image);
+  return apiRequestMultipart<PropertyMediaRead[]>(`/properties/${propertyId}/media`, formData);
+}
+
+export function submitProperty(propertyId: string): Promise<PropertyRead> {
+  return apiRequest<PropertyRead>(`/properties/${propertyId}/submit`, { method: "POST" });
 }

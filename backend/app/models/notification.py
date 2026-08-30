@@ -7,11 +7,11 @@ inserting rows directly, so delivery channels can be added centrally.
 """
 
 from sqlalchemy import Column, DateTime, ForeignKey, Index, String, Text, text
-from sqlalchemy.dialects.postgresql import ENUM as PGEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
+from app.models._helpers import _pg_enum
 from app.models.enums import NotificationType
 
 
@@ -26,12 +26,7 @@ class Notification(Base):
     # postgresql.ENUM is used instead of the generic sa.Enum type — see
     # app/models/user.py for the reason.
     type = Column(
-        PGEnum(
-            NotificationType,
-            name="notification_type",
-            create_type=False,
-            values_callable=lambda enum_cls: [member.value for member in enum_cls],
-        ),
+        _pg_enum(NotificationType, "notification_type"),
         nullable=False,
     )
     title = Column(String(150), nullable=False)

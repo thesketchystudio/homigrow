@@ -2,10 +2,8 @@
 app/services/email_service.py
 
 Thin Resend adapter for outbound transactional email, isolated behind
-this module so switching providers later stays a one-file change
-(same precedent as the shelved sms_service.py adapter, ADR-011). Backs
-OTP delivery (09_Phase_2.md amendment, 2026-07-14) and password-reset
-delivery (P2-T30, 2026-07-17).
+this module so switching providers later stays a one-file change.
+Backs OTP delivery and password-reset delivery.
 """
 
 import logging

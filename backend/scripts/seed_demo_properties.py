@@ -43,12 +43,20 @@ DEFAULT_BROKER_NAME = "Vikram Sethi"
 DEFAULT_BROKER_PASSWORD = "Preetham-test"
 
 # (title, listing_type, property_type, price, bhk, bathrooms, area_sqft,
-#  furnishing, city, locality, state, pincode, amenities, image)
+#  furnishing, city, locality, state, pincode, amenities, image,
+#  metro_distance_m)
 #
 # None of these have real per-property editorial copy written yet, so they
 # all share create_test_property.py's DEFAULT_DESCRIPTION (the "Architectural
 # Vision" text) rather than a placeholder — the same content shown for every
 # one of them until real per-listing descriptions exist.
+#
+# metro_distance_m was previously left unset on every one of these (only
+# create_test_property.py's single Obsidian Estate demo had it), which is
+# why the Property Details page's Metro quick-stat appeared "present for
+# some, not others" — a seed-data gap, not a frontend bug. Set for every
+# listing with a plausible nearby metro/transit link; left as None for the
+# ECR Beachside Plot, which is realistically far from any station.
 DEMO_PROPERTIES = [
     (
         "Emerald Heights Apartment",
@@ -65,6 +73,7 @@ DEMO_PROPERTIES = [
         "560038",
         ["Swimming pool", "Gym", "Metro station"],
         "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1200",
+        1200,
     ),
     (
         "Whitefield Tech Loft",
@@ -81,6 +90,7 @@ DEMO_PROPERTIES = [
         "560066",
         ["Gym", "Metro station"],
         "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=1200",
+        2500,
     ),
     (
         "Marine Drive Residency",
@@ -97,6 +107,7 @@ DEMO_PROPERTIES = [
         "400002",
         ["Swimming pool", "Sea view"],
         "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=1200",
+        700,
     ),
     (
         "Bandra Garden Villa",
@@ -113,6 +124,7 @@ DEMO_PROPERTIES = [
         "400050",
         ["Swimming pool", "Private Garden"],
         "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200",
+        1800,
     ),
     (
         "Vasant Vihar Independent House",
@@ -129,6 +141,7 @@ DEMO_PROPERTIES = [
         "110057",
         ["Private Garden", "Parking"],
         "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=1200",
+        3200,
     ),
     (
         "Cyber City Co-living PG",
@@ -145,6 +158,7 @@ DEMO_PROPERTIES = [
         "122002",
         ["Wifi", "Meals Included", "Metro station"],
         "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200",
+        550,
     ),
     (
         "Koregaon Park Retail Space",
@@ -161,6 +175,7 @@ DEMO_PROPERTIES = [
         "411001",
         ["Metro station"],
         "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200",
+        1100,
     ),
     (
         "HITEC City Office Suite",
@@ -177,6 +192,7 @@ DEMO_PROPERTIES = [
         "500081",
         ["Parking", "Metro station"],
         "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200",
+        900,
     ),
     (
         "ECR Beachside Plot",
@@ -193,6 +209,7 @@ DEMO_PROPERTIES = [
         "600041",
         [],
         "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200",
+        None,
     ),
     (
         "Sarjapur Modern Villa",
@@ -209,6 +226,7 @@ DEMO_PROPERTIES = [
         "560035",
         ["Swimming pool", "Private Garden", "Metro station"],
         "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?w=1200",
+        4200,
     ),
 ]
 
@@ -261,6 +279,7 @@ def seed_demo_properties() -> None:
             pincode,
             amenities,
             image_url,
+            metro_distance_m,
         ) in enumerate(DEMO_PROPERTIES):
             if db.query(Property).filter(Property.title == title).first() is not None:
                 print(f"Skipping (already exists): {title!r}")
@@ -285,6 +304,7 @@ def seed_demo_properties() -> None:
                 city=city,
                 state=state,
                 pincode=pincode,
+                metro_distance_m=metro_distance_m,
                 # Staggered so "newest" sort has a real, distinct order across the seed set.
                 published_at=now - timedelta(hours=index),
             )

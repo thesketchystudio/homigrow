@@ -8,11 +8,11 @@ a user signs up as, or upgrades to, a broker.
 """
 
 from sqlalchemy import Column, ForeignKey, SmallInteger, String, Text, text
-from sqlalchemy.dialects.postgresql import ENUM as PGEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base, TimestampMixin
+from app.models._helpers import _pg_enum
 from app.models.enums import VerificationStatus
 
 
@@ -37,12 +37,7 @@ class BrokerProfile(Base, TimestampMixin):
     # postgresql.ENUM is used instead of the generic sa.Enum type — see
     # app/models/user.py for the reason.
     verification_status = Column(
-        PGEnum(
-            VerificationStatus,
-            name="verification_status",
-            create_type=False,
-            values_callable=lambda enum_cls: [member.value for member in enum_cls],
-        ),
+        _pg_enum(VerificationStatus, "verification_status"),
         nullable=False,
         server_default=VerificationStatus.unverified.value,
     )

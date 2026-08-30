@@ -43,6 +43,22 @@ def _mock_send_password_reset_email(monkeypatch):
     monkeypatch.setattr("app.services.email_service.send_password_reset_email", lambda *args, **kwargs: None)
 
 
+@pytest.fixture(autouse=True)
+def _mock_s3_client(monkeypatch):
+    """
+    Prevents tests from making real Supabase Storage (S3) calls, while
+    leaving storage_service.upload_broker_document's own validation
+    logic (content type, size) genuinely exercised — only the boto3
+    client itself is stubbed.
+    """
+
+    class _FakeS3Client:
+        def put_object(self, **kwargs):
+            return None
+
+    monkeypatch.setattr("app.services.storage_service._get_client", lambda: _FakeS3Client())
+
+
 @pytest.fixture()
 def db_session():
     """Yields a database session bound to a transaction that is rolled back after the test."""

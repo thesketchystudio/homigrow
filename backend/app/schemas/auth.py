@@ -1,10 +1,9 @@
 """
 app/schemas/auth.py
 
-Pydantic request/response shapes for the auth endpoints. Mirrors the
-resource catalog in docs/architecture/05_API_Design.md — schemas
+Pydantic request/response shapes for the auth endpoints. Schemas
 define API shape, SQLAlchemy models define storage; the two are never
-the same object (03_Backend_Architecture.md).
+the same object.
 """
 
 from typing import Optional
@@ -19,9 +18,8 @@ from app.models.enums import OTPPurpose, UserRole
 class SignupRequest(BaseModel):
     """
     Password-path signup input. email is required (not Optional) since
-    it's now the signup-verification OTP's delivery address — the
-    Figma design collects it alongside phone at signup, not later
-    (09_Phase_2.md amendment, 2026-07-14).
+    it's the signup-verification OTP's delivery address — the signup
+    design collects it alongside phone at signup, not later.
     """
 
     phone: str
@@ -32,15 +30,34 @@ class SignupRequest(BaseModel):
     city: Optional[str] = None
     state: Optional[str] = None
 
+    # Broker-only "Verification Details" fields from the Figma signup
+    # form (Step 2) — ignored by the service for role=client, same as
+    # how a client sending them would just have them silently dropped.
+    company_name: Optional[str] = None
+    rera_number: Optional[str] = None
+    service_area: Optional[str] = None
+
     @field_validator("role")
     @classmethod
     def role_must_be_signupable(cls, value: UserRole) -> UserRole:
         """
         Blocks admin creation through signup — admin accounts are
-        provisioned only by script/console (14_Security.md §RBAC).
+        provisioned only by script/console.
         """
         if value == UserRole.admin:
             raise ValueError("role must be client or broker")
+        return value
+
+    @field_validator("rera_number")
+    @classmethod
+    def rera_number_sane_length(cls, value: Optional[str]) -> Optional[str]:
+        """
+        RERA numbers have no single national format — each state
+        authority issues its own scheme — so this is a basic sanity
+        check, not a format/checksum validation.
+        """
+        if value is not None and not (5 <= len(value) <= 50):
+            raise ValueError("RERA number must be between 5 and 50 characters")
         return value
 
     @field_validator("password")
@@ -95,9 +112,8 @@ class UserOut(BaseModel):
 class TokenResponse(BaseModel):
     """
     Shared response shape for every endpoint that hands back a session
-    (login, refresh) — per 05_API_Design.md's "token response shape
-    everywhere" contract. The refresh token itself is never in this
-    body; it travels only as the httpOnly cookie.
+    (login, refresh). The refresh token itself is never in this body;
+    it travels only as the httpOnly cookie.
     """
 
     access_token: str

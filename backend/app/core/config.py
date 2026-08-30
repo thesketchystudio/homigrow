@@ -35,12 +35,13 @@ class Settings(BaseSettings):
 
     # Declared now so Settings() doesn't fail on the already-present .env
     # value (pydantic-settings forbids undeclared env vars by default).
-    # The sms_service.py MSG91 adapter itself is P2-T10, still on hold.
+    # The sms_service.py MSG91 adapter that would consume this is not
+    # currently wired up anywhere in the app.
     MSG91_AUTH_KEY: str = ""
 
     # Expected browser origin for the frontend SPA; used only to validate
     # the Origin header on the one cookie-authenticated endpoint
-    # (/auth/refresh) per 14_Security.md's CSRF stance.
+    # (/auth/refresh) as a CSRF defense.
     FRONTEND_ORIGIN: str = "http://localhost:3000"
 
     # OAuth 2.0 web client ID from Google Cloud Console, used to verify
@@ -48,6 +49,30 @@ class Settings(BaseSettings):
     # is needed since the ID-token flow never performs a server-side code
     # exchange.
     GOOGLE_CLIENT_ID: str = ""
+
+    # Broker verification document storage. Points at Supabase Storage's
+    # S3-compatible endpoint rather than Cloudflare R2 (the originally
+    # planned provider, per 00_Project_Overview.md) — R2 requires a card
+    # on file to activate even on its free tier, which wasn't available
+    # when this was built. storage_service.py talks to this purely via
+    # the S3 protocol (boto3), so swapping to R2 later is a config change,
+    # not a rewrite.
+    SUPABASE_ACCESS_KEY_ID: str = ""
+    SUPABASE_SECRET_ACCESS_KEY: str = ""
+    SUPABASE_S3_ENDPOINT: str = ""
+    SUPABASE_S3_REGION: str = ""
+    SUPABASE_S3_BUCKET: str = ""
+
+    # Project base URL, used only to build public object URLs for property
+    # media (https://<ref>.supabase.co/storage/v1/object/public/<bucket>/<key>)
+    # — distinct from SUPABASE_S3_ENDPOINT, which points at the storage
+    # subdomain's S3-compatible API and isn't the public object host.
+    SUPABASE_URL: str = ""
+
+    # Public bucket for broker-uploaded listing photos — separate from
+    # SUPABASE_S3_BUCKET (private, verification documents only), since
+    # listing photos must be publicly viewable on the client site.
+    SUPABASE_S3_BUCKET_PROPERTY_MEDIA: str = "property-media"
 
     @computed_field
     @property

@@ -4,15 +4,15 @@ app/services/auth_service.py
 Password-path signup and login, Google Sign-In, refresh-token
 issuance/rotation/revocation, email-OTP request/verify, and password
 reset. Signup creates the user (and a broker_profile row when
-role=broker) and issues an email-verification OTP (Figma "Verify your
-identity" step; MSG91/SMS is shelved, 09_Phase_2.md amendment
-2026-07-14); login checks credentials and enforces the lockout policy,
-then issues a session (access token + refresh token). google_auth()
-verifies a Google ID token and logs in or creates an account from it,
-skipping the password/OTP steps entirely. refresh() rotates a
-presented refresh token and detects reuse of an already-rotated one as
-a theft signal (14_Security.md §Token design). reset_password()
-verifies a signed, stateless reset token and revokes every session.
+role=broker) and issues an email-verification OTP — verification is
+sent to email, not phone/SMS, since that's what the signup design
+actually asks for; login checks credentials and enforces the lockout
+policy, then issues a session (access token + refresh token).
+google_auth() verifies a Google ID token and logs in or creates an
+account from it, skipping the password/OTP steps entirely. refresh()
+rotates a presented refresh token and detects reuse of an
+already-rotated one as a theft signal. reset_password() verifies a
+signed, stateless reset token and revokes every session.
 """
 
 import ipaddress
@@ -236,6 +236,9 @@ def signup(
     password: Optional[str],
     city: Optional[str] = None,
     state: Optional[str] = None,
+    company_name: Optional[str] = None,
+    rera_number: Optional[str] = None,
+    service_area: Optional[str] = None,
 ) -> User:
     """
     Creates a user (and a broker_profile row when role=broker), then
@@ -247,8 +250,16 @@ def signup(
     surface at flush time, outside any try/except around db.commit().
     city/state have no dedicated columns (users.city doesn't exist) and
     land in the same free-form preferences JSONB the profile Account tab
-    reads/writes (P2-T22) — left out entirely, not stored as empty
-    strings, when the signup form didn't send them.
+    reads/writes — left out entirely, not stored as empty strings, when
+    the signup form didn't send them.
+
+    company_name/rera_number/service_area are the broker-only
+    "Verification Details" fields from Figma's Step 2 form; only
+    written when role=broker (silently dropped otherwise, same as a
+    client sending them). service_area seeds broker_profiles.
+    service_areas — a JSONB list a broker can expand later via profile
+    edit (P4) — as a one-item list; there's no dedicated single-city
+    column since Figma's one field is just this list's first entry.
     """
     if db.query(User).filter(User.phone == phone).first() is not None:
         raise ConflictError("PHONE_TAKEN", "This phone number is already registered.")
@@ -274,7 +285,14 @@ def signup(
     db.flush()  # assigns user.id for the broker_profile FK below
 
     if role == UserRole.broker:
-        db.add(BrokerProfile(user_id=user.id))
+        db.add(
+            BrokerProfile(
+                user_id=user.id,
+                company_name=company_name,
+                rera_number=rera_number,
+                **({"service_areas": [service_area]} if service_area else {}),
+            )
+        )
 
     _issue_otp(db, email, OTPPurpose.signup)
     db.commit()
@@ -293,8 +311,8 @@ def login(
     Verifies credentials and enforces the lockout policy: 5 consecutive
     failures locks the account for 15 minutes, reset on success.
     Returns an access token, a raw refresh token, and the authenticated
-    user. Rejects a soft-deactivated account (is_active=false,
-    P2-T27) so login can't silently undo a deactivation.
+    user. Rejects a soft-deactivated account (is_active=false) so login
+    can't silently undo a deactivation.
     """
     bad_credentials = AuthError("BAD_CREDENTIALS", "Invalid phone/email or password.")
 
@@ -387,6 +405,20 @@ def google_auth(
     return access_token, refresh_token, user
 
 
+def validate_refresh_origin(origin: Optional[str]) -> None:
+    """
+    CSRF defense-in-depth for the one cookie-authenticated endpoint:
+    SameSite=Lax already blocks the cookie from being sent on most
+    cross-site requests, but browsers still attach it on some
+    same-site-adjacent navigations. A present but mismatched Origin
+    header is rejected outright; a same-origin or browser-omitted
+    Origin (non-browser clients don't always send one) is allowed
+    through.
+    """
+    if origin is not None and origin != settings.FRONTEND_ORIGIN:
+        raise REFRESH_INVALID
+
+
 def refresh(
     db: Session,
     raw_token: Optional[str],
@@ -396,9 +428,9 @@ def refresh(
     """
     Rotates a presented refresh token: revokes it and issues a new
     access/refresh pair. Presenting a token whose row is already
-    revoked is the reuse/theft signal from 14_Security.md — instead of
-    just failing, it revokes every active refresh token belonging to
-    that user, forcing re-login everywhere.
+    revoked is treated as a reuse/theft signal — instead of just
+    failing, it revokes every active refresh token belonging to that
+    user, forcing re-login everywhere.
     """
     if not raw_token:
         raise REFRESH_INVALID
@@ -451,7 +483,7 @@ def logout(db: Session, raw_token: Optional[str]) -> None:
 def forgot_password(db: Session, email: str) -> None:
     """
     Always succeeds with no signal about whether the email is
-    registered (05_API_Design.md: no enumeration). If a matching
+    registered, to avoid account enumeration. If a matching
     account exists, generates a signed, 30-minute password-reset token
     and emails a reset link via Resend (email_service.py). Always logs
     the token in non-production environments too, as a fallback
@@ -479,12 +511,12 @@ def forgot_password(db: Session, email: str) -> None:
 def reset_password(db: Session, token: str, new_password: str) -> None:
     """
     Verifies a password-reset token and sets the new password, then
-    revokes every refresh token for the user (05_API_Design.md:
-    revoke-all on reset) so a compromised session can't outlive the
-    reset. The token embeds a fingerprint of the password_hash it was
-    issued against; once this function changes password_hash, replaying
-    the same token no longer fingerprint-matches — a stateless
-    single-use mechanism, no reset_tokens table needed. Also rejects a
+    revokes every refresh token for the user so a compromised session
+    can't outlive the reset. The token embeds a fingerprint of the
+    password_hash it was issued against; once this function changes
+    password_hash, replaying the same token no longer
+    fingerprint-matches — a stateless single-use mechanism, no
+    reset_tokens table needed. Also rejects a
     reset to the same password the account already has (422
     SAME_PASSWORD) — checked against the current hash only, not a
     password-history table.

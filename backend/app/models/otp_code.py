@@ -3,19 +3,18 @@ app/models/otp_code.py
 
 A single issued OTP code, stored hashed, tagged with the purpose it
 was issued for (app.models.enums.OTPPurpose). Delivered by email via
-Resend (app/services/email_service.py) — the Figma signup design sends
-its 6-digit verification code to email, not phone/SMS; MSG91/SMS
-integration is shelved for now (09_Phase_2.md amendment, 2026-07-14;
-M4 migration renamed this table's identifier column from phone to
-email). Rows are short-lived; a daily cleanup job deletes expired ones
-(P4+) rather than this model enforcing it.
+Resend (app/services/email_service.py) — the signup design sends its
+6-digit verification code to email, not phone/SMS, so this table
+identifies codes by email rather than phone. Rows are short-lived; a
+future daily cleanup job is expected to delete expired ones rather
+than this model enforcing it.
 """
 
 from sqlalchemy import Column, DateTime, Index, SmallInteger, String, text
-from sqlalchemy.dialects.postgresql import ENUM as PGEnum
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.db.base import Base
+from app.models._helpers import _pg_enum
 from app.models.enums import OTPPurpose
 
 
@@ -32,12 +31,7 @@ class OTPCode(Base):
     # postgresql.ENUM is used instead of the generic sa.Enum type — see
     # app/models/user.py for why (create_type propagation).
     purpose = Column(
-        PGEnum(
-            OTPPurpose,
-            name="otp_purpose",
-            create_type=False,
-            values_callable=lambda enum_cls: [member.value for member in enum_cls],
-        ),
+        _pg_enum(OTPPurpose, "otp_purpose"),
         nullable=False,
     )
     attempts = Column(SmallInteger, nullable=False, server_default="0")
