@@ -13,9 +13,10 @@
 // (components/shared/Sidebar.tsx) — that primitive is a fixed-position,
 // collapsible/off-canvas app shell, which doesn't fit alongside a fixed
 // top nav and a page footer.
-// The Figma card here also shows decorative "Premium Member"/star-rating
-// content with no backing field on the User model — replaced with the
-// real is_email_verified flag instead of fabricating account status.
+// The Figma card's "Premium Member"/star-rating row has no backing field
+// on the User model — per explicit product decision it's shown as static
+// UI for every user (not derived from real tier/rating data), matching
+// Figma exactly rather than being dropped.
 //
 // `user` is optional: the nav groups and support card are static (no
 // backing data), so per Figma's own "skeleton" frames for this section
@@ -34,7 +35,7 @@
 
 import type { ComponentType } from "react";
 import Link from "next/link";
-import { Bell, Building2, CreditCard, FileText, FolderOpen, Heart, History, LogOut, Shield, User } from "lucide-react";
+import { Bell, Building2, CreditCard, FileText, FolderOpen, Heart, History, LogOut, Shield, Star, User } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -91,14 +92,21 @@ export function ProfileSidebar({ user, activeRoute }: { user?: UserRead; activeR
           </div>
         </div>
         {user ? (
-          <div className="flex flex-col gap-0.5">
+          <div className="flex flex-col items-center gap-0.5">
             <p className="font-heading text-brand-primary-600 text-[16px] font-bold">{user.full_name ?? user.phone}</p>
-            <p className="font-body text-[12px] text-slate-500">{user.is_email_verified ? "Verified Buyer" : "Unverified"}</p>
+            <p className="font-body text-[12px] text-slate-500">Premium Member</p>
+            <div className="flex items-center gap-1">
+              <Star className="size-2.5 fill-amber-400 text-amber-400" />
+              <Star className="size-2.5 fill-amber-400 text-amber-400" />
+              <Star className="size-2.5 fill-amber-400 text-amber-400" />
+              <p className="font-body text-[12px] text-slate-500">{user.is_email_verified ? "Verified Buyer" : "Unverified"}</p>
+            </div>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-1.5">
             <Skeleton className="h-4 w-28" />
             <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-3 w-24" />
           </div>
         )}
       </div>

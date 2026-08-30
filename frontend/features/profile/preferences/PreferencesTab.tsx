@@ -10,6 +10,14 @@
 // below) and every other wizard-collected field is shown, per explicit
 // product decision: this tab is now the sole view+edit surface for
 // buyer_preferences, replacing the subset AccountTab used to edit.
+//
+// The back-arrow + "Settings" title row itself lives in the shared
+// app/(client)/profile/layout.tsx, not here — per the Figma XML (node
+// 569:673/569:681 are full-width siblings of the sidebar+content
+// container, not nested inside it). This tab only registers its own
+// right-aligned action button(s) — "Edit preferences" in view mode,
+// "Discard Changes"/"Save Changes" in edit mode — into that shared header
+// via useProfileHeaderActions (node 569:679 / 569:649).
 
 "use client";
 
@@ -19,6 +27,7 @@ import { Heart } from "lucide-react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import EmptyState from "@/components/shared/EmptyState";
+import { useProfileHeaderActions } from "@/features/profile/ProfileHeaderActions";
 import { OverflowChipsSection, SingleChipSection } from "@/features/profile/preferences/OverflowChipsSection";
 import { PreferencesEditForm } from "@/features/profile/preferences/PreferencesEditForm";
 import { labelFor, labelsFor } from "@/features/profile/preferences/labels";
@@ -63,6 +72,7 @@ function PreferencesForm({ user }: { user: UserRead }) {
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<"view" | "edit">("view");
   const preferences = extractBuyerPreferences(user);
+  const [draft, setDraft] = useState<BuyerPreferences>(preferences);
 
   const mutation = useMutation({
     mutationFn: (next: BuyerPreferences) =>
@@ -82,33 +92,46 @@ function PreferencesForm({ user }: { user: UserRead }) {
     },
   });
 
+  const enterEdit = () => {
+    setDraft(preferences);
+    setMode("edit");
+  };
+
+  useProfileHeaderActions(
+    mode === "edit" ? (
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setMode("view")}
+          disabled={mutation.isPending}
+          className="font-heading rounded border border-[rgba(38,38,38,0.3)] px-6 py-2.5 text-[16px] font-bold text-slate-500 disabled:opacity-50"
+        >
+          Discard Changes
+        </button>
+        <button
+          type="button"
+          onClick={() => mutation.mutate(draft)}
+          disabled={mutation.isPending}
+          className="bg-brand-primary-600 text-background font-heading rounded px-6 py-2.5 text-[16px] font-bold disabled:opacity-50"
+        >
+          {mutation.isPending ? "Saving…" : "Save Changes"}
+        </button>
+      </div>
+    ) : (
+      <button
+        type="button"
+        onClick={enterEdit}
+        className="bg-brand-primary-600 text-background font-heading shrink-0 rounded px-4 py-2 text-[16px] font-bold whitespace-nowrap"
+      >
+        Edit preferences
+      </button>
+    ),
+  );
+
   return (
     <div className="flex max-w-3xl flex-col gap-8">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1.5">
-          <h1 className="font-heading text-brand-primary-400 text-[36px] leading-[44px] font-bold">Settings</h1>
-          <p className="font-body text-brand-primary-600/70 text-[16px] leading-[26px]">
-            Manage your architectural preferences and account security.
-          </p>
-        </div>
-        {mode === "view" && (
-          <button
-            type="button"
-            onClick={() => setMode("edit")}
-            className="bg-brand-primary-600 text-background font-heading shrink-0 rounded px-4 py-2 text-[16px] font-bold whitespace-nowrap"
-          >
-            Edit preferences
-          </button>
-        )}
-      </div>
-
       {mode === "edit" ? (
-        <PreferencesEditForm
-          initialValue={preferences}
-          isSaving={mutation.isPending}
-          onSave={(next) => mutation.mutate(next)}
-          onDiscard={() => setMode("view")}
-        />
+        <PreferencesEditForm value={draft} onChange={setDraft} />
       ) : hasAnyPreference(preferences) ? (
         <div className="flex flex-col gap-8">
           {(preferences.budget_min !== undefined || preferences.budget_max !== undefined) && (
@@ -149,7 +172,7 @@ function PreferencesForm({ user }: { user: UserRead }) {
           action={
             <button
               type="button"
-              onClick={() => setMode("edit")}
+              onClick={enterEdit}
               className="bg-brand-primary-600 text-background font-heading rounded px-6 py-2.5 text-[16px] font-bold"
             >
               Set preferences
@@ -164,13 +187,6 @@ function PreferencesForm({ user }: { user: UserRead }) {
 export function PreferencesTabSkeleton() {
   return (
     <div className="flex max-w-3xl flex-col gap-8">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1.5">
-          <Skeleton className="h-9 w-48" />
-          <Skeleton className="h-5 w-72" />
-        </div>
-        <Skeleton className="h-10 w-40 rounded" />
-      </div>
       <div className="flex flex-col gap-8">
         {Array.from({ length: 3 }).map((_, index) => (
           <div key={index} className="flex flex-col gap-4">
