@@ -1210,4 +1210,35 @@ starting)
   no basis in the actual Figma design, so it was removed. Live-verified
   with a fresh screenshot compared directly against Figma's own render —
   matches. `tsc`/`eslint` clean, zero console errors.
+- **Profile sidebar dividers, Preferences tab grouping, Compare button
+  alignment, 2026-08-30** — three flagged Figma mismatches fixed in one
+  batch. `ProfileSidebar.tsx`: the divider above "Log out" used
+  `border-slate-100` (`#f1f5f9`), visibly lighter than Figma's actual
+  divider color (`Homigrow System/Secondary/500`, `#dfe0e1` — already
+  exposed as `border-brand-secondary-500` from T20's token work); fixed,
+  and added a matching divider between the Profile and Settings nav
+  groups that Figma has (node `569:640`/`570:1970`, both same asset/
+  color) but the code never rendered at all. `PreferencesTab.tsx`: the
+  read-only view previously rendered all 15 `BuyerPreferences` fields as
+  one flat vertical list; regrouped into the same 6 categories the
+  signup wizard collects them under (`BudgetLocationStep`..
+  `CurrentSituationStep` — Budget & Location, Property Type, Investment
+  Goal, Exit Strategy, Development Stage, Current Situation), each as a
+  heading + 2-column field grid (new `PreferenceGroup` helper) instead
+  of one long list — a layout decision on top of Figma's own 3-category
+  mock, not a literal pull, confirmed with you before implementing.
+  `CompareSelectionBar.tsx`/`ComparePicker.tsx`: added an opt-in
+  `spread` prop that pushes the Compare button to the far right of its
+  row via `justify-between`, used only on `/compare` — the Saved page
+  keeps its own Figma-matched inline layout (button right next to
+  "Selected: N Properties") unchanged. `eslint`/`tsc` clean on all
+  changed files. Live-verified with Playwright against the real backend
+  + Supabase dev DB, logged in as the standing test account: sidebar
+  divider colors screenshot-matched Figma's `#dfe0e1` exactly; the
+  Preferences tab rendered all 6 real wizard-collected groups correctly
+  (Budget Range/Cities, Property Type/Bedrooms, Investment Goals/
+  Timeline, Exit Strategy/Hold Period/ROI/Risk/Market Timing,
+  Development Stage/Amenities, Current Situation); the Compare button
+  sat at the row's far right on `/compare` with the Saved page's inline
+  layout unaffected.
 
