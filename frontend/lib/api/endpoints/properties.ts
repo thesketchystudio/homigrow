@@ -5,6 +5,7 @@
 
 import { apiRequest, apiRequestMultipart } from "@/lib/api/client";
 import type { Furnishing, ListingType, MediaType, PropertyStatus, PropertyType, VerificationStatus } from "@/lib/enums";
+import type { LandDetailsValues, PlotDetailsValues } from "@/lib/validation/postProperty";
 
 export type PropertyMediaRead = {
   id: string;
@@ -46,6 +47,8 @@ export type PropertyRead = {
   parking_slots?: number;
   furnishing?: Furnishing;
   amenities: string[];
+  plot_details?: PlotDetailsValues;
+  land_details?: LandDetailsValues;
   address_line: string;
   locality: string;
   city: string;
@@ -196,9 +199,12 @@ export type PropertyCreateInput = {
   bhk?: number;
   bathrooms?: number;
   area_sqft?: number;
+  facing?: string;
   furnishing?: Furnishing;
   built_year?: number;
   amenities: string[];
+  plot_details?: PlotDetailsValues;
+  land_details?: LandDetailsValues;
   address_line: string;
   locality: string;
   city: string;
