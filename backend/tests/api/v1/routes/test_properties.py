@@ -252,6 +252,46 @@ class TestListProperties:
         assert response.status_code == 200
         assert {"Match"} == {item["title"] for item in response.json()["items"]}
 
+    def test_search_combines_property_type_and_area(self, client, db_session):
+        # "villas in <locality>" should resolve to property_type=villa AND
+        # an area match — not one dead literal-phrase substring match.
+        locality = f"Indiranagar-{uuid.uuid4().hex[:8]}"
+        city = _unique_city()
+        _make_property(db_session, title="Villa Match", city=city, locality=locality, property_type=PropertyType.villa)
+        _make_property(db_session, title="Wrong Type", city=city, locality=locality, property_type=PropertyType.apartment)
+        _make_property(db_session, title="Wrong Area", city=city, locality="Somewhere Else", property_type=PropertyType.villa)
+
+        response = client.get("/api/v1/properties", params={"search": f"villas in {locality.lower()}"})
+
+        assert response.status_code == 200
+        titles = {item["title"] for item in response.json()["items"]}
+        assert titles == {"Villa Match"}
+
+    def test_search_property_type_alone_matches_by_type_not_title_text(self, client, db_session):
+        # A villa whose title happens to contain no type-ish words at all
+        # must still match a bare "apartments" search once it's the right
+        # type — this only works via the structured property_type filter,
+        # not the old plain-substring fallback.
+        city = _unique_city()
+        _make_property(db_session, title="Emerald Heights Residency", city=city, property_type=PropertyType.apartment)
+        _make_property(db_session, title="Sunset Villa", city=city, property_type=PropertyType.villa)
+
+        response = client.get("/api/v1/properties", params={"city": city, "search": "apartments"})
+
+        assert response.status_code == 200
+        titles = {item["title"] for item in response.json()["items"]}
+        assert titles == {"Emerald Heights Residency"}
+
+    def test_search_falls_back_to_substring_when_no_type_token(self, client, db_session):
+        city = _unique_city()
+        unique_word = f"Skyline{uuid.uuid4().hex[:8]}"
+        _make_property(db_session, title=f"The {unique_word} Tower", city=city)
+
+        response = client.get("/api/v1/properties", params={"search": unique_word.lower()})
+
+        assert response.status_code == 200
+        assert unique_word in response.json()["items"][0]["title"]
+
     def test_search_finds_nothing_for_an_unrelated_term(self, client, db_session):
         city = _unique_city()
         _make_property(db_session, title="Match", city=city)
