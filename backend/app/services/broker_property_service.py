@@ -59,6 +59,8 @@ def create_property(db: Session, broker: User, data: PropertyCreateRequest) -> P
         furnishing=data.furnishing,
         built_year=data.built_year,
         amenities=data.amenities,
+        plot_details=data.plot_details.model_dump() if data.plot_details else None,
+        land_details=data.land_details.model_dump() if data.land_details else None,
         address_line=data.address_line,
         locality=data.locality,
         city=data.city,

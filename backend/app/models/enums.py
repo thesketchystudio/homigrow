@@ -45,6 +45,7 @@ class PropertyType(str, Enum):
     villa = "villa"
     independent_house = "independent_house"
     plot = "plot"
+    land = "land"
     office = "office"
     shop = "shop"
     pg_colive = "pg_colive"

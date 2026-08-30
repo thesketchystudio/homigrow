@@ -54,6 +54,8 @@ class TestCreateProperty:
         assert body["title"] == "2 BHK Luxury Flat"
         assert body["price"] == 15000000
         assert body["media"] == []
+        assert body["plot_details"] is None
+        assert body["land_details"] is None
 
     def test_requires_authentication(self, client):
         response = client.post("/api/v1/properties", json=_VALID_PAYLOAD)
@@ -73,6 +75,42 @@ class TestCreateProperty:
         response = client.post("/api/v1/properties", headers=_auth_headers(broker), json=payload)
 
         assert response.status_code == 422
+
+    def test_broker_can_create_a_plot_listing(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546012")
+        payload = {
+            **_VALID_PAYLOAD,
+            "property_type": "plot",
+            "bhk": None,
+            "bathrooms": None,
+            "plot_details": {"dimension": "30x40", "is_corner_plot": True},
+        }
+
+        response = client.post("/api/v1/properties", headers=_auth_headers(broker), json=payload)
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["property_type"] == "plot"
+        assert body["plot_details"] == {"dimension": "30x40", "is_corner_plot": True}
+        assert body["land_details"] is None
+
+    def test_broker_can_create_a_land_listing(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546013")
+        payload = {
+            **_VALID_PAYLOAD,
+            "property_type": "land",
+            "bhk": None,
+            "bathrooms": None,
+            "land_details": {"land_use": "commercial", "approvals": ["RERA", "BMRDA"]},
+        }
+
+        response = client.post("/api/v1/properties", headers=_auth_headers(broker), json=payload)
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["property_type"] == "land"
+        assert body["land_details"] == {"land_use": "commercial", "approvals": ["RERA", "BMRDA"]}
+        assert body["plot_details"] is None
 
 
 class TestUploadPropertyMedia:

@@ -34,6 +34,24 @@ class PropertyMediaRead(BaseModel):
     height: Optional[int] = None
 
 
+class PlotDetails(BaseModel):
+    """Sub-fields shown only when property_type is "plot" — stored in Property.plot_details (JSONB)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    dimension: Optional[str] = Field(default=None, max_length=50)  # e.g. "30x40"
+    is_corner_plot: Optional[bool] = None
+
+
+class LandDetails(BaseModel):
+    """Sub-fields shown only when property_type is "land" — stored in Property.land_details (JSONB)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    land_use: Optional[str] = None  # "residential" | "commercial"
+    approvals: list[str] = []  # e.g. ["RERA", "BMRDA"]
+
+
 class PropertyBrokerVerification(BaseModel):
     """Embedded on PropertyBrokerRead only when the broker has a profile."""
 
@@ -73,6 +91,8 @@ class PropertyRead(BaseModel):
     parking_slots: Optional[int] = None
     furnishing: Optional[Furnishing] = None
     amenities: list[str]
+    plot_details: Optional[PlotDetails] = None
+    land_details: Optional[LandDetails] = None
     address_line: str
     locality: str
     city: str
@@ -136,11 +156,12 @@ class PropertyCreateRequest(BaseModel):
     collect data client-side; nothing is persisted until this fires,
     because `Property.price` is NOT NULL with a `price > 0` check
     constraint, so a valid row can't exist before pricing is known.
-    Scoped to residential listings (apartment/villa/independent_house)
-    sold or rented directly by the broker — the schema itself doesn't
-    enforce that subset (the Property model and PropertyType/ListingType
-    enums already support plot/land/pg/commercial for future phases),
-    the wizard's frontend does by only offering those options.
+    Supports residential listings (apartment/villa/independent_house) plus
+    Plot and Land — PG/co-living and Commercial Building are not yet
+    offered by the wizard's frontend, though the PropertyType enum already
+    has room for them. The schema itself doesn't enforce which
+    property_type values are "allowed"; the wizard's frontend does, by
+    only offering the types it has a Step 1 sub-form for.
     """
 
     title: str = Field(min_length=1, max_length=200)
@@ -152,6 +173,8 @@ class PropertyCreateRequest(BaseModel):
     furnishing: Optional[Furnishing] = None
     built_year: Optional[int] = None
     amenities: list[str] = []
+    plot_details: Optional[PlotDetails] = None
+    land_details: Optional[LandDetails] = None
     address_line: str = Field(min_length=1, max_length=255)
     locality: str = Field(min_length=1, max_length=100)
     city: str = Field(min_length=1, max_length=100)

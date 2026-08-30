@@ -81,6 +81,10 @@ class Property(Base, TimestampMixin):
 
     # {room_type, sharing, meals, rules} — only populated when listing_type is "pg".
     pg_details = Column(JSONB, nullable=True)
+    # {dimension, is_corner_plot} — only populated when property_type is "plot".
+    plot_details = Column(JSONB, nullable=True)
+    # {land_use, approvals} — only populated when property_type is "land".
+    land_details = Column(JSONB, nullable=True)
 
     # Denormalized counter for fast reads; the events table is the source of truth.
     views_count = Column(Integer, nullable=False, server_default="0")
