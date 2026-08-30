@@ -83,6 +83,7 @@ class TestCreateProperty:
             "property_type": "plot",
             "bhk": None,
             "bathrooms": None,
+            "facing": "North-East",
             "plot_details": {"dimension": "30x40", "is_corner_plot": True},
         }
 
@@ -91,6 +92,7 @@ class TestCreateProperty:
         assert response.status_code == 200
         body = response.json()
         assert body["property_type"] == "plot"
+        assert body["facing"] == "North-East"
         assert body["plot_details"] == {"dimension": "30x40", "is_corner_plot": True}
         assert body["land_details"] is None
 

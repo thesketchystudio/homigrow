@@ -56,6 +56,7 @@ def create_property(db: Session, broker: User, data: PropertyCreateRequest) -> P
         bhk=data.bhk,
         bathrooms=data.bathrooms,
         area_sqft=data.area_sqft,
+        facing=data.facing,
         furnishing=data.furnishing,
         built_year=data.built_year,
         amenities=data.amenities,

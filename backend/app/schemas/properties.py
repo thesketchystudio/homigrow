@@ -170,6 +170,7 @@ class PropertyCreateRequest(BaseModel):
     bhk: Optional[int] = None
     bathrooms: Optional[int] = None
     area_sqft: Optional[float] = Field(default=None, gt=0)
+    facing: Optional[str] = Field(default=None, max_length=20)
     furnishing: Optional[Furnishing] = None
     built_year: Optional[int] = None
     amenities: list[str] = []
