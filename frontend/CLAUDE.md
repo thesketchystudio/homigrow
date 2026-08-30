@@ -1242,3 +1242,57 @@ starting)
   sat at the row's far right on `/compare` with the Saved page's inline
   layout unaffected.
 
+### Frontend Phase 3 — Post Property broker types (on
+`feature/phase_3_frontend_broker`, cut from `origin/dev` 2026-08-30 —
+first use of the new `<phase>_frontend_broker`/`<phase>_backend_broker`
+naming convention going forward for broker-only Post Property work,
+separate from the general `<phase>_frontend_client` branch)
+- **Plot + Land added to the Post Property wizard, 2026-08-30** — first
+  of a planned one-at-a-time rollout (Plot+Land now, PG/Co-living and
+  Commercial Building later) closing the gap between the wizard
+  (previously residential-only: apartment/villa/independent_house) and
+  the real Figma "Broker view > post property" design's full Property
+  Type dropdown, following the matching backend work on
+  `feature/phase_3_backend_broker`. `PropertyInfoStep.tsx`'s Step 1 now
+  swaps in a type-specific sub-form below Built Year: Plot gets Plot
+  Dimension, a Facing dropdown, and a Corner Plot Yes/No toggle; Land
+  gets a Land Use dropdown (Residential/Commercial), reuses the existing
+  Total Area field, and an "Approval / Classification" checklist (Podi,
+  Change of Land, Conversion, RERA, BMRDA) — matching the Figma "Plot
+  Details"/"Land Details" blocks exactly. Bed/Bath/Furnishing/Amenities
+  stay scoped to residential types only, unchanged. Facing's 8-point
+  compass option list isn't from Figma (its Plot Details frame only
+  showed a placeholder, no real option list) — standard Indian
+  real-estate convention used instead, same judgment call this codebase
+  already made for the Amenities list. New `PropertyType.land` in
+  `lib/enums.ts` (was missing entirely — a real gap, since that file's
+  own comment requires it stay byte-identical to the backend enum); new
+  `plotDetailsSchema`/`landDetailsSchema`/`POSTABLE_PROPERTY_TYPES`/
+  `FACING_OPTIONS`/`LAND_APPROVAL_OPTIONS` in
+  `lib/validation/postProperty.ts`; `PropertyCreateInput`/`PropertyRead`
+  in `lib/api/endpoints/properties.ts` gained `facing`/`plot_details`/
+  `land_details`. **Found and fixed a real backend gap while building
+  this**, on `feature/phase_3_backend_broker`: `Property.facing` has
+  existed as a column since M1 and was already readable via
+  `PropertyRead`, but `PropertyCreateRequest` never accepted it as
+  input, so there was no way for any wizard step to actually set it —
+  added `facing: Optional[str]` to the create schema and wired it
+  through `broker_property_service.create_property()`. `next build` and
+  `tsc --noEmit` both clean. Live-verified end-to-end with Playwright
+  against the real backend + Supabase dev DB, logged in as the standing
+  test broker: created one real Land listing (Land Use, Total Area,
+  Podi approval checked) and one real Plot listing (Plot Dimension,
+  Facing = North-East, Corner Plot = Yes) all the way through photo
+  upload and final submit — both landed in `status: pending` with
+  `facing`/`plot_details`/`land_details` persisted exactly as entered,
+  confirmed via direct SQL; both deleted afterward.
+  **Incidental fix, not part of this task's scope but blocking its own
+  verification:** the backend worktree's `.env` had all 7
+  `SUPABASE_S3_*`/`SUPABASE_URL` storage keys commented out (stale state
+  left over from a previous session, matching the documented worktree-env
+  gotcha) — caused every media upload to 500 with an unhandled
+  `ValueError: Invalid endpoint` from boto3, which the browser reported
+  misleadingly as a CORS failure. Uncommented them back (values already
+  correct, just disabled) and restarted the dev server; not a code
+  change, so nothing to commit.
+
