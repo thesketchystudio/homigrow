@@ -17,6 +17,7 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
+import { getRoleHomePath } from "@/lib/auth/roleHome";
 import { ensureAuthResolved } from "@/lib/auth/session";
 import { useAuthStore } from "@/lib/stores/auth";
 import type { UserRole } from "@/lib/enums";
@@ -51,10 +52,10 @@ export function AuthGuard({
   useEffect(() => {
     if (status === "unauthenticated") {
       router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
-    } else if (status === "authenticated" && !roleAllowed) {
-      router.replace("/");
+    } else if (status === "authenticated" && !roleAllowed && user) {
+      router.replace(getRoleHomePath(user.role));
     }
-  }, [status, roleAllowed, pathname, router]);
+  }, [status, roleAllowed, pathname, router, user]);
 
   if (status !== "authenticated" || !roleAllowed) {
     return <>{fallback}</>;
