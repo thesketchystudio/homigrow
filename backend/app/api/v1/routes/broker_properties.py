@@ -46,6 +46,30 @@ def upload_property_media(
     return [PropertyMediaRead.model_validate(item) for item in media]
 
 
+@router.post("/{property_id}/media/video", response_model=PropertyMediaRead)
+def upload_property_video(
+    property_id: UUID,
+    user: RequireBroker,
+    video: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> PropertyMediaRead:
+    """Uploads a property walkthrough or drone video; 403 if the property isn't owned by the caller."""
+    media = broker_property_service.add_video(db, user, property_id, video.file.read(), video.content_type)
+    return PropertyMediaRead.model_validate(media)
+
+
+@router.post("/{property_id}/jv-agreement", response_model=PropertyRead)
+def upload_jv_agreement(
+    property_id: UUID,
+    user: RequireBroker,
+    document: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> PropertyRead:
+    """Uploads the JV agreement document; 422 if the property isn't flagged as a JV property."""
+    property_ = broker_property_service.upload_jv_agreement(db, user, property_id, document.file.read(), document.content_type)
+    return PropertyRead.model_validate(property_)
+
+
 @router.post("/{property_id}/submit", response_model=PropertyRead)
 def submit_property(
     property_id: UUID,

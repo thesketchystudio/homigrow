@@ -49,6 +49,25 @@ class PropertyType(str, Enum):
     office = "office"
     shop = "shop"
     pg_colive = "pg_colive"
+    # Rent-only, per the Post Property wizard's "Commercial & Spaces" dropdown group.
+    commercial_building = "commercial_building"
+    built_to_suit = "built_to_suit"
+
+
+class PriceFlexibility(str, Enum):
+    """How open a broker is to negotiating a listing's price."""
+
+    fixed = "fixed"
+    negotiable = "negotiable"
+    highly_flexible = "highly_flexible"
+
+
+class PaymentStructure(str, Enum):
+    """How a buyer is expected to pay for a listing."""
+
+    full_payment = "full_payment"
+    emi_installments = "emi_installments"
+    construction_linked = "construction_linked"
 
 
 class Furnishing(str, Enum):

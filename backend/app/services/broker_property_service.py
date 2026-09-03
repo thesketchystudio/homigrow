@@ -50,9 +50,17 @@ def create_property(db: Session, broker: User, data: PropertyCreateRequest) -> P
         listing_type=data.listing_type,
         property_type=data.property_type,
         price=data.price,
+        price_per_sqft=data.price_per_sqft,
+        token_amount=data.token_amount,
         maintenance_monthly=data.maintenance_monthly,
         deposit=data.deposit,
         is_negotiable=data.is_negotiable,
+        price_flexibility=data.price_flexibility,
+        payment_structure=data.payment_structure,
+        stamp_duty_percent=data.stamp_duty_percent,
+        registration_fee_percent=data.registration_fee_percent,
+        brokerage_included=data.brokerage_included,
+        brokerage_percent=data.brokerage_percent,
         bhk=data.bhk,
         bathrooms=data.bathrooms,
         area_sqft=data.area_sqft,
@@ -62,6 +70,10 @@ def create_property(db: Session, broker: User, data: PropertyCreateRequest) -> P
         amenities=data.amenities,
         plot_details=data.plot_details.model_dump() if data.plot_details else None,
         land_details=data.land_details.model_dump() if data.land_details else None,
+        pg_details=data.pg_details.model_dump() if data.pg_details else None,
+        is_jv_property=data.is_jv_property,
+        jv_details=data.jv_details.model_dump() if data.jv_details else None,
+        virtual_tour_url=data.virtual_tour_url,
         address_line=data.address_line,
         locality=data.locality,
         city=data.city,
@@ -102,6 +114,46 @@ def add_media(db: Session, broker: User, property_id: UUID, uploads: list[tuple[
     for media in created:
         db.refresh(media)
     return created
+
+
+def add_video(db: Session, broker: User, property_id: UUID, content: bytes, content_type: str) -> PropertyMedia:
+    """
+    Uploads one property video (walkthrough or drone footage) and creates
+    its PropertyMedia row. Ordered after any existing media, and never
+    treated as the cover image — cover selection stays photo-only.
+    """
+    property_ = _get_owned_property(db, broker, property_id)
+    url = storage_service.upload_property_video(property_.id, content, content_type)
+    media = PropertyMedia(
+        property_id=property_.id,
+        media_type=MediaType.video,
+        url=url,
+        position=len(property_.media),
+        is_cover=False,
+    )
+    db.add(media)
+    db.commit()
+    db.refresh(media)
+    return media
+
+
+def upload_jv_agreement(db: Session, broker: User, property_id: UUID, content: bytes, content_type: str) -> Property:
+    """
+    Uploads the JV agreement document for a property already flagged as a
+    joint venture and records its (private) object key on jv_details.
+    """
+    property_ = _get_owned_property(db, broker, property_id)
+    if not property_.is_jv_property:
+        raise ValidationFailed(
+            "NOT_JV_PROPERTY",
+            "This property isn't flagged as a JV property.",
+            {"jv_details": "This property isn't flagged as a JV property."},
+        )
+    object_key = storage_service.upload_property_document(property_.id, content, content_type)
+    property_.jv_details = {**(property_.jv_details or {}), "agreement_document_key": object_key}
+    db.commit()
+    db.refresh(property_)
+    return property_
 
 
 def submit_property(db: Session, broker: User, property_id: UUID) -> Property:
