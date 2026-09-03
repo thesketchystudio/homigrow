@@ -26,6 +26,9 @@ type AuthSelectFieldProps = {
   error?: string;
   disabled?: boolean;
   className?: string;
+  // Overrides the default label color — e.g. the Post Property wizard's
+  // Figma labels are darker (rgba(26,26,26,0.8)) than the auth flow's.
+  labelClassName?: string;
 };
 
 function normalizeOption(option: SelectOption) {
@@ -42,10 +45,11 @@ export function AuthSelectField({
   error,
   disabled,
   className,
+  labelClassName,
 }: AuthSelectFieldProps) {
   return (
     <div className={cn("flex w-full flex-col gap-3", className)}>
-      <span className="font-body font-bold text-[12px] leading-[18px] text-brand-primary-100">{label}</span>
+      <span className={cn("font-body font-bold text-[12px] leading-[18px] text-brand-primary-100", labelClassName)}>{label}</span>
       <Select value={value || undefined} onValueChange={onValueChange} disabled={disabled}>
         <SelectTrigger
           aria-invalid={Boolean(error)}

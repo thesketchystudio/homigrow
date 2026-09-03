@@ -241,6 +241,14 @@ export type PropertyCreateInput = {
   brokerage_percent?: number;
 };
 
+// Broker's own listings across every status (draft included) — backs the
+// Dashboard/Listings pages' empty-state check.
+export type BrokerPropertyListItem = PropertyListItem & { status: PropertyStatus };
+
+export function listMyProperties(): Promise<BrokerPropertyListItem[]> {
+  return apiRequest<BrokerPropertyListItem[]>("/properties/mine");
+}
+
 export function createProperty(data: PropertyCreateInput): Promise<PropertyRead> {
   return apiRequest<PropertyRead>("/properties", { method: "POST", body: data });
 }

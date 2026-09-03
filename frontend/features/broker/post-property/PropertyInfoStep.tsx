@@ -20,6 +20,7 @@ import { JVPartnersSection } from "@/features/broker/post-property/JVPartnersSec
 import { PGDetailsSection } from "@/features/broker/post-property/PGDetailsSection";
 import { Furnishing, ListingType, PropertyType } from "@/lib/enums";
 import { cn, toOptionalNumber } from "@/lib/utils";
+import { toast } from "@/lib/toast";
 import {
   FACING_OPTIONS,
   LAND_APPROVAL_OPTIONS,
@@ -112,13 +113,11 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
   };
 
   const onSubmit = handleSubmit(onContinue);
+  const labelClassName = "text-brand-primary-600/80";
 
   return (
     <form onSubmit={onSubmit} className="flex w-full flex-col gap-8">
-      <div className="flex flex-col gap-2">
-        <h1 className="font-heading text-[28px] font-bold text-foreground">List your property</h1>
-        <p className="font-body text-[16px] text-muted-foreground">Tell us about the property you&apos;re listing.</p>
-      </div>
+      <h1 className="font-heading text-[48px] font-bold leading-15 text-brand-primary-600">Post your listing</h1>
 
       <PostPropertyStepper current="info" />
       <FreePlanUsageBar />
@@ -126,25 +125,33 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         <div className="flex flex-col gap-8 lg:col-span-2">
           <div className="flex items-center justify-between">
-            <span className="font-body font-bold text-[12px] uppercase tracking-[1px] text-muted-foreground">Listing Type</span>
-            <div className="flex rounded-md border border-border p-1">
+            <h2 className="font-heading text-[20px] font-bold text-brand-primary-600">Property Basics</h2>
+            <div className="flex items-start rounded p-1 bg-border">
               {([ListingType.sale, ListingType.rent] as const).map((option) => (
                 <button
                   key={option}
                   type="button"
                   onClick={() => handleListingTypeChange(option)}
                   className={cn(
-                    "rounded px-4 py-1.5 font-heading text-[14px] font-bold",
-                    listingType === option ? "bg-foreground text-background" : "text-muted-foreground",
+                    "rounded px-6 py-1.5 font-heading text-[16px] font-bold",
+                    listingType === option
+                      ? "bg-background text-foreground shadow-[0px_1px_1px_rgba(0,0,0,0.05)]"
+                      : "text-brand-primary-600/80",
                   )}
                 >
-                  {option === ListingType.sale ? "Sell" : "Rent"}
+                  {option === ListingType.sale ? "SELL" : "RENT"}
                 </button>
               ))}
             </div>
           </div>
 
-          <AuthTextField label="Listing Title" placeholder="e.g. 3 BHK Villa in Whitefield" register={register("title")} error={errors.title?.message} />
+          <AuthTextField
+            label="Listing Title"
+            placeholder="e.g. 3 BHK Villa in Whitefield"
+            register={register("title")}
+            error={errors.title?.message}
+            labelClassName={labelClassName}
+          />
 
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
             <AuthSelectField
@@ -154,12 +161,14 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
               onValueChange={(value) => setValue("property_type", value as PropertyInfoValues["property_type"], { shouldValidate: true })}
               groups={propertyTypeGroups}
               error={errors.property_type?.message}
+              labelClassName={labelClassName}
             />
             <AuthTextField
               label="Built Year"
               placeholder="2020"
               register={register("built_year", { setValueAs: toOptionalNumber })}
               error={errors.built_year?.message}
+              labelClassName={labelClassName}
             />
           </div>
 
@@ -169,6 +178,7 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
               placeholder="Select furnishing"
               value={watch("furnishing")}
               onValueChange={(value) => setValue("furnishing", value as PropertyInfoValues["furnishing"], { shouldValidate: true })}
+              labelClassName={labelClassName}
               options={FURNISHING_OPTIONS}
               error={errors.furnishing?.message}
             />
@@ -279,7 +289,7 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
           {isPG && <PGDetailsSection listingType={listingType} value={pgDetails} onChange={(patch) => setValue("pg_details", { ...pgDetails, ...patch })} />}
 
           <div className="flex flex-col gap-6 border-t border-border pt-8">
-            <h2 className="font-heading text-[16px] font-bold text-foreground">Location Details</h2>
+            <h2 className="font-heading text-[20px] font-bold text-brand-primary-600">Location Details</h2>
             <AuthTextField label="Address" placeholder="12 MG Road" register={register("address_line")} error={errors.address_line?.message} />
             <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
               <AuthTextField label="Locality" placeholder="Indiranagar" register={register("locality")} error={errors.locality?.message} />
@@ -310,13 +320,17 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
         )}
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
         <button
-          type="submit"
-          className="flex items-center justify-center rounded py-4 px-12 font-heading text-[16px] font-bold text-background"
-          style={{ backgroundImage: "linear-gradient(122.455deg, rgb(0, 0, 0) 0%, rgb(19, 27, 46) 100%)" }}
+          type="button"
+          onClick={() => toast.info("Saving a draft and resuming later isn't built yet.")}
+          className="rounded px-16 py-4.75 font-heading text-[14px] font-bold uppercase tracking-[1.4px] text-[#1b1c1c]"
+          style={{ backgroundColor: "#eae8e7" }}
         >
-          Continue
+          Save as Draft
+        </button>
+        <button type="submit" className="rounded bg-black px-14 py-4.75 font-heading text-[14px] font-bold uppercase tracking-[1.4px] text-white">
+          Save &amp; Continue
         </button>
       </div>
     </form>

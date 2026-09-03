@@ -65,10 +65,7 @@ export function MediaStep({
 
   return (
     <div className="flex w-full flex-col gap-8">
-      <div className="flex flex-col gap-2">
-        <h1 className="font-heading text-[28px] font-bold text-foreground">Curate Your Listing</h1>
-        <p className="font-body text-[16px] text-muted-foreground">Add photos, floor plans, and video to bring your listing to life.</p>
-      </div>
+      <h1 className="font-heading text-[48px] font-bold leading-15 text-brand-primary-600">Post your listing</h1>
 
       <PostPropertyStepper current="media" />
       <FreePlanUsageBar />

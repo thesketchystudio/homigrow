@@ -1,9 +1,13 @@
 // features/broker/post-property/PostPropertyStepper.tsx
-// Numbered tab row for the Post Property wizard's 4 steps (Figma "Curate
-// Your Listing" tab bar, adapted to real Homigrow tokens instead of the
-// unskinned template's raw hex/font values). Purely a progress display —
-// tabs aren't clickable, since a later step can depend on data collected
-// in an earlier one (Media needs Info's data before it means anything).
+// Numbered tab row for the Post Property wizard's 4 steps (Figma "Post
+// your listing" header, node 612:811 — 16px number+label pairs, the
+// current step at full opacity with a black underline, upcoming steps
+// dimmed to 40% opacity, no underline). Purely a progress display — tabs
+// aren't clickable, since a later step can depend on data collected in an
+// earlier one (Media needs Info's data before it means anything). A
+// completed step has no Figma reference (only the first-step screen was
+// designed), so it's inferred to render at full opacity without the
+// active underline.
 
 import { cn } from "@/lib/utils";
 
@@ -20,7 +24,7 @@ export function PostPropertyStepper({ current }: { current: StepKey }) {
   const currentIndex = STEPS.findIndex((step) => step.key === current);
 
   return (
-    <div className="flex w-full gap-8 border-b border-border">
+    <div className="flex w-full border-b border-brand-primary-100">
       {STEPS.map((step, index) => {
         const isActive = step.key === current;
         const isDone = index < currentIndex;
@@ -28,16 +32,14 @@ export function PostPropertyStepper({ current }: { current: StepKey }) {
           <div
             key={step.key}
             className={cn(
-              "flex items-center gap-2 border-b-2 pb-3 font-heading text-[14px] font-bold uppercase tracking-[1px]",
-              isActive
-                ? "border-foreground text-foreground"
-                : isDone
-                  ? "border-transparent text-brand-green-800"
-                  : "border-transparent text-muted-foreground",
+              "flex items-center gap-3 border-b-2 pb-4.5",
+              index > 0 && "pl-12",
+              isActive ? "border-foreground" : "border-transparent",
+              !isActive && !isDone && "opacity-40",
             )}
           >
-            <span>{`0${index + 1}`}</span>
-            <span>{step.label}</span>
+            <span className="font-heading text-[16px] font-bold text-foreground">{`0${index + 1}`}</span>
+            <span className="font-heading text-[16px] font-medium uppercase text-foreground">{step.label}</span>
           </div>
         );
       })}

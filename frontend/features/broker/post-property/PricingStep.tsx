@@ -65,10 +65,7 @@ export function PricingStep({ listingType, onBack, onContinue }: PricingStepProp
 
   return (
     <form onSubmit={onFormSubmit} className="flex w-full flex-col gap-8">
-      <div className="flex flex-col gap-2">
-        <h1 className="font-heading text-[28px] font-bold text-foreground">Curate Your Listing</h1>
-        <p className="font-body text-[16px] text-muted-foreground">Review pricing before submitting your listing for review.</p>
-      </div>
+      <h1 className="font-heading text-[48px] font-bold leading-15 text-brand-primary-600">Post your listing</h1>
 
       <PostPropertyStepper current="pricing" />
       <FreePlanUsageBar />
