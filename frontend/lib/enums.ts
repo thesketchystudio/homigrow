@@ -54,6 +54,9 @@ export const PropertyType = {
   office: "office",
   shop: "shop",
   pg_colive: "pg_colive",
+  // Rent-only, per the Post Property wizard's "Commercial & Spaces" dropdown group.
+  commercial_building: "commercial_building",
+  built_to_suit: "built_to_suit",
 } as const;
 export type PropertyType = (typeof PropertyType)[keyof typeof PropertyType];
 
@@ -69,6 +72,34 @@ export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
   [PropertyType.office]: "Office",
   [PropertyType.shop]: "Shop",
   [PropertyType.pg_colive]: "PG / Co-living",
+  [PropertyType.commercial_building]: "Commercial Building",
+  [PropertyType.built_to_suit]: "Built to Suit",
+};
+
+export const PriceFlexibility = {
+  fixed: "fixed",
+  negotiable: "negotiable",
+  highly_flexible: "highly_flexible",
+} as const;
+export type PriceFlexibility = (typeof PriceFlexibility)[keyof typeof PriceFlexibility];
+
+export const PRICE_FLEXIBILITY_LABELS: Record<PriceFlexibility, string> = {
+  [PriceFlexibility.fixed]: "Fixed Price",
+  [PriceFlexibility.negotiable]: "Negotiable",
+  [PriceFlexibility.highly_flexible]: "Highly Flexible",
+};
+
+export const PaymentStructure = {
+  full_payment: "full_payment",
+  emi_installments: "emi_installments",
+  construction_linked: "construction_linked",
+} as const;
+export type PaymentStructure = (typeof PaymentStructure)[keyof typeof PaymentStructure];
+
+export const PAYMENT_STRUCTURE_LABELS: Record<PaymentStructure, string> = {
+  [PaymentStructure.full_payment]: "Full Payment",
+  [PaymentStructure.emi_installments]: "EMI / Installments",
+  [PaymentStructure.construction_linked]: "Construction Linked",
 };
 
 export const Furnishing = {

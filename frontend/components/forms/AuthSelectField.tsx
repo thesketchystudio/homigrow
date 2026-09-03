@@ -4,7 +4,7 @@
 // matching the Homigrow auth/onboarding Figma flow's dropdown fields
 // (label + full-width underline with a chevron, no boxed border).
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 type SelectOption = string | { value: string; label: string };
@@ -17,11 +17,20 @@ type AuthSelectFieldProps = {
   // Plain strings when the value and its display label are the same
   // (e.g. a city name); { value, label } pairs when they diverge (e.g.
   // an enum key like "independent_house" displayed as "Independent House").
-  options: SelectOption[];
+  // Mutually exclusive with `groups` below.
+  options?: SelectOption[];
+  // Grouped variant — renders a muted section header per group (e.g. the
+  // Post Property wizard's "RESIDENTIAL" / "COMMERCIAL & LAND" Property
+  // Type dropdown sections). Takes precedence over `options` when set.
+  groups?: { label: string; options: SelectOption[] }[];
   error?: string;
   disabled?: boolean;
   className?: string;
 };
+
+function normalizeOption(option: SelectOption) {
+  return typeof option === "string" ? { value: option, label: option } : option;
+}
 
 export function AuthSelectField({
   label,
@@ -29,6 +38,7 @@ export function AuthSelectField({
   value,
   onValueChange,
   options,
+  groups,
   error,
   disabled,
   className,
@@ -47,14 +57,28 @@ export function AuthSelectField({
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {options.map((option) => {
-            const { value: optionValue, label: optionLabel } = typeof option === "string" ? { value: option, label: option } : option;
-            return (
-              <SelectItem key={optionValue} value={optionValue}>
-                {optionLabel}
-              </SelectItem>
-            );
-          })}
+          {groups
+            ? groups.map((group) => (
+                <SelectGroup key={group.label}>
+                  <SelectLabel>{group.label}</SelectLabel>
+                  {group.options.map((option) => {
+                    const { value: optionValue, label: optionLabel } = normalizeOption(option);
+                    return (
+                      <SelectItem key={optionValue} value={optionValue}>
+                        {optionLabel}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectGroup>
+              ))
+            : (options ?? []).map((option) => {
+                const { value: optionValue, label: optionLabel } = normalizeOption(option);
+                return (
+                  <SelectItem key={optionValue} value={optionValue}>
+                    {optionLabel}
+                  </SelectItem>
+                );
+              })}
         </SelectContent>
       </Select>
       {error && <p className="text-[12px] text-destructive">{error}</p>}

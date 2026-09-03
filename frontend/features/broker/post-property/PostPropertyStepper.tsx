@@ -1,5 +1,5 @@
 // features/broker/post-property/PostPropertyStepper.tsx
-// Numbered tab row for the Post Property wizard's 3 steps (Figma "Curate
+// Numbered tab row for the Post Property wizard's 4 steps (Figma "Curate
 // Your Listing" tab bar, adapted to real Homigrow tokens instead of the
 // unskinned template's raw hex/font values). Purely a progress display —
 // tabs aren't clickable, since a later step can depend on data collected
@@ -11,6 +11,7 @@ const STEPS = [
   { key: "info", label: "Property Info" },
   { key: "media", label: "Media" },
   { key: "pricing", label: "Pricing" },
+  { key: "verification", label: "Verification" },
 ] as const;
 
 type StepKey = (typeof STEPS)[number]["key"];
