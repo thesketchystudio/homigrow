@@ -13,6 +13,11 @@ api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router)
 api_router.include_router(users.router)
 api_router.include_router(brokers.router)
-api_router.include_router(properties.router)
+# broker_properties (which declares the literal GET /properties/mine)
+# must be registered before properties (whose GET /properties/{property_id}
+# would otherwise swallow it first — same reasoning that keeps
+# /properties/compare and /properties/neighborhoods declared ahead of
+# /properties/{property_id} within properties.py itself).
 api_router.include_router(broker_properties.router)
+api_router.include_router(properties.router)
 api_router.include_router(saved_properties.router)

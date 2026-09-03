@@ -16,10 +16,22 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.deps import RequireBroker
 from app.db.session import get_db
-from app.schemas.properties import PropertyCreateRequest, PropertyMediaRead, PropertyRead
+from app.schemas.properties import BrokerPropertyListItem, PropertyCreateRequest, PropertyMediaRead, PropertyRead
 from app.services import broker_property_service
 
 router = APIRouter(prefix="/properties", tags=["properties", "broker"])
+
+
+# Declared ahead of the writes below (and, at the include_router level,
+# ahead of properties.router's GET /properties/{property_id}) so this
+# literal path wins — see the comment in app/api/v1/router.py.
+@router.get("/mine", response_model=list[BrokerPropertyListItem])
+def list_my_properties(
+    user: RequireBroker,
+    db: Session = Depends(get_db),
+) -> list[BrokerPropertyListItem]:
+    """Lists every property owned by the calling broker, across all statuses — backs the Dashboard's empty state."""
+    return broker_property_service.list_my_properties(db, user)
 
 
 @router.post("", response_model=PropertyRead)

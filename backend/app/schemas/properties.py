@@ -221,6 +221,16 @@ class PropertyListResponse(PaginatedResponse[PropertyListItem]):
     """Pagination envelope for GET /properties: page/page_size in, total/total_pages computed for the caller."""
 
 
+class BrokerPropertyListItem(PropertyListItem):
+    """
+    GET /properties/mine's card shape — PropertyListItem plus status, since
+    a broker (unlike the public search grid) needs to see draft/pending
+    listings too, not just active ones.
+    """
+
+    status: PropertyStatus
+
+
 class PropertyCompareResponse(BaseModel):
     """GET /properties/compare — a normalized spec table, reusing PropertyRead's full field set."""
 

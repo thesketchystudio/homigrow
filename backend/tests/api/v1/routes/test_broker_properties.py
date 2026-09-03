@@ -8,9 +8,13 @@ POST /properties/{id}/submit — auth/ownership gating, the
 create-requires-price contract, and the media-required submit rule.
 """
 
+import datetime
+from uuid import UUID
+
 from app.core.security import create_access_token
 from app.models.broker_profile import BrokerProfile
 from app.models.enums import UserRole
+from app.models.property import Property
 from tests.conftest import make_user
 
 _VALID_PAYLOAD = {
@@ -43,6 +47,65 @@ def _make_broker(db_session, **kwargs):
     db_session.add(BrokerProfile(user_id=user.id))
     db_session.flush()
     return user
+
+
+class TestListMyProperties:
+    def test_returns_empty_list_for_a_broker_with_no_listings(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546027")
+
+        response = client.get("/api/v1/properties/mine", headers=_auth_headers(broker))
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_returns_draft_and_pending_listings_newest_first(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546028")
+        first_id = client.post("/api/v1/properties", headers=_auth_headers(broker), json=_VALID_PAYLOAD).json()["id"]
+        second_payload = {**_VALID_PAYLOAD, "title": "3 BHK Villa"}
+        second_id = client.post("/api/v1/properties", headers=_auth_headers(broker), json=second_payload).json()["id"]
+        client.post(f"/api/v1/properties/{second_id}/media", headers=_auth_headers(broker), files=_IMAGE_FILES)
+        client.post(f"/api/v1/properties/{second_id}/submit", headers=_auth_headers(broker))
+
+        # The test transaction's now() is frozen at transaction start, so
+        # both creates share one created_at — force a deterministic order
+        # the same way test_sort_newest_orders_by_published_at_desc does
+        # for published_at.
+        db_session.query(Property).filter(Property.id == UUID(first_id)).update(
+            {"created_at": datetime.datetime(2020, 1, 1, tzinfo=datetime.timezone.utc)}
+        )
+        db_session.query(Property).filter(Property.id == UUID(second_id)).update(
+            {"created_at": datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc)}
+        )
+        db_session.flush()
+
+        response = client.get("/api/v1/properties/mine", headers=_auth_headers(broker))
+
+        assert response.status_code == 200
+        body = response.json()
+        assert [item["id"] for item in body] == [second_id, first_id]
+        assert body[0]["status"] == "pending"
+        assert body[1]["status"] == "draft"
+
+    def test_does_not_return_another_brokers_listings(self, client, db_session):
+        owner = _make_broker(db_session, phone="+919876546029")
+        other = _make_broker(db_session, phone="+919876546030")
+        client.post("/api/v1/properties", headers=_auth_headers(owner), json=_VALID_PAYLOAD)
+
+        response = client.get("/api/v1/properties/mine", headers=_auth_headers(other))
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_requires_authentication(self, client):
+        response = client.get("/api/v1/properties/mine")
+        assert response.status_code == 401
+
+    def test_client_role_is_forbidden(self, client, db_session):
+        user = make_user(db_session, role=UserRole.client, phone="+919876546031")
+
+        response = client.get("/api/v1/properties/mine", headers=_auth_headers(user))
+
+        assert response.status_code == 403
 
 
 class TestCreateProperty:

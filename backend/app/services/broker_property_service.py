@@ -1,10 +1,11 @@
 """
 app/services/broker_property_service.py
 
-Broker-authenticated writes for the Post Property wizard: create, edit,
-media upload, and submit-for-moderation. Kept separate from
+Broker-authenticated writes for the Post Property wizard (create, edit,
+media upload, submit-for-moderation) plus the one owner-scoped read a
+broker needs: their own listings across every status. Kept separate from
 property_service.py, which is scoped to public/unauthenticated reads of
-active listings only — mixing owner-scoped writes into that module
+active listings only — mixing owner-scoped access into that module
 would break its existing "no owner-preview path" contract.
 """
 
@@ -16,8 +17,9 @@ from app.core.exceptions import ForbiddenError, NotFoundError, ValidationFailed
 from app.models.enums import MediaType, PropertyStatus
 from app.models.property import Property, PropertyMedia
 from app.models.user import User
-from app.schemas.properties import PropertyCreateRequest
+from app.schemas.properties import BrokerPropertyListItem, PropertyCreateRequest
 from app.services import storage_service
+from app.services._property_query_helpers import build_property_list_item, cover_image_subquery
 from app.services.property_lifecycle import transition_property_status
 
 
@@ -34,6 +36,25 @@ def _get_owned_property(db: Session, broker: User, property_id: UUID) -> Propert
     if property_.broker_id != broker.id:
         raise ForbiddenError("FORBIDDEN", "You do not have permission to access this property.")
     return property_
+
+
+def list_my_properties(db: Session, broker: User) -> list[BrokerPropertyListItem]:
+    """
+    Every property owned by broker, across every status (draft included),
+    newest first — backs the broker Dashboard's empty-state check and its
+    listing list once there's at least one.
+    """
+    cover_image_subq = cover_image_subquery()
+    rows = (
+        db.query(Property, cover_image_subq.label("cover_image_url"))
+        .filter(Property.broker_id == broker.id)
+        .order_by(Property.created_at.desc())
+        .all()
+    )
+    return [
+        BrokerPropertyListItem(**build_property_list_item(property_, cover_image_url), status=property_.status)
+        for property_, cover_image_url in rows
+    ]
 
 
 def create_property(db: Session, broker: User, data: PropertyCreateRequest) -> Property:
