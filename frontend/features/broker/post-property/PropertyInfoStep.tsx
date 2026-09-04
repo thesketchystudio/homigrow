@@ -12,7 +12,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { AuthTextField } from "@/components/forms/AuthTextField";
 import { AuthSelectField } from "@/components/forms/AuthSelectField";
-import { ChecklistGroup } from "@/features/auth/preferences/ChecklistGroup";
 import { PostPropertyStepper, type StepKey } from "@/features/broker/post-property/PostPropertyStepper";
 import { FreePlanUsageBar } from "@/features/broker/post-property/FreePlanUsageBar";
 import { PropertySpecificationsSidebar } from "@/features/broker/post-property/PropertySpecificationsSidebar";
@@ -51,7 +50,6 @@ const FURNISHING_OPTIONS = Object.values(Furnishing).map((value) => ({
   label: value === Furnishing.unfurnished ? "Unfurnished" : value === Furnishing.semi_furnished ? "Semi-furnished" : "Fully furnished",
 }));
 const FACING_SELECT_OPTIONS = FACING_OPTIONS.map((value) => ({ value, label: value }));
-const LAND_APPROVAL_CHECKLIST_OPTIONS = LAND_APPROVAL_OPTIONS.map((value) => ({ value, label: value }));
 const LAND_USE_OPTIONS = [
   { value: "residential", label: "Residential" },
   { value: "commercial", label: "Commercial" },
@@ -104,6 +102,9 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
     setValue("property_type", value as PropertyInfoValues["property_type"], { shouldValidate: true });
     if (value === PropertyType.plot && getValues("plot_details.is_corner_plot") === undefined) {
       setValue("plot_details.is_corner_plot", false);
+    }
+    if (value === PropertyType.pg_colive && getValues("pg_details.currently_operational") === undefined) {
+      setValue("pg_details.currently_operational", true);
     }
   };
 
@@ -231,6 +232,60 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
             </div>
           )}
 
+          {isLand && (
+            <div className="flex flex-col gap-5 rounded border border-[rgba(198,198,205,0.35)] p-5">
+              <span className="font-heading text-[9px] font-bold uppercase tracking-[1.5px] text-brand-primary-600/50">Land Details</span>
+              <div className="flex flex-col gap-2.5">
+                <span className={labelClassName}>Land Use</span>
+                <div className="flex flex-wrap gap-2">
+                  {LAND_USE_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setValue("land_details.land_use", option.value as "residential" | "commercial", { shouldValidate: true })}
+                      className={cn(
+                        "self-stretch rounded px-[13px] py-1.5 font-heading text-[13px] font-medium",
+                        watch("land_details.land_use") === option.value
+                          ? "border border-foreground bg-foreground text-background"
+                          : "border border-[rgba(198,198,205,0.5)] bg-background text-brand-primary-600",
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col gap-2.5">
+                <span className={labelClassName}>Approval / Classification (select all that apply)</span>
+                <div className="flex flex-wrap gap-2">
+                  {LAND_APPROVAL_OPTIONS.map((option) => {
+                    const selected = landApprovals.includes(option);
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setValue("land_details.approvals", selected ? landApprovals.filter((v) => v !== option) : [...landApprovals, option])}
+                        className={cn(
+                          "self-stretch rounded px-[13px] py-1.5 font-heading text-[13px] font-medium",
+                          selected ? "border border-foreground bg-foreground text-background" : "border border-[rgba(198,198,205,0.5)] bg-background text-brand-primary-600",
+                        )}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <AuthTextField
+                label="Total Area (sqft)"
+                placeholder="e.g. 15,000"
+                register={register("area_sqft", { setValueAs: toOptionalNumber })}
+                error={errors.area_sqft?.message}
+                labelClassName={labelClassName}
+              />
+            </div>
+          )}
+
           {isResidential && (
             <AuthSelectField
               label="Furnishing"
@@ -277,39 +332,6 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
                   onAgreementFileChange={onJvAgreementFileChange}
                 />
               )}
-            </div>
-          )}
-
-          {isLand && (
-            <div className="flex flex-col gap-8 border-t border-border pt-8">
-              <h2 className="font-heading text-[16px] font-bold text-foreground">Land Details</h2>
-              <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
-                <AuthSelectField
-                  label="Land Use"
-                  placeholder="Select land use"
-                  value={watch("land_details.land_use")}
-                  onValueChange={(value) => setValue("land_details.land_use", value as "residential" | "commercial", { shouldValidate: true })}
-                  options={LAND_USE_OPTIONS}
-                  error={errors.land_details?.land_use?.message}
-                />
-                <AuthTextField
-                  label="Total Area (sq.ft)"
-                  placeholder="12000"
-                  register={register("area_sqft", { setValueAs: toOptionalNumber })}
-                  error={errors.area_sqft?.message}
-                />
-              </div>
-              <div className="flex flex-col gap-3">
-                <span className="font-body font-bold text-[12px] uppercase tracking-[1px] text-muted-foreground">
-                  Approval / Classification (select all that apply)
-                </span>
-                <ChecklistGroup
-                  options={LAND_APPROVAL_CHECKLIST_OPTIONS}
-                  value={landApprovals}
-                  onChange={(value) => setValue("land_details.approvals", value)}
-                  className="gap-0"
-                />
-              </div>
             </div>
           )}
 
@@ -372,14 +394,6 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
           </div>
         </div>
 
-        {/*
-          Figma's Plot frame (node 619:3941) shows a right-column "Specifications" sidebar
-          too, but with the exact same Bedrooms/Bathrooms/Total Area/Curated Amenities
-          content as the Apartment frame — none of which Plot actually collects (only
-          Plot Dimension, Facing, Corner Plot). Flagged as an unedited Figma duplicate,
-          not implemented: a real Plot-specific specifications sidebar is a separate,
-          later task, not assumed here.
-        */}
         {isResidential && (
           <div className="lg:col-span-1">
             <PropertySpecificationsSidebar

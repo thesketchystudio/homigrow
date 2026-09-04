@@ -27,19 +27,27 @@ type PGDetailsSectionProps = {
   onChange: (patch: Partial<PGDetailsValues>) => void;
 };
 
+const fieldLabelClassName = "font-heading text-[10px] font-bold uppercase tracking-[1px] text-brand-primary-600/80";
+const subLabelClassName = "font-heading text-[9px] font-bold uppercase tracking-[1.5px] text-brand-primary-600/50";
+const textInputClassName =
+  "w-full border-b border-foreground bg-transparent pb-[5px] pt-2 font-heading text-[16px] leading-[24px] text-foreground outline-none placeholder:text-brand-secondary-700 focus:border-brand-green-600";
+
+// Figma's "ChipToggle" style (Post Property wizard's PG frame, node
+// 619:4296) — a bordered white chip, filled dark when selected. Shared by
+// both the single-select and multi-select variants below since Figma
+// draws them identically; only which options can be active differs.
+function chipButtonClassName(selected: boolean) {
+  return cn(
+    "self-stretch rounded px-[13px] py-1.5 font-heading text-[13px] font-medium",
+    selected ? "border border-foreground bg-foreground text-background" : "border border-[rgba(198,198,205,0.5)] bg-background text-brand-primary-600",
+  );
+}
+
 function ToggleGroup<T extends string>({ options, value, onChange }: { options: readonly T[]; value: T | undefined; onChange: (v: T) => void }) {
   return (
     <div className="flex flex-wrap gap-2">
       {options.map((option) => (
-        <button
-          key={option}
-          type="button"
-          onClick={() => onChange(option)}
-          className={cn(
-            "rounded-md border px-4 py-2 font-heading text-[14px] font-bold",
-            value === option ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground",
-          )}
-        >
+        <button key={option} type="button" onClick={() => onChange(option)} className={chipButtonClassName(value === option)}>
           {option}
         </button>
       ))}
@@ -60,10 +68,7 @@ function MultiToggleGroup<T extends string>({ options, value, onChange }: { opti
             key={option}
             type="button"
             onClick={() => onChange(selected ? value.filter((v) => v !== option) : [...value, option])}
-            className={cn(
-              "rounded-md border px-4 py-2 font-heading text-[14px] font-bold",
-              selected ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground",
-            )}
+            className={chipButtonClassName(selected)}
           >
             {option}
           </button>
@@ -73,10 +78,36 @@ function MultiToggleGroup<T extends string>({ options, value, onChange }: { opti
   );
 }
 
-function LabeledField({ label, children }: { label: string; children: React.ReactNode }) {
+// Figma's "PillToggle" style — a segmented two-option track (Yes/No),
+// visually distinct from the ChipToggle group above. Used for every plain
+// boolean question in this section (Currently Operational, Meals Included).
+function PillToggle({ options, value, onChange }: { options: readonly ["Yes", "No"]; value: "Yes" | "No" | undefined; onChange: (v: "Yes" | "No") => void }) {
   return (
-    <div className="flex flex-col gap-3">
-      <span className="font-body font-bold text-[12px] uppercase tracking-[1px] text-muted-foreground">{label}</span>
+    <div className="flex w-fit items-start rounded p-1 bg-border">
+      {options.map((option) => (
+        <button
+          key={option}
+          type="button"
+          onClick={() => onChange(option)}
+          className={cn(
+            "rounded px-4 py-1.5 font-heading text-[13px] font-bold",
+            value === option ? "bg-background text-foreground shadow-[0px_1px_1px_rgba(0,0,0,0.05)]" : "text-brand-primary-600/70",
+          )}
+        >
+          {option}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function LabeledField({ label, optional, children }: { label: string; optional?: boolean; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-1">
+        <span className={fieldLabelClassName}>{label}</span>
+        {optional && <span className="font-heading text-[9px] font-normal uppercase tracking-[0.8px] text-brand-primary-600/40">— optional</span>}
+      </div>
       {children}
     </div>
   );
@@ -89,7 +120,7 @@ function NumberInput({ value, onChange, placeholder }: { value: number | undefin
       value={value ?? ""}
       onChange={(event) => onChange(event.target.value === "" ? undefined : Number(event.target.value))}
       placeholder={placeholder}
-      className="w-full border-b border-foreground bg-transparent pb-[5px] pt-1 font-heading text-[20px] leading-[28px] text-foreground outline-none placeholder:text-brand-secondary-700 focus:border-brand-green-600"
+      className={textInputClassName}
     />
   );
 }
@@ -99,9 +130,9 @@ const AMENITY_CHECKLIST = PG_AMENITY_OPTIONS.map((value) => ({ value, label: val
 export function PGDetailsSection({ listingType, value, onChange }: PGDetailsSectionProps) {
   if (listingType === ListingType.sale) {
     return (
-      <div className="flex flex-col gap-8 border-t border-border pt-8">
-        <h2 className="font-heading text-[16px] font-bold text-foreground">PG / Co-living Building Details</h2>
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
+      <div className="flex flex-col gap-5 rounded border border-[rgba(198,198,205,0.35)] p-5">
+        <span className={subLabelClassName}>PG / Co-living Building Details</span>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <LabeledField label="Total Floors">
             <NumberInput value={value.total_floors} onChange={(total_floors) => onChange({ total_floors })} placeholder="e.g. 4" />
           </LabeledField>
@@ -110,7 +141,7 @@ export function PGDetailsSection({ listingType, value, onChange }: PGDetailsSect
           </LabeledField>
         </div>
         <LabeledField label="Currently Operational">
-          <ToggleGroup
+          <PillToggle
             options={["Yes", "No"] as const}
             value={value.currently_operational === undefined ? undefined : value.currently_operational ? "Yes" : "No"}
             onChange={(option) => onChange({ currently_operational: option === "Yes" })}
@@ -122,7 +153,7 @@ export function PGDetailsSection({ listingType, value, onChange }: PGDetailsSect
         <LabeledField label="Gender">
           <ToggleGroup options={PG_GENDER_OPTIONS} value={value.gender as (typeof PG_GENDER_OPTIONS)[number] | undefined} onChange={(gender) => onChange({ gender })} />
         </LabeledField>
-        <LabeledField label="Estimated Monthly Revenue (₹, optional)">
+        <LabeledField label="Estimated Monthly Revenue (₹)" optional>
           <NumberInput value={value.estimated_monthly_revenue} onChange={(estimated_monthly_revenue) => onChange({ estimated_monthly_revenue })} placeholder="e.g. 2,40,000" />
         </LabeledField>
       </div>
@@ -136,7 +167,7 @@ export function PGDetailsSection({ listingType, value, onChange }: PGDetailsSect
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <button
           type="button"
-          onClick={() => onChange({ listing_scope: "entire" })}
+          onClick={() => onChange({ listing_scope: "entire", meals_included: value.meals_included ?? true })}
           className={cn(
             "flex flex-col items-start gap-2 rounded-md border p-4 text-left",
             value.listing_scope === "entire" ? "border-foreground" : "border-border",
@@ -148,7 +179,7 @@ export function PGDetailsSection({ listingType, value, onChange }: PGDetailsSect
         </button>
         <button
           type="button"
-          onClick={() => onChange({ listing_scope: "unit" })}
+          onClick={() => onChange({ listing_scope: "unit", meals_included: value.meals_included ?? true })}
           className={cn(
             "flex flex-col items-start gap-2 rounded-md border p-4 text-left",
             value.listing_scope === "unit" ? "border-foreground" : "border-border",
@@ -177,7 +208,7 @@ export function PGDetailsSection({ listingType, value, onChange }: PGDetailsSect
             <ToggleGroup options={PG_GENDER_OPTIONS} value={value.gender as (typeof PG_GENDER_OPTIONS)[number] | undefined} onChange={(gender) => onChange({ gender })} />
           </LabeledField>
           <LabeledField label="Meals Included">
-            <ToggleGroup options={["Yes", "No"] as const} value={value.meals_included === undefined ? undefined : value.meals_included ? "Yes" : "No"} onChange={(option) => onChange({ meals_included: option === "Yes" })} />
+            <PillToggle options={["Yes", "No"] as const} value={value.meals_included === undefined ? undefined : value.meals_included ? "Yes" : "No"} onChange={(option) => onChange({ meals_included: option === "Yes" })} />
           </LabeledField>
           <LabeledField label="Amenities">
             <ChecklistGroup options={AMENITY_CHECKLIST} value={value.amenities ?? []} onChange={(amenities) => onChange({ amenities })} className="gap-0" />
@@ -193,7 +224,7 @@ export function PGDetailsSection({ listingType, value, onChange }: PGDetailsSect
                 value={value.room_type ?? ""}
                 onChange={(event) => onChange({ room_type: event.target.value })}
                 placeholder="e.g. Single Sharing"
-                className="w-full border-b border-foreground bg-transparent pb-[5px] pt-1 font-heading text-[20px] leading-[28px] text-foreground outline-none placeholder:text-brand-secondary-700 focus:border-brand-green-600"
+                className={textInputClassName}
               />
             </LabeledField>
             <LabeledField label="Floor">
@@ -212,7 +243,7 @@ export function PGDetailsSection({ listingType, value, onChange }: PGDetailsSect
             <ToggleGroup options={PG_GENDER_PREFERENCE_OPTIONS} value={value.gender_preference as (typeof PG_GENDER_PREFERENCE_OPTIONS)[number] | undefined} onChange={(gender_preference) => onChange({ gender_preference })} />
           </LabeledField>
           <LabeledField label="Meals Included">
-            <ToggleGroup options={["Yes", "No"] as const} value={value.meals_included === undefined ? undefined : value.meals_included ? "Yes" : "No"} onChange={(option) => onChange({ meals_included: option === "Yes" })} />
+            <PillToggle options={["Yes", "No"] as const} value={value.meals_included === undefined ? undefined : value.meals_included ? "Yes" : "No"} onChange={(option) => onChange({ meals_included: option === "Yes" })} />
           </LabeledField>
           <LabeledField label="Amenities">
             <ChecklistGroup options={AMENITY_CHECKLIST} value={value.amenities ?? []} onChange={(amenities) => onChange({ amenities })} className="gap-0" />

@@ -4,6 +4,7 @@
 // matching the Homigrow auth/onboarding Figma flow's dropdown fields
 // (label + full-width underline with a chevron, no boxed border).
 
+import { useRef } from "react";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
@@ -47,15 +48,26 @@ export function AuthSelectField({
   className,
   labelClassName,
 }: AuthSelectFieldProps) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Radix re-focuses the trigger after a selection closes the dropdown, so a
+  // mouse-picked option still lights up the focus-visible green underline —
+  // blur it back out once that refocus has happened (hence the deferred tick).
+  const handleValueChange = (next: string) => {
+    onValueChange(next);
+    setTimeout(() => triggerRef.current?.blur(), 0);
+  };
+
   return (
     <div className={cn("flex w-full flex-col gap-3", className)}>
       <span className={cn("font-body font-bold text-[12px] leading-[18px] text-brand-primary-100", labelClassName)}>{label}</span>
-      <Select value={value || undefined} onValueChange={onValueChange} disabled={disabled}>
+      <Select value={value || undefined} onValueChange={handleValueChange} disabled={disabled}>
         <SelectTrigger
+          ref={triggerRef}
           aria-invalid={Boolean(error)}
           className={cn(
             "h-auto w-full rounded-none border-0 border-b bg-transparent px-0 pb-[5px] pt-1 font-heading text-[20px] leading-[28px] text-foreground shadow-none focus-visible:ring-0 disabled:cursor-default disabled:opacity-100",
-            error ? "border-destructive" : "border-foreground focus:border-brand-green-600",
+            error ? "border-destructive" : "border-foreground focus-visible:border-brand-green-600",
           )}
         >
           <SelectValue placeholder={placeholder} />
