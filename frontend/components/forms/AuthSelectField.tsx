@@ -8,7 +8,7 @@ import { useRef } from "react";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-type SelectOption = string | { value: string; label: string };
+type SelectOption = string | { value: string; label: string; disabled?: boolean };
 
 type AuthSelectFieldProps = {
   label: string;
@@ -33,7 +33,7 @@ type AuthSelectFieldProps = {
 };
 
 function normalizeOption(option: SelectOption) {
-  return typeof option === "string" ? { value: option, label: option } : option;
+  return typeof option === "string" ? { value: option, label: option, disabled: false } : { disabled: false, ...option };
 }
 
 export function AuthSelectField({
@@ -78,9 +78,9 @@ export function AuthSelectField({
                 <SelectGroup key={group.label}>
                   <SelectLabel>{group.label}</SelectLabel>
                   {group.options.map((option) => {
-                    const { value: optionValue, label: optionLabel } = normalizeOption(option);
+                    const { value: optionValue, label: optionLabel, disabled: optionDisabled } = normalizeOption(option);
                     return (
-                      <SelectItem key={optionValue} value={optionValue}>
+                      <SelectItem key={optionValue} value={optionValue} disabled={optionDisabled}>
                         {optionLabel}
                       </SelectItem>
                     );
@@ -88,9 +88,9 @@ export function AuthSelectField({
                 </SelectGroup>
               ))
             : (options ?? []).map((option) => {
-                const { value: optionValue, label: optionLabel } = normalizeOption(option);
+                const { value: optionValue, label: optionLabel, disabled: optionDisabled } = normalizeOption(option);
                 return (
-                  <SelectItem key={optionValue} value={optionValue}>
+                  <SelectItem key={optionValue} value={optionValue} disabled={optionDisabled}>
                     {optionLabel}
                   </SelectItem>
                 );

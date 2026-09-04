@@ -10,7 +10,7 @@ import { Furnishing, ListingType, PaymentStructure, PriceFlexibility, PropertyTy
 // (bed/bath/area, furnishing, amenities) — no type-specific block below.
 export const RESIDENTIAL_PROPERTY_TYPES = [PropertyType.apartment, PropertyType.villa, PropertyType.independent_house] as const;
 
-type PropertyTypeOption = { value: PropertyType; label: string };
+type PropertyTypeOption = { value: PropertyType; label: string; disabled?: boolean };
 type PropertyTypeGroup = { label: string; options: PropertyTypeOption[] };
 
 // Property Type dropdown groups, split by listing_type — Sell and Rent
@@ -37,18 +37,18 @@ export const RENT_PROPERTY_TYPE_GROUPS: PropertyTypeGroup[] = [
   {
     label: "Residential",
     options: [
-      { value: PropertyType.apartment, label: "Flat" },
-      { value: PropertyType.independent_house, label: "Independent House" },
+      { value: PropertyType.apartment, label: "Apartment" },
       { value: PropertyType.villa, label: "Villa" },
+      { value: PropertyType.independent_house, label: "Independent House" },
       { value: PropertyType.pg_colive, label: "PG / Co-living" },
     ],
   },
   {
-    label: "Commercial & Spaces",
+    label: "Commercial & Spaces (Coming soon)",
     options: [
-      { value: PropertyType.shop, label: "Shop" },
-      { value: PropertyType.commercial_building, label: "Commercial Building" },
-      { value: PropertyType.built_to_suit, label: "Built to Suit" },
+      { value: PropertyType.shop, label: "Shop", disabled: true },
+      { value: PropertyType.commercial_building, label: "Commercial Building", disabled: true },
+      { value: PropertyType.built_to_suit, label: "Built to Suit", disabled: true },
     ],
   },
 ];

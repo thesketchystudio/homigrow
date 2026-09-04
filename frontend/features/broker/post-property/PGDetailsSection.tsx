@@ -7,8 +7,6 @@
 
 "use client";
 
-import { Building2, DoorOpen } from "lucide-react";
-import { ChecklistGroup } from "@/features/auth/preferences/ChecklistGroup";
 import { cn } from "@/lib/utils";
 import { ListingType } from "@/lib/enums";
 import {
@@ -125,7 +123,51 @@ function NumberInput({ value, onChange, placeholder }: { value: number | undefin
   );
 }
 
-const AMENITY_CHECKLIST = PG_AMENITY_OPTIONS.map((value) => ({ value, label: value }));
+// Figma's "TypeCard" icons (node 619:8072, PGRentSubFields) — traced from
+// the exported assets rather than substituted with a lucide equivalent,
+// since neither glyph matches an existing icon closely enough.
+function EntireBuildingIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <path
+        d="M2.5 17.5H17.5M2.5 5.83333L10 2.5L17.5 5.83333M3.33333 17.5V5.83333M16.6667 17.5V5.83333M7.5 17.5V14.1667H12.5V17.5"
+        stroke="#1A1A1A"
+        strokeOpacity="0.5"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function UnitRoomIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <path
+        d="M15.8333 2.5H4.16667C3.24619 2.5 2.5 3.24619 2.5 4.16667V15.8333C2.5 16.7538 3.24619 17.5 4.16667 17.5H15.8333C16.7538 17.5 17.5 16.7538 17.5 15.8333V4.16667C17.5 3.24619 16.7538 2.5 15.8333 2.5Z"
+        stroke="#1A1A1A"
+        strokeOpacity="0.5"
+        strokeWidth="1.5"
+      />
+      <path d="M2.5 7.5H17.5M7.5 17.5V7.5" stroke="#1A1A1A" strokeOpacity="0.5" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// Figma's "Selected" badge on the active TypeCard choice (node 619:8838).
+function SelectedBadge() {
+  return (
+    <div className="flex items-center gap-1">
+      <span className="flex size-3.5 items-center justify-center rounded-full bg-[#090909]">
+        <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
+          <path d="M1.3125 3.5L3.0625 5.25L5.6875 1.75" stroke="white" strokeWidth="1.3125" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+      <span className="font-heading text-[9px] font-bold uppercase tracking-[0.5px] text-[#090909]">Selected</span>
+    </div>
+  );
+}
 
 export function PGDetailsSection({ listingType, value, onChange }: PGDetailsSectionProps) {
   if (listingType === ListingType.sale) {
@@ -160,34 +202,50 @@ export function PGDetailsSection({ listingType, value, onChange }: PGDetailsSect
     );
   }
 
-  // Rent: choose Entire Building vs Unit/Room first.
+  // Rent: choose Entire Building vs Unit/Room first, with the matching
+  // field set rendering inside the same bordered card (Figma's "TypeCard",
+  // nodes 619:8072 and 619:8838 — "PGRentSubFields"/"PGRentBuildingFields").
   return (
-    <div className="flex flex-col gap-8 border-t border-border pt-8">
-      <h2 className="font-heading text-[16px] font-bold text-foreground">What are you listing?</h2>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div className="flex flex-col gap-5 rounded border border-[rgba(198,198,205,0.35)] p-5">
+      <span className={subLabelClassName}>What Are You Listing?</span>
+      <div className="flex items-stretch gap-3">
         <button
           type="button"
           onClick={() => onChange({ listing_scope: "entire", meals_included: value.meals_included ?? true })}
           className={cn(
-            "flex flex-col items-start gap-2 rounded-md border p-4 text-left",
-            value.listing_scope === "entire" ? "border-foreground" : "border-border",
+            "flex flex-1 flex-col items-start gap-2.5 rounded-md border-2 p-4 text-left",
+            value.listing_scope === "entire" ? "border-[#090909] bg-[#f8f9fa]" : "border-[rgba(198,198,205,0.4)] bg-background",
           )}
         >
-          <Building2 size={20} />
-          <span className="font-heading text-[14px] font-bold text-foreground">Entire Building</span>
-          <span className="font-body text-[12px] text-muted-foreground">You own the whole PG / co-living property and are renting it out as a whole or managing tenants.</span>
+          <div className="flex w-full items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5">
+              <EntireBuildingIcon />
+              <span className="font-heading text-[14px] font-bold leading-5 text-[#1a1a1a]">Entire Building</span>
+            </div>
+            {value.listing_scope === "entire" && <SelectedBadge />}
+          </div>
+          <p className="font-body text-[12px] leading-[18px] text-[rgba(26,26,26,0.55)]">
+            You own the whole PG / co-living property and are renting it out as a whole or managing tenants.
+          </p>
         </button>
         <button
           type="button"
           onClick={() => onChange({ listing_scope: "unit", meals_included: value.meals_included ?? true })}
           className={cn(
-            "flex flex-col items-start gap-2 rounded-md border p-4 text-left",
-            value.listing_scope === "unit" ? "border-foreground" : "border-border",
+            "flex flex-1 flex-col items-start gap-2.5 rounded-md border-2 p-4 text-left",
+            value.listing_scope === "unit" ? "border-[#090909] bg-[#f8f9fa]" : "border-[rgba(198,198,205,0.4)] bg-background",
           )}
         >
-          <DoorOpen size={20} />
-          <span className="font-heading text-[14px] font-bold text-foreground">Unit / Room</span>
-          <span className="font-body text-[12px] text-muted-foreground">You are listing a single room or bed in an existing PG or co-living space.</span>
+          <div className="flex w-full items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5">
+              <UnitRoomIcon />
+              <span className="font-heading text-[14px] font-bold leading-5 text-[#1a1a1a]">Unit / Room</span>
+            </div>
+            {value.listing_scope === "unit" && <SelectedBadge />}
+          </div>
+          <p className="font-body text-[12px] leading-[18px] text-[rgba(26,26,26,0.55)]">
+            You are listing a single room or bed in an existing PG or co-living space.
+          </p>
         </button>
       </div>
 
@@ -211,7 +269,7 @@ export function PGDetailsSection({ listingType, value, onChange }: PGDetailsSect
             <PillToggle options={["Yes", "No"] as const} value={value.meals_included === undefined ? undefined : value.meals_included ? "Yes" : "No"} onChange={(option) => onChange({ meals_included: option === "Yes" })} />
           </LabeledField>
           <LabeledField label="Amenities">
-            <ChecklistGroup options={AMENITY_CHECKLIST} value={value.amenities ?? []} onChange={(amenities) => onChange({ amenities })} className="gap-0" />
+            <MultiToggleGroup options={PG_AMENITY_OPTIONS} value={(value.amenities ?? []) as (typeof PG_AMENITY_OPTIONS)[number][]} onChange={(amenities) => onChange({ amenities })} />
           </LabeledField>
         </>
       )}
@@ -246,7 +304,7 @@ export function PGDetailsSection({ listingType, value, onChange }: PGDetailsSect
             <PillToggle options={["Yes", "No"] as const} value={value.meals_included === undefined ? undefined : value.meals_included ? "Yes" : "No"} onChange={(option) => onChange({ meals_included: option === "Yes" })} />
           </LabeledField>
           <LabeledField label="Amenities">
-            <ChecklistGroup options={AMENITY_CHECKLIST} value={value.amenities ?? []} onChange={(amenities) => onChange({ amenities })} className="gap-0" />
+            <MultiToggleGroup options={PG_AMENITY_OPTIONS} value={(value.amenities ?? []) as (typeof PG_AMENITY_OPTIONS)[number][]} onChange={(amenities) => onChange({ amenities })} />
           </LabeledField>
           <LabeledField label="Monthly Rent (₹)">
             <NumberInput value={value.monthly_rent} onChange={(monthly_rent) => onChange({ monthly_rent })} placeholder="e.g. 9,500" />
