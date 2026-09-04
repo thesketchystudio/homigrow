@@ -6,6 +6,8 @@
 // submitProperty in sequence. See PropertyCreateInput's comment in
 // lib/api/endpoints/properties.ts for why creation can't happen any
 // earlier (Property.price is NOT NULL with a `price > 0` check).
+// Step 1's "Save as Draft" is a lighter, browser-local stand-in for a real
+// resumable draft — see lib/postPropertyDraft.ts for why.
 
 "use client";
 
@@ -26,13 +28,17 @@ import { MediaStep } from "@/features/broker/post-property/MediaStep";
 import { PricingStep } from "@/features/broker/post-property/PricingStep";
 import { VerificationStep } from "@/features/broker/post-property/VerificationStep";
 import type { PropertyInfoValues, PropertyPricingValues } from "@/lib/validation/postProperty";
+import { clearInfoDraft, loadInfoDraft } from "@/lib/postPropertyDraft";
 
 type WizardStep = "info" | "media" | "pricing" | "verification";
+
+const STEP_ORDER: WizardStep[] = ["info", "media", "pricing", "verification"];
 
 export function PostPropertyWizard() {
   const router = useRouter();
   const [step, setStep] = useState<WizardStep>("info");
   const [info, setInfo] = useState<PropertyInfoValues | null>(null);
+  const [infoDraft] = useState<Partial<PropertyInfoValues> | null>(() => loadInfoDraft());
   const [pricing, setPricing] = useState<PropertyPricingValues | null>(null);
 
   const [heroImages, setHeroImages] = useState<File[]>([]);
@@ -42,6 +48,13 @@ export function PostPropertyWizard() {
   const [droneFile, setDroneFile] = useState<File | null>(null);
   const [virtualTourUrl, setVirtualTourUrl] = useState("");
   const [jvAgreementFile, setJvAgreementFile] = useState<File | null>(null);
+
+  // Only allows jumping back to an already-completed step — a later step
+  // (e.g. Pricing) reads an earlier one's data with a non-null assertion,
+  // so jumping forward to a step never reached yet would crash.
+  const goToStep = (target: WizardStep) => {
+    if (STEP_ORDER.indexOf(target) < STEP_ORDER.indexOf(step)) setStep(target);
+  };
 
   const postMutation = useMutation({
     mutationFn: async () => {
@@ -66,6 +79,7 @@ export function PostPropertyWizard() {
       return submitProperty(property.id);
     },
     onSuccess: () => {
+      clearInfoDraft();
       toast.success("Listing submitted for review.");
       router.push("/broker/dashboard");
     },
@@ -77,13 +91,14 @@ export function PostPropertyWizard() {
   if (step === "info") {
     return (
       <PropertyInfoStep
-        defaultValues={info}
+        defaultValues={info ?? infoDraft}
         jvAgreementFile={jvAgreementFile}
         onJvAgreementFileChange={setJvAgreementFile}
         onContinue={(values) => {
           setInfo(values);
           setStep("media");
         }}
+        onStepSelect={goToStep}
       />
     );
   }
@@ -105,6 +120,7 @@ export function PostPropertyWizard() {
         onVirtualTourUrlChange={setVirtualTourUrl}
         onBack={() => setStep("info")}
         onContinue={() => setStep("pricing")}
+        onStepSelect={goToStep}
       />
     );
   }
@@ -113,11 +129,13 @@ export function PostPropertyWizard() {
     return (
       <PricingStep
         listingType={info!.listing_type}
+        defaultValues={pricing}
         onBack={() => setStep("media")}
         onContinue={(values) => {
           setPricing(values);
           setStep("verification");
         }}
+        onStepSelect={goToStep}
       />
     );
   }
@@ -127,6 +145,7 @@ export function PostPropertyWizard() {
       onBack={() => setStep("pricing")}
       onSubmit={() => postMutation.mutate()}
       isSubmitting={postMutation.isPending}
+      onStepSelect={goToStep}
     />
   );
 }

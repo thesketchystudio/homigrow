@@ -12,7 +12,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { AuthTextField } from "@/components/forms/AuthTextField";
-import { PostPropertyStepper } from "@/features/broker/post-property/PostPropertyStepper";
+import { PostPropertyStepper, type StepKey } from "@/features/broker/post-property/PostPropertyStepper";
 import { FreePlanUsageBar } from "@/features/broker/post-property/FreePlanUsageBar";
 import { ListingType, PAYMENT_STRUCTURE_LABELS, PaymentStructure, PRICE_FLEXIBILITY_LABELS, PriceFlexibility } from "@/lib/enums";
 import { cn, toOptionalNumber } from "@/lib/utils";
@@ -20,8 +20,10 @@ import { propertyPricingSchema, type PropertyPricingValues } from "@/lib/validat
 
 type PricingStepProps = {
   listingType: ListingType;
+  defaultValues: Partial<PropertyPricingValues> | null;
   onBack: () => void;
   onContinue: (values: PropertyPricingValues) => void;
+  onStepSelect?: (step: StepKey) => void;
 };
 
 const FLEXIBILITY_OPTIONS = [PriceFlexibility.fixed, PriceFlexibility.negotiable, PriceFlexibility.highly_flexible] as const;
@@ -31,7 +33,7 @@ function formatInr(value: number): string {
   return `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 }
 
-export function PricingStep({ listingType, onBack, onContinue }: PricingStepProps) {
+export function PricingStep({ listingType, defaultValues, onBack, onContinue, onStepSelect }: PricingStepProps) {
   const {
     register,
     handleSubmit,
@@ -45,6 +47,7 @@ export function PricingStep({ listingType, onBack, onContinue }: PricingStepProp
       price_flexibility: PriceFlexibility.negotiable,
       payment_structure: PaymentStructure.full_payment,
       brokerage_included: true,
+      ...defaultValues,
     },
   });
 
@@ -67,7 +70,7 @@ export function PricingStep({ listingType, onBack, onContinue }: PricingStepProp
     <form onSubmit={onFormSubmit} className="flex w-full flex-col gap-8">
       <h1 className="font-heading text-[48px] font-bold leading-15 text-brand-primary-600">Post your listing</h1>
 
-      <PostPropertyStepper current="pricing" />
+      <PostPropertyStepper current="pricing" onStepSelect={onStepSelect} />
       <FreePlanUsageBar />
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">

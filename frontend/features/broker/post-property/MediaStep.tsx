@@ -13,7 +13,7 @@
 
 import { useState } from "react";
 import { Circle, CircleCheck } from "lucide-react";
-import { PostPropertyStepper } from "@/features/broker/post-property/PostPropertyStepper";
+import { PostPropertyStepper, type StepKey } from "@/features/broker/post-property/PostPropertyStepper";
 import { FreePlanUsageBar } from "@/features/broker/post-property/FreePlanUsageBar";
 import { PropertyMediaDropzone } from "@/features/broker/post-property/PropertyMediaDropzone";
 
@@ -32,6 +32,7 @@ type MediaStepProps = {
   onVirtualTourUrlChange: (url: string) => void;
   onBack: () => void;
   onContinue: () => void;
+  onStepSelect?: (step: StepKey) => void;
 };
 
 function ChecklistRow({ label, done }: { label: string; done: boolean }) {
@@ -58,6 +59,7 @@ export function MediaStep({
   onVirtualTourUrlChange,
   onBack,
   onContinue,
+  onStepSelect,
 }: MediaStepProps) {
   const [touched, setTouched] = useState(false);
   const hasCoverPhoto = heroImages.length > 0 || interiorImages.length > 0;
@@ -67,7 +69,7 @@ export function MediaStep({
     <div className="flex w-full flex-col gap-8">
       <h1 className="font-heading text-[48px] font-bold leading-15 text-brand-primary-600">Post your listing</h1>
 
-      <PostPropertyStepper current="media" />
+      <PostPropertyStepper current="media" onStepSelect={onStepSelect} />
       <FreePlanUsageBar />
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">

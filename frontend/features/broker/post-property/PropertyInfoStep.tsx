@@ -13,14 +13,17 @@ import { useForm } from "react-hook-form";
 import { AuthTextField } from "@/components/forms/AuthTextField";
 import { AuthSelectField } from "@/components/forms/AuthSelectField";
 import { ChecklistGroup } from "@/features/auth/preferences/ChecklistGroup";
-import { PostPropertyStepper } from "@/features/broker/post-property/PostPropertyStepper";
+import { PostPropertyStepper, type StepKey } from "@/features/broker/post-property/PostPropertyStepper";
 import { FreePlanUsageBar } from "@/features/broker/post-property/FreePlanUsageBar";
 import { PropertySpecificationsSidebar } from "@/features/broker/post-property/PropertySpecificationsSidebar";
+import { PropertyLocationMapPreview } from "@/features/broker/post-property/PropertyLocationMapPreview";
 import { JVPartnersSection } from "@/features/broker/post-property/JVPartnersSection";
 import { PGDetailsSection } from "@/features/broker/post-property/PGDetailsSection";
 import { Furnishing, ListingType, PropertyType } from "@/lib/enums";
 import { cn, toOptionalNumber } from "@/lib/utils";
 import { toast } from "@/lib/toast";
+import { CITY_NAMES, stateForCity } from "@/lib/data/indian-cities";
+import { saveInfoDraft } from "@/lib/postPropertyDraft";
 import {
   FACING_OPTIONS,
   LAND_APPROVAL_OPTIONS,
@@ -63,14 +66,16 @@ type PropertyInfoStepProps = {
   jvAgreementFile: File | null;
   onJvAgreementFileChange: (file: File | null) => void;
   onContinue: (values: PropertyInfoValues) => void;
+  onStepSelect?: (step: StepKey) => void;
 };
 
-export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreementFileChange, onContinue }: PropertyInfoStepProps) {
+export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreementFileChange, onContinue, onStepSelect }: PropertyInfoStepProps) {
   const {
     register,
     handleSubmit,
     watch,
     setValue,
+    getValues,
     formState: { errors },
   } = useForm<PropertyInfoValues>({
     resolver: zodResolver(propertyInfoSchema),
@@ -95,6 +100,18 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
 
   const propertyTypeGroups = isSell ? SELL_PROPERTY_TYPE_GROUPS : RENT_PROPERTY_TYPE_GROUPS;
 
+  const handlePropertyTypeChange = (value: string) => {
+    setValue("property_type", value as PropertyInfoValues["property_type"], { shouldValidate: true });
+    if (value === PropertyType.plot && getValues("plot_details.is_corner_plot") === undefined) {
+      setValue("plot_details.is_corner_plot", false);
+    }
+  };
+
+  const handleCityChange = (city: string) => {
+    setValue("city", city, { shouldValidate: true });
+    setValue("state", stateForCity(city) ?? "", { shouldValidate: true });
+  };
+
   const handleListingTypeChange = (option: PropertyInfoValues["listing_type"]) => {
     setValue("listing_type", option, { shouldValidate: true });
     const nextGroups = option === ListingType.sale ? SELL_PROPERTY_TYPE_GROUPS : RENT_PROPERTY_TYPE_GROUPS;
@@ -113,13 +130,13 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
   };
 
   const onSubmit = handleSubmit(onContinue);
-  const labelClassName = "text-brand-primary-600/80";
+  const labelClassName = "text-[10px] font-bold uppercase tracking-[1px] text-brand-primary-600/80";
 
   return (
     <form onSubmit={onSubmit} className="flex w-full flex-col gap-8">
       <h1 className="font-heading text-[48px] font-bold leading-15 text-brand-primary-600">Post your listing</h1>
 
-      <PostPropertyStepper current="info" />
+      <PostPropertyStepper current="info" onStepSelect={onStepSelect} />
       <FreePlanUsageBar />
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
@@ -158,7 +175,7 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
               label="Property Type"
               placeholder="Select property type"
               value={watch("property_type")}
-              onValueChange={(value) => setValue("property_type", value as PropertyInfoValues["property_type"], { shouldValidate: true })}
+              onValueChange={handlePropertyTypeChange}
               groups={propertyTypeGroups}
               error={errors.property_type?.message}
               labelClassName={labelClassName}
@@ -171,6 +188,48 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
               labelClassName={labelClassName}
             />
           </div>
+
+          {isPlot && (
+            <div className="flex flex-col gap-5 rounded border border-[rgba(198,198,205,0.35)] p-5">
+              <span className="font-heading text-[9px] font-bold uppercase tracking-[1.5px] text-brand-primary-600/50">Plot Details</span>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <AuthTextField
+                  label="Plot Dimension"
+                  placeholder="e.g. 30x40"
+                  register={register("plot_details.dimension")}
+                  error={errors.plot_details?.dimension?.message}
+                  labelClassName={labelClassName}
+                />
+                <AuthSelectField
+                  label="Facing"
+                  placeholder="Select facing"
+                  value={watch("facing")}
+                  onValueChange={(value) => setValue("facing", value, { shouldValidate: true })}
+                  options={FACING_SELECT_OPTIONS}
+                  error={errors.facing?.message}
+                  labelClassName={labelClassName}
+                />
+              </div>
+              <div className="flex flex-col gap-2.5">
+                <span className={labelClassName}>Corner Plot</span>
+                <div className="flex w-fit items-start self-start rounded p-1 bg-border">
+                  {([false, true] as const).map((option) => (
+                    <button
+                      key={String(option)}
+                      type="button"
+                      onClick={() => setValue("plot_details.is_corner_plot", option, { shouldValidate: true })}
+                      className={cn(
+                        "rounded px-4 py-1.5 font-heading text-[13px] font-bold",
+                        isCornerPlot === option ? "bg-background text-foreground shadow-[0px_1px_1px_rgba(0,0,0,0.05)]" : "text-brand-primary-600/70",
+                      )}
+                    >
+                      {option ? "Yes" : "No"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {isResidential && (
             <AuthSelectField
@@ -185,71 +244,39 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
           )}
 
           {isSell && (
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="font-heading text-[14px] font-bold text-foreground">Is this a JV Property?</span>
-                <span className="font-body text-[12px] text-muted-foreground">Add venture features and partner management</span>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={isJvProperty}
-                onClick={() => setValue("is_jv_property", !isJvProperty)}
-                className={cn("h-6 w-11 rounded-full transition-colors", isJvProperty ? "bg-foreground" : "bg-muted")}
-              >
-                <span className={cn("block size-5 translate-x-0.5 rounded-full bg-background transition-transform", isJvProperty && "translate-x-5")} />
-              </button>
-            </div>
-          )}
-
-          {isSell && isJvProperty && (
-            <JVPartnersSection
-              partners={jvPartners}
-              onPartnersChange={(partners) => setValue("jv_details.partners", partners)}
-              commissionMode={commissionMode}
-              onCommissionModeChange={(mode) => setValue("jv_details.commission_mode", mode)}
-              agreementFile={jvAgreementFile}
-              onAgreementFileChange={onJvAgreementFileChange}
-            />
-          )}
-
-          {isPlot && (
-            <div className="flex flex-col gap-8 border-t border-border pt-8">
-              <h2 className="font-heading text-[16px] font-bold text-foreground">Plot Details</h2>
-              <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
-                <AuthTextField
-                  label="Plot Dimension"
-                  placeholder="e.g. 30x40"
-                  register={register("plot_details.dimension")}
-                  error={errors.plot_details?.dimension?.message}
-                />
-                <AuthSelectField
-                  label="Facing"
-                  placeholder="Select facing"
-                  value={watch("facing")}
-                  onValueChange={(value) => setValue("facing", value, { shouldValidate: true })}
-                  options={FACING_SELECT_OPTIONS}
-                  error={errors.facing?.message}
-                />
-              </div>
+            <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <span className="font-body font-bold text-[12px] uppercase tracking-[1px] text-muted-foreground">Corner Plot</span>
-                <div className="flex rounded-md border border-border p-1">
-                  {([true, false] as const).map((option) => (
-                    <button
-                      key={String(option)}
-                      type="button"
-                      onClick={() => setValue("plot_details.is_corner_plot", option, { shouldValidate: true })}
-                      className={cn(
-                        "rounded px-4 py-1.5 font-heading text-[14px] font-bold",
-                        isCornerPlot === option ? "bg-foreground text-background" : "text-muted-foreground",
-                      )}
-                    >
-                      {option ? "Yes" : "No"}
-                    </button>
-                  ))}
+                <div className="flex flex-col">
+                  <span className="font-heading text-[15px] font-medium text-brand-primary-600">Is this a JV Property?</span>
+                  <span className="font-body text-[12px] leading-[18px] text-brand-primary-600/50">Add venture features and partner management</span>
                 </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isJvProperty}
+                  onClick={() => {
+                    const next = !isJvProperty;
+                    setValue("is_jv_property", next);
+                    if (next && !getValues("jv_details.commission_mode")) {
+                      setValue("jv_details.commission_mode", "auto");
+                    }
+                  }}
+                  className={cn("h-6 w-11 rounded-full transition-colors", isJvProperty ? "bg-foreground" : "bg-brand-secondary-500")}
+                >
+                  <span className={cn("block size-5 translate-x-0.5 rounded-full bg-background transition-transform", isJvProperty && "translate-x-5")} />
+                </button>
               </div>
+
+              {isJvProperty && (
+                <JVPartnersSection
+                  partners={jvPartners}
+                  onPartnersChange={(partners) => setValue("jv_details.partners", partners)}
+                  commissionMode={commissionMode}
+                  onCommissionModeChange={(mode) => setValue("jv_details.commission_mode", mode)}
+                  agreementFile={jvAgreementFile}
+                  onAgreementFileChange={onJvAgreementFileChange}
+                />
+              )}
             </div>
           )}
 
@@ -290,19 +317,69 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
 
           <div className="flex flex-col gap-6 border-t border-border pt-8">
             <h2 className="font-heading text-[20px] font-bold text-brand-primary-600">Location Details</h2>
-            <AuthTextField label="Address" placeholder="12 MG Road" register={register("address_line")} error={errors.address_line?.message} />
+            <AuthTextField
+              label="Address"
+              placeholder="12 MG Road"
+              register={register("address_line")}
+              error={errors.address_line?.message}
+              labelClassName={labelClassName}
+            />
             <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
-              <AuthTextField label="Locality" placeholder="Indiranagar" register={register("locality")} error={errors.locality?.message} />
-              <AuthTextField label="Landmark (optional)" placeholder="Near Metro Station" register={register("landmark")} error={errors.landmark?.message} />
+              <AuthTextField
+                label="Locality"
+                placeholder="Indiranagar"
+                register={register("locality")}
+                error={errors.locality?.message}
+                labelClassName={labelClassName}
+              />
+              <AuthTextField
+                label="Landmark (optional)"
+                placeholder="Near Metro Station"
+                register={register("landmark")}
+                error={errors.landmark?.message}
+                labelClassName={labelClassName}
+              />
             </div>
             <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
-              <AuthTextField label="City" placeholder="Bengaluru" register={register("city")} error={errors.city?.message} />
-              <AuthTextField label="State" placeholder="Karnataka" register={register("state")} error={errors.state?.message} />
-              <AuthTextField label="Pincode" placeholder="560038" register={register("pincode")} error={errors.pincode?.message} />
+              <AuthSelectField
+                label="City"
+                placeholder="Select your city"
+                value={watch("city")}
+                onValueChange={handleCityChange}
+                options={CITY_NAMES}
+                error={errors.city?.message}
+                labelClassName={labelClassName}
+              />
+              <AuthSelectField
+                label="State"
+                placeholder="State"
+                value={watch("state")}
+                onValueChange={() => {}}
+                options={watch("state") ? [watch("state")] : []}
+                disabled
+                error={errors.state?.message}
+                labelClassName={labelClassName}
+              />
+              <AuthTextField
+                label="Pincode"
+                placeholder="560038"
+                register={register("pincode")}
+                error={errors.pincode?.message}
+                labelClassName={labelClassName}
+              />
             </div>
+            <PropertyLocationMapPreview />
           </div>
         </div>
 
+        {/*
+          Figma's Plot frame (node 619:3941) shows a right-column "Specifications" sidebar
+          too, but with the exact same Bedrooms/Bathrooms/Total Area/Curated Amenities
+          content as the Apartment frame — none of which Plot actually collects (only
+          Plot Dimension, Facing, Corner Plot). Flagged as an unedited Figma duplicate,
+          not implemented: a real Plot-specific specifications sidebar is a separate,
+          later task, not assumed here.
+        */}
         {isResidential && (
           <div className="lg:col-span-1">
             <PropertySpecificationsSidebar
@@ -323,7 +400,10 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
       <div className="flex items-center justify-between">
         <button
           type="button"
-          onClick={() => toast.info("Saving a draft and resuming later isn't built yet.")}
+          onClick={() => {
+            saveInfoDraft(getValues());
+            toast.success("Draft saved on this device.");
+          }}
           className="rounded px-16 py-4.75 font-heading text-[14px] font-bold uppercase tracking-[1.4px] text-[#1b1c1c]"
           style={{ backgroundColor: "#eae8e7" }}
         >
