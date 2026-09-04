@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ImageIcon, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +22,9 @@ type PropertyMediaDropzoneProps = {
   helperText?: string;
   accept?: string;
   showPreviews?: boolean;
+  // Hero Photography caps at 5 per the Figma "0/5 Photos" counter; Interior
+  // and Floor Plans have no cap yet, so this is left unset for those.
+  maxFiles?: number;
 };
 
 export function PropertyMediaDropzone({
@@ -32,37 +35,62 @@ export function PropertyMediaDropzone({
   helperText = "Drag & drop or browse — JPG, PNG, or WEBP, max 10MB each",
   accept = "image/jpeg,image/png,image/webp",
   showPreviews = true,
+  maxFiles,
 }: PropertyMediaDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-  // Derived, not state — recomputing only when the file list identity
-  // changes (not on every render) is what useMemo is for. Revocation
-  // lives in a separate cleanup-only effect below, since setting state
-  // from inside an effect body is what actually causes cascading renders.
-  const previewUrls = useMemo(() => images.map((file) => URL.createObjectURL(file)), [images]);
+  const [capMessage, setCapMessage] = useState<string | undefined>(undefined);
+  const isFull = maxFiles !== undefined && images.length >= maxFiles;
+
+  // previewUrls is state, not a useMemo derived from `images`, because the
+  // object URLs must be created and revoked together inside the same effect
+  // run. A useMemo-computed value revoked by a separate cleanup-only effect
+  // breaks under React 18 StrictMode in dev: mount fires the effect once,
+  // then StrictMode immediately replays cleanup+setup to check for missing
+  // cleanup — the phantom cleanup revokes the very URLs already painted to
+  // the DOM, and since the memo's inputs never changed, nothing recreates
+  // them until the images array itself changes (which is why they'd only
+  // reappear after adding/removing a file). Creating fresh URLs inside the
+  // effect body itself means the phantom replay just swaps in a second,
+  // still-valid batch instead of leaving the visible one revoked.
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
   useEffect(() => {
+    const urls = images.map((file) => URL.createObjectURL(file));
+    setPreviewUrls(urls);
     return () => {
-      for (const url of previewUrls) URL.revokeObjectURL(url);
+      for (const url of urls) URL.revokeObjectURL(url);
     };
-  }, [previewUrls]);
+  }, [images]);
 
   const addFiles = (files: FileList | File[]) => {
-    onChange([...images, ...Array.from(files)]);
+    const incoming = Array.from(files);
+    const room = maxFiles === undefined ? incoming.length : Math.max(0, maxFiles - images.length);
+
+    if (room <= 0) {
+      setCapMessage(`Maximum ${maxFiles} photos allowed.`);
+      return;
+    }
+
+    onChange([...images, ...incoming.slice(0, room)]);
+    const skipped = incoming.length - room;
+    setCapMessage(skipped > 0 ? `${skipped} photo${skipped === 1 ? "" : "s"} skipped — maximum ${maxFiles} photos allowed.` : undefined);
   };
 
   const removeAt = (index: number) => {
     onChange(images.filter((_, i) => i !== index));
+    setCapMessage(undefined);
   };
 
   return (
     <div className="flex flex-col gap-4">
       <button
         type="button"
+        disabled={isFull}
         onClick={() => inputRef.current?.click()}
         onDragOver={(event) => {
           event.preventDefault();
-          setIsDragOver(true);
+          if (!isFull) setIsDragOver(true);
         }}
         onDragLeave={() => setIsDragOver(false)}
         onDrop={(event) => {
@@ -72,13 +100,21 @@ export function PropertyMediaDropzone({
         }}
         className={cn(
           "flex w-full flex-col items-center justify-center gap-4 rounded-lg border-[1.5px] border-dashed px-[25px] py-[41px] text-center transition-colors",
-          error ? "border-destructive" : isDragOver ? "border-brand-green-600 bg-brand-green-100" : "border-brand-primary-200 bg-background",
+          isFull
+            ? "cursor-not-allowed border-brand-primary-200 bg-muted opacity-60"
+            : error
+              ? "border-destructive"
+              : isDragOver
+                ? "border-brand-green-600 bg-brand-green-100"
+                : "border-brand-primary-200 bg-background",
         )}
       >
         <Upload size={24} className="text-brand-primary-100" />
         <div className="flex flex-col gap-2">
-          <p className="font-heading text-[14px] font-bold uppercase tracking-[1.4px] text-brand-secondary-900">{title}</p>
-          <p className="font-body text-[12px] text-brand-primary-300">{helperText}</p>
+          <p className="font-heading text-[14px] font-bold uppercase tracking-[1.4px] text-brand-secondary-900">
+            {isFull ? `Maximum ${maxFiles} photos reached` : title}
+          </p>
+          <p className="font-body text-[12px] text-brand-primary-300">{isFull ? "Remove one to add another." : helperText}</p>
         </div>
       </button>
       <input
@@ -86,6 +122,7 @@ export function PropertyMediaDropzone({
         type="file"
         accept={accept}
         multiple
+        disabled={isFull}
         className="hidden"
         onChange={(event) => {
           if (event.target.files && event.target.files.length > 0) addFiles(event.target.files);
@@ -138,6 +175,7 @@ export function PropertyMediaDropzone({
         </p>
       )}
       {error && <p className="text-[12px] text-destructive">{error}</p>}
+      {capMessage && <p className="font-body text-[12px] text-muted-foreground">{capMessage}</p>}
     </div>
   );
 }

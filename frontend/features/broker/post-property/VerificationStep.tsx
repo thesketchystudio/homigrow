@@ -1,7 +1,7 @@
 // features/broker/post-property/VerificationStep.tsx
 // Step 4 (final) of the Post Property wizard (Figma "Curate Your Listing"
 // > Verification). Three confirmation checkboxes gate the actual submit —
-// createProperty -> media/video/JV-agreement uploads -> submitProperty,
+// createProperty -> media/JV-agreement uploads -> submitProperty,
 // all orchestrated by PostPropertyWizard. This step has no schema of its
 // own; the checkboxes are a client-side gate, not persisted fields.
 

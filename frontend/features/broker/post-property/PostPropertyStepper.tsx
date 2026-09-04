@@ -30,7 +30,7 @@ export function PostPropertyStepper({ current, onStepSelect }: PostPropertyStepp
   const currentIndex = STEPS.findIndex((step) => step.key === current);
 
   return (
-    <div className="flex w-full border-b border-brand-primary-100">
+    <div className="flex w-full gap-12 border-b border-brand-primary-100">
       {STEPS.map((step, index) => {
         const isActive = step.key === current;
         const isDone = index < currentIndex;
@@ -40,9 +40,11 @@ export function PostPropertyStepper({ current, onStepSelect }: PostPropertyStepp
             <span className="font-heading text-[16px] font-medium uppercase text-foreground">{step.label}</span>
           </>
         );
+        // Inter-step spacing lives on the parent's `gap-12` above, not as
+        // padding on each item — padding would sit inside this element's own
+        // border box and shift the underline left of its number/label.
         const className = cn(
           "flex items-center gap-3 border-b-2 pb-4.5",
-          index > 0 && "pl-12",
           isActive ? "border-foreground" : "border-transparent",
           !isActive && !isDone && "opacity-40",
         );
