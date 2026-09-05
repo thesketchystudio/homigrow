@@ -4,18 +4,20 @@
 // shows property-specific commentary ("14% YOY appreciation..." etc.) —
 // there's no real market-data source behind that, so the copy here is
 // generic rather than fabricated per-property stats; "Download Market
-// Report" just toasts, same as the other unbuilt actions below.
+// Report" just toasts, since no backend exists for that.
 //
-// POST /properties/{id}/enquire doesn't exist yet (same deferred list), so
-// the form collects input locally but both actions just surface a toast —
-// same placeholder pattern LoginForm used for "Forgot password?" before
-// that flow was actually built.
+// Both CTAs hit POST /properties/{id}/enquire, which works for anonymous
+// and logged-in visitors alike and reveals the broker's phone number on
+// success — GET /properties/{id} never exposes it.
 
 "use client";
 
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { MapPin, ShieldCheck, User } from "lucide-react";
 
+import { ApiError } from "@/lib/api/client";
+import { enquireProperty, type EnquireResponse, type LeadSource } from "@/lib/api/endpoints/leads";
 import type { PropertyRead } from "@/lib/api/endpoints/properties";
 import { VerificationStatus } from "@/lib/enums";
 import { toast } from "@/lib/toast";
@@ -24,14 +26,27 @@ export function PropertyContactCard({ property }: { property: PropertyRead }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [date, setDate] = useState("");
+  const [revealed, setRevealed] = useState<EnquireResponse | null>(null);
   const isVerified = property.broker.broker_profile?.verification_status === VerificationStatus.verified;
 
-  const handleAction = (action: string) => {
+  const enquireMutation = useMutation({
+    mutationFn: (source: LeadSource) =>
+      enquireProperty(property.id, { name, phone, source, preferred_date: date || undefined }),
+    onSuccess: (data) => {
+      setRevealed(data);
+      toast.success("Request sent — the broker's number is below.");
+    },
+    onError: (error: ApiError) => {
+      toast.error(error.code === "LEAD_ALREADY_OPEN" ? error.message : "Couldn't send your request. Please try again.");
+    },
+  });
+
+  const handleAction = (source: LeadSource) => {
     if (!name || !phone) {
       toast.error("Please enter your name and number first.");
       return;
     }
-    toast.info(`${action} isn't available yet — check back soon.`);
+    enquireMutation.mutate(source);
   };
 
   return (
@@ -49,59 +64,73 @@ export function PropertyContactCard({ property }: { property: PropertyRead }) {
           </div>
         </div>
 
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="contact-name" className="font-heading text-[10px] font-bold uppercase tracking-[1px] text-brand-primary-600/80">
-              Full Name
-            </label>
-            <input
-              id="contact-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Enter your name"
-              className="rounded-sm bg-brand-secondary-400 px-4 py-3 font-body text-[14px] text-brand-primary-600 placeholder:text-brand-primary-300 outline-none"
-            />
+        {revealed ? (
+          <div className="flex flex-col gap-3">
+            <p className="font-body text-[14px] text-brand-primary-600">Thanks, {name}! Your request has been sent.</p>
+            <a
+              href={`tel:${revealed.broker_phone}`}
+              className="rounded-md bg-brand-green-500 py-4 text-center font-heading text-[14px] font-bold uppercase tracking-[1.4px] text-brand-primary-400"
+            >
+              Call {revealed.broker_name ?? "the broker"}: {revealed.broker_phone ?? "not available"}
+            </a>
           </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="contact-phone" className="font-heading text-[10px] font-bold uppercase tracking-[1px] text-brand-primary-600/80">
-              Number
-            </label>
-            <input
-              id="contact-phone"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-              placeholder="Enter your number"
-              className="rounded-sm bg-brand-secondary-400 px-4 py-3 font-body text-[14px] text-brand-primary-600 placeholder:text-brand-primary-300 outline-none"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="contact-date" className="font-heading text-[10px] font-bold uppercase tracking-[1px] text-brand-primary-600/80">
-              Preferred Date
-            </label>
-            <input
-              id="contact-date"
-              type="date"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-              className="rounded-sm bg-brand-secondary-400 px-4 py-3 font-body text-[14px] text-brand-primary-600 outline-none"
-            />
-          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <label htmlFor="contact-name" className="font-heading text-[10px] font-bold uppercase tracking-[1px] text-brand-primary-600/80">
+                Full Name
+              </label>
+              <input
+                id="contact-name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Enter your name"
+                className="rounded-sm bg-brand-secondary-400 px-4 py-3 font-body text-[14px] text-brand-primary-600 placeholder:text-brand-primary-300 outline-none"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="contact-phone" className="font-heading text-[10px] font-bold uppercase tracking-[1px] text-brand-primary-600/80">
+                Number
+              </label>
+              <input
+                id="contact-phone"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                placeholder="Enter your number"
+                className="rounded-sm bg-brand-secondary-400 px-4 py-3 font-body text-[14px] text-brand-primary-600 placeholder:text-brand-primary-300 outline-none"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="contact-date" className="font-heading text-[10px] font-bold uppercase tracking-[1px] text-brand-primary-600/80">
+                Preferred Date
+              </label>
+              <input
+                id="contact-date"
+                type="date"
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+                className="rounded-sm bg-brand-secondary-400 px-4 py-3 font-body text-[14px] text-brand-primary-600 outline-none"
+              />
+            </div>
 
-          <button
-            type="button"
-            onClick={() => handleAction("Scheduling a private tour")}
-            className="rounded-md bg-brand-primary-600 py-4 font-heading text-[14px] font-bold uppercase tracking-[1.4px] text-brand-secondary-100 shadow-lg"
-          >
-            Schedule Private Tour
-          </button>
-          <button
-            type="button"
-            onClick={() => handleAction("Getting the owner's number")}
-            className="rounded-md bg-brand-green-500 py-4 font-heading text-[14px] font-bold uppercase tracking-[1.4px] text-brand-primary-400"
-          >
-            Get Number
-          </button>
-        </div>
+            <button
+              type="button"
+              disabled={enquireMutation.isPending}
+              onClick={() => handleAction("tour_request")}
+              className="rounded-md bg-brand-primary-600 py-4 font-heading text-[14px] font-bold uppercase tracking-[1.4px] text-brand-secondary-100 shadow-lg disabled:opacity-60"
+            >
+              Schedule Private Tour
+            </button>
+            <button
+              type="button"
+              disabled={enquireMutation.isPending}
+              onClick={() => handleAction("number_request")}
+              className="rounded-md bg-brand-green-500 py-4 font-heading text-[14px] font-bold uppercase tracking-[1.4px] text-brand-primary-400 disabled:opacity-60"
+            >
+              Get Number
+            </button>
+          </div>
+        )}
 
         {isVerified && (
           <div className="flex flex-col gap-4 border-t border-[rgba(198,198,205,0.1)] pt-4">
