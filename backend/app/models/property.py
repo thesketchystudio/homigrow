@@ -28,7 +28,15 @@ from sqlalchemy.orm import relationship
 
 from app.db.base import Base, TimestampMixin
 from app.models._helpers import _pg_enum
-from app.models.enums import Furnishing, ListingType, MediaType, PropertyStatus, PropertyType
+from app.models.enums import (
+    Furnishing,
+    ListingType,
+    MediaType,
+    PaymentStructure,
+    PriceFlexibility,
+    PropertyStatus,
+    PropertyType,
+)
 
 
 class Property(Base, TimestampMixin):
@@ -50,9 +58,20 @@ class Property(Base, TimestampMixin):
     status = Column(_pg_enum(PropertyStatus, "property_status"), nullable=False, server_default=PropertyStatus.draft.value)
 
     price = Column(Numeric(12, 2), nullable=False)
+    price_per_sqft = Column(Numeric(12, 2), nullable=True)
+    token_amount = Column(Numeric(12, 2), nullable=True)
     maintenance_monthly = Column(Numeric(10, 2), nullable=True)
     deposit = Column(Numeric(12, 2), nullable=True)
     is_negotiable = Column(Boolean, nullable=False, server_default=text("false"))
+    # Richer 3-way negotiation stance shown on the Pricing step; is_negotiable
+    # above is kept in sync by the frontend (fixed -> false, else -> true) for
+    # any existing consumer that only reads the boolean.
+    price_flexibility = Column(_pg_enum(PriceFlexibility, "price_flexibility"), nullable=True)
+    payment_structure = Column(_pg_enum(PaymentStructure, "payment_structure"), nullable=True)
+    stamp_duty_percent = Column(Numeric(5, 2), nullable=True)
+    registration_fee_percent = Column(Numeric(5, 2), nullable=True)
+    brokerage_included = Column(Boolean, nullable=False, server_default=text("true"))
+    brokerage_percent = Column(Numeric(5, 2), nullable=True)
 
     bhk = Column(SmallInteger, nullable=True)  # null for plots/offices
     bathrooms = Column(SmallInteger, nullable=True)
@@ -79,8 +98,21 @@ class Property(Base, TimestampMixin):
     # event, so the generated migration DDL is predictable and reviewable.
     location = Column(Geography(geometry_type="POINT", srid=4326, spatial_index=False), nullable=True)
 
-    # {room_type, sharing, meals, rules} — only populated when listing_type is "pg".
+    # PG/co-living sub-fields, shape varies by listing_scope inside the blob:
+    # building details (Sell), or Entire Building / Unit-Room (Rent) — only
+    # populated when property_type is "pg_colive". See PGDetails schema.
     pg_details = Column(JSONB, nullable=True)
+    # {dimension, is_corner_plot} — only populated when property_type is "plot".
+    plot_details = Column(JSONB, nullable=True)
+    # {land_use, approvals} — only populated when property_type is "land".
+    land_details = Column(JSONB, nullable=True)
+
+    # Cross-cutting flag — any Sell property type can be a joint-venture
+    # listing (see JVDetails schema); not modeled as its own PropertyType.
+    is_jv_property = Column(Boolean, nullable=False, server_default=text("false"))
+    jv_details = Column(JSONB, nullable=True)
+
+    virtual_tour_url = Column(String(500), nullable=True)
 
     # Denormalized counter for fast reads; the events table is the source of truth.
     views_count = Column(Integer, nullable=False, server_default="0")

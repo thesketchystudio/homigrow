@@ -34,16 +34,40 @@ MAX_DOCUMENT_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB, matches the Figma upload copy
 ALLOWED_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB, higher than docs since these are hero/interior photos
 
+ALLOWED_VIDEO_CONTENT_TYPES = {"video/mp4", "video/quicktime"}
+# Figma's Property Video / Drone Footage upload copy says "Max 500MB", but
+# that ceiling also depends on the Supabase project's own global upload-size
+# limit (configured in its dashboard, separate from this app). 100MB here is
+# a conservative starting cap for the Supabase-Storage-only path — raise
+# both together once Cloudflare Stream (or a higher Supabase limit) is wired up.
+MAX_VIDEO_SIZE_BYTES = 100 * 1024 * 1024
+
+ALLOWED_DOCUMENT_CONTENT_TYPES = {
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+MAX_PROPERTY_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024  # matches the JV Agreement upload copy ("Max 10MB")
+
 _EXTENSION_BY_CONTENT_TYPE = {
     "application/pdf": ".pdf",
     "image/jpeg": ".jpg",
     "image/png": ".png",
+    "application/msword": ".doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
 }
 
 _IMAGE_EXTENSION_BY_CONTENT_TYPE = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
     "image/webp": ".webp",
+}
+
+_VIDEO_EXTENSION_BY_CONTENT_TYPE = {
+    "video/mp4": ".mp4",
+    "video/quicktime": ".mov",
 }
 
 _client = None
@@ -140,3 +164,77 @@ def upload_property_image(
         ContentType=content_type,
     )
     return f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.SUPABASE_S3_BUCKET_PROPERTY_MEDIA}/{object_key}"
+
+
+def upload_property_video(
+    property_id: UUID,
+    content: bytes,
+    content_type: str,
+) -> str:
+    """
+    Validates and uploads a property video (walkthrough or drone footage) to
+    the same public property-media bucket used for photos, returning a
+    fetchable public URL. Goes straight through Supabase Storage rather than
+    Cloudflare Stream — Stream isn't wired up yet, so there's no adaptive
+    transcoding/streaming here, just a direct file URL, same as an image.
+    """
+    if content_type not in ALLOWED_VIDEO_CONTENT_TYPES:
+        raise ValidationFailed(
+            "UNSUPPORTED_FILE_TYPE",
+            "Only MP4 or MOV videos are accepted.",
+            {"file": "Only MP4 or MOV videos are accepted."},
+        )
+    if len(content) > MAX_VIDEO_SIZE_BYTES:
+        raise ValidationFailed(
+            "FILE_TOO_LARGE",
+            "File must be 100 MB or smaller.",
+            {"file": "File must be 100 MB or smaller."},
+        )
+
+    extension = _VIDEO_EXTENSION_BY_CONTENT_TYPE[content_type]
+    object_key = f"{property_id}/{uuid4().hex}{extension}"
+
+    _get_client().put_object(
+        Bucket=settings.SUPABASE_S3_BUCKET_PROPERTY_MEDIA,
+        Key=object_key,
+        Body=content,
+        ContentType=content_type,
+    )
+    return f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.SUPABASE_S3_BUCKET_PROPERTY_MEDIA}/{object_key}"
+
+
+def upload_property_document(
+    property_id: UUID,
+    content: bytes,
+    content_type: str,
+) -> str:
+    """
+    Validates and uploads a property-scoped private document (currently
+    just the JV Agreement) to the same private bucket used for broker
+    verification documents, returning an internal object key rather than a
+    fetchable URL — matches the Figma copy ("For internal use only — not
+    visible to buyers").
+    """
+    if content_type not in ALLOWED_DOCUMENT_CONTENT_TYPES:
+        raise ValidationFailed(
+            "UNSUPPORTED_FILE_TYPE",
+            "Only PDF, DOC, DOCX, JPG, or PNG files are accepted.",
+            {"file": "Only PDF, DOC, DOCX, JPG, or PNG files are accepted."},
+        )
+    if len(content) > MAX_PROPERTY_DOCUMENT_SIZE_BYTES:
+        raise ValidationFailed(
+            "FILE_TOO_LARGE",
+            "File must be 10 MB or smaller.",
+            {"file": "File must be 10 MB or smaller."},
+        )
+
+    extension = _EXTENSION_BY_CONTENT_TYPE[content_type]
+    object_key = f"properties/{property_id}/documents/{uuid4().hex}{extension}"
+
+    _get_client().put_object(
+        Bucket=settings.SUPABASE_S3_BUCKET,
+        Key=object_key,
+        Body=content,
+        ContentType=content_type,
+    )
+    return object_key

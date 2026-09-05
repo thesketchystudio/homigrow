@@ -402,6 +402,40 @@ commits to `dev` before starting)
   `multiprocessing` child from an earlier session had outlived its
   parent and was still holding port 8000); killed it and started fresh
   from this worktree before testing.
+- **Plot + Land property types shipped 2026-08-30** — first of a
+  planned one-at-a-time rollout closing the gap between the wizard
+  (residential-only: apartment/villa/independent_house) and the real
+  Figma "Broker view > post property" design, which lets a broker pick
+  Plot, Land, PG/Co-living, or Commercial Building too (PG/Commercial
+  and JV Property are separate follow-up passes, backend-first per
+  your explicit ordering). New `PropertyType.land` enum value; two new
+  nullable `plot_details`/`land_details` JSONB columns on `Property`
+  (migration M7, `aa1defd89f8c`), following the same reserved-JSONB-
+  bucket pattern `pg_details` already established rather than adding
+  5+ narrow typed columns — `{dimension, is_corner_plot}` and
+  `{land_use, approvals}` respectively. Plot's Facing field and Land's
+  Total Area reuse the existing (previously wizard-unused) `facing`/
+  `area_sqft` columns, no new column needed for either. New
+  `PlotDetails`/`LandDetails` schemas in `app/schemas/properties.py`,
+  wired into `PropertyRead` and `PropertyCreateRequest`;
+  `broker_property_service.create_property()` persists both. M7's
+  `ALTER TYPE ... ADD VALUE` can't be reversed directly (Postgres has
+  no `DROP VALUE`), so its downgrade rebuilds `property_type` via
+  rename → recreate → cast → drop-old, same as the standard pattern
+  for this class of migration — verified upgrade → downgrade → upgrade
+  clean against the real dev DB. 224→226 tests pass (2 new in
+  `test_broker_properties.py`, covering plot and land creation +
+  round-trip, plus an added assertion that residential creates still
+  get `null` for both new fields). Live-verified end-to-end against
+  the real Supabase dev DB via curl using the standing test broker
+  (`broker.login.test@homigrow.local`): created one real plot listing
+  and one real land listing, confirmed both `plot_details`/
+  `land_details` round-tripped exactly through the response, confirmed
+  each other's detail field stayed `null`; both verification rows
+  deleted afterward via `delete_test_property.py`. **Frontend wizard
+  changes (Property Type dropdown, conditional Plot/Land sub-forms)
+  not started — separate task, backend-first per your explicit
+  ordering.**
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
