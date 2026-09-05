@@ -7,19 +7,22 @@ public Property Details and Listings screens.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
+from app.api.v1.deps import OptionalCurrentUser
 from app.core.exceptions import ValidationFailed
+from app.core.middleware import limiter
 from app.db.session import get_db
 from app.models.enums import ListingType, PropertyType
+from app.schemas.leads import EnquireRequest, EnquireResponse
 from app.schemas.properties import (
     NeighborhoodSummary,
     PropertyCompareResponse,
     PropertyListResponse,
     PropertyRead,
 )
-from app.services import property_service
+from app.services import lead_service, property_service
 from app.services.property_service import MAX_COMPARE_IDS, SortOption
 
 router = APIRouter(prefix="/properties", tags=["properties"])
@@ -104,3 +107,25 @@ def get_property(property_id: UUID, db: Session = Depends(get_db)) -> PropertyRe
     """Returns an active property's full detail; 404 if missing or not active."""
     property_ = property_service.get_property_detail(db, property_id)
     return PropertyRead.model_validate(property_)
+
+
+@router.post("/{property_id}/enquire", response_model=EnquireResponse, status_code=201)
+@limiter.limit("5/minute")
+def enquire_property(
+    property_id: UUID,
+    payload: EnquireRequest,
+    request: Request,
+    requester: OptionalCurrentUser,
+    db: Session = Depends(get_db),
+) -> EnquireResponse:
+    """Creates a Lead from the Property Details contact card's two CTAs — works for both
+    anonymous and logged-in visitors. On success reveals the broker's phone number, which
+    GET /{property_id} never exposes."""
+    property_ = property_service.get_property_detail(db, property_id)
+    lead = lead_service.create_enquiry(db, property_, requester, payload)
+    return EnquireResponse(
+        id=lead.id,
+        status=lead.status,
+        broker_name=property_.broker.full_name,
+        broker_phone=property_.broker.phone,
+    )

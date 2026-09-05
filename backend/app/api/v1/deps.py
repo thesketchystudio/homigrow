@@ -51,6 +51,26 @@ def get_current_user(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+def get_current_user_optional(
+    credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(_bearer_scheme)],
+    db: Session = Depends(get_db),
+) -> Optional[User]:
+    """Mirrors get_current_user but returns None instead of raising on missing/expired/invalid
+    credentials or an unknown user — for endpoints that must work for both anonymous and
+    logged-in callers."""
+    if credentials is None:
+        return None
+    try:
+        payload = decode_access_token(credentials.credentials)
+        user_id = UUID(payload["sub"])
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, KeyError, ValueError):
+        return None
+    return db.query(User).filter(User.id == user_id).first()
+
+
+OptionalCurrentUser = Annotated[Optional[User], Depends(get_current_user_optional)]
+
+
 def require_role(*roles: UserRole):
     """Dependency factory: 403s unless the current user's role is one of `roles`."""
 
