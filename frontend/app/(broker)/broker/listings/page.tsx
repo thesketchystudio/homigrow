@@ -1,11 +1,10 @@
 // app/(broker)/broker/listings/page.tsx
-// A dedicated listings-management table (filters, bulk actions, etc.) is
-// future work — until then this shows the same real empty-state/status-
-// list as the Dashboard (BrokerListingsPanel), since both currently have
-// the same data behind them.
+// Real Listings table (Figma "Real Estate Broker Portal > MyListings",
+// node 176:789) — search, Type/Status filters, and per-row actions. See
+// BrokerListingsTable.tsx for the implementation.
 
-import { BrokerListingsPanel } from "@/features/broker/BrokerListingsPanel";
+import { BrokerListingsTable } from "@/features/broker/listings/BrokerListingsTable";
 
 export default function BrokerListingsPage() {
-  return <BrokerListingsPanel heading="All Listings" />;
+  return <BrokerListingsTable />;
 }

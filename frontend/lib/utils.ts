@@ -45,3 +45,10 @@ export function formatListingPrice(item: { listing_type: ListingType; price: num
   }
   return `₹${Math.round(item.price).toLocaleString("en-IN")}/mo`;
 }
+
+// Formats a timestamp as "Listed Xd ago" for the broker Listings table,
+// matching the Figma design's relative-age column.
+export function formatListedAgo(dateString: string): string {
+  const days = Math.max(0, Math.floor((Date.now() - new Date(dateString).getTime()) / (1000 * 60 * 60 * 24)));
+  return days === 0 ? "Listed today" : `Listed ${days}d ago`;
+}

@@ -1295,4 +1295,42 @@ separate from the general `<phase>_frontend_client` branch)
   misleadingly as a CORS failure. Uncommented them back (values already
   correct, just disabled) and restarted the dev server; not a code
   change, so nothing to commit.
+- **Broker Listings table shipped 2026-09-05** — real `/broker/listings`
+  page (previously the same plain empty-state/status-list as Dashboard,
+  `BrokerListingsPanel`), matching Figma node `176:789`
+  ("Real Estate Broker Portal > MyListings"). New
+  `features/broker/listings/BrokerListingsTable.tsx`: search + Type/
+  Status filter dropdowns, and the shared `SharedTable`/`StatusPill`
+  composites (first real consumer of `SharedTable` — previously unused
+  outside its own file) for Property (thumbnail + title + "Listed Xd
+  ago") / Location / Price / Details (BHK + sq.ft) / Performance /
+  Status / Actions columns. Filtering, search, and pagination (8 rows/
+  page, matching the Figma mock) are all client-side against
+  `listMyProperties()`'s existing unpaginated `/properties/mine` result
+  — no new list endpoint needed. `BrokerListingsPanel.tsx` now backs the
+  Dashboard page only; its header comment updated to say so.
+  **Performance (views/leads) is hardcoded to 0/0**, your explicit
+  instruction — no per-property view/lead-count aggregate exists on the
+  backend yet. **Boost** (the header button and each row's action, which
+  Figma's icon reads as the same action, not two different ones) always
+  toasts "Boost Listing — coming soon!" — `BoostPlan` is a catalog table
+  only, no purchase/assignment flow exists to call. **Edit opens the Post
+  Property wizard in a new tab** with `?propertyId=<id>` on the URL —
+  navigation-only per your explicit scope call: the wizard has no
+  prefill/edit mode and no `PATCH /properties/{id}` exists yet, both
+  deliberately deferred to a follow-up task rather than built here.
+  Backend gained one small, targeted addition to support the "Listed Xd
+  ago" column: `BrokerPropertyListItem.created_at` (see backend
+  CLAUDE.md, 2026-09-05) — `published_at` alone is null for the
+  draft/pending listings a broker mostly sees. New `formatListedAgo()` in
+  `lib/utils.ts`. `tsc`/`eslint`/`next build` all clean (one pre-existing-
+  pattern `<img>` warning, matching `PropertyCard.tsx`'s own convention).
+  Live-verified with Playwright against the real backend + Supabase dev
+  DB, logged in as the demo-data broker (`vikram.broker.test@homigrow.local`,
+  11 real listings): full table renders correctly across 2 pages; the
+  Status filter narrows correctly including to a genuine empty state
+  ("Draft" — zero of this broker's listings are drafts); search narrows
+  correctly (`villa` → exactly the 2 matching titles); both Boost toasts
+  fire; Edit's link `href` carries the correct property id. Screenshot-
+  compared against the Figma reference — close match.
 

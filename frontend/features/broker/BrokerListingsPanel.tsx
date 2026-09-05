@@ -1,9 +1,9 @@
 // features/broker/BrokerListingsPanel.tsx
-// Shared by the Dashboard and Listings pages, which currently show
-// identical content (a real KPI dashboard and a full listings table are
-// both future work) — fetches the broker's own properties across every
-// status and renders the Figma "Blank screen" empty state when there are
-// none, or a plain status list once there's at least one.
+// Backs the Dashboard page only (Listings now has its own real table, see
+// features/broker/listings/BrokerListingsTable.tsx) — a real KPI dashboard
+// is still future work, so this fetches the broker's own properties across
+// every status and renders the Figma "Blank screen" empty state when there
+// are none, or a plain status list once there's at least one.
 
 "use client";
 
