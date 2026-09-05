@@ -4,7 +4,8 @@
 // GET /properties serves the Listings search grid.
 
 import { apiRequest, apiRequestMultipart } from "@/lib/api/client";
-import type { Furnishing, ListingType, MediaType, PropertyStatus, PropertyType, VerificationStatus } from "@/lib/enums";
+import type { Furnishing, ListingType, MediaType, PaymentStructure, PriceFlexibility, PropertyStatus, PropertyType, VerificationStatus } from "@/lib/enums";
+import type { JVDetailsValues, LandDetailsValues, PGDetailsValues, PlotDetailsValues } from "@/lib/validation/postProperty";
 
 export type PropertyMediaRead = {
   id: string;
@@ -33,9 +34,17 @@ export type PropertyRead = {
   listing_type: ListingType;
   property_type: PropertyType;
   price: number;
+  price_per_sqft?: number;
+  token_amount?: number;
   maintenance_monthly?: number;
   deposit?: number;
   is_negotiable: boolean;
+  price_flexibility?: PriceFlexibility;
+  payment_structure?: PaymentStructure;
+  stamp_duty_percent?: number;
+  registration_fee_percent?: number;
+  brokerage_included: boolean;
+  brokerage_percent?: number;
   bhk?: number;
   bathrooms?: number;
   area_sqft?: number;
@@ -46,6 +55,12 @@ export type PropertyRead = {
   parking_slots?: number;
   furnishing?: Furnishing;
   amenities: string[];
+  plot_details?: PlotDetailsValues;
+  land_details?: LandDetailsValues;
+  pg_details?: PGDetailsValues;
+  is_jv_property: boolean;
+  jv_details?: JVDetailsValues;
+  virtual_tour_url?: string;
   address_line: string;
   locality: string;
   city: string;
@@ -196,9 +211,16 @@ export type PropertyCreateInput = {
   bhk?: number;
   bathrooms?: number;
   area_sqft?: number;
+  facing?: string;
   furnishing?: Furnishing;
   built_year?: number;
   amenities: string[];
+  plot_details?: PlotDetailsValues;
+  land_details?: LandDetailsValues;
+  pg_details?: PGDetailsValues;
+  is_jv_property: boolean;
+  jv_details?: JVDetailsValues;
+  virtual_tour_url?: string;
   address_line: string;
   locality: string;
   city: string;
@@ -206,10 +228,26 @@ export type PropertyCreateInput = {
   pincode: string;
   landmark?: string;
   price: number;
+  price_per_sqft?: number;
+  token_amount?: number;
   maintenance_monthly?: number;
   deposit?: number;
   is_negotiable: boolean;
+  price_flexibility?: PriceFlexibility;
+  payment_structure?: PaymentStructure;
+  stamp_duty_percent?: number;
+  registration_fee_percent?: number;
+  brokerage_included: boolean;
+  brokerage_percent?: number;
 };
+
+// Broker's own listings across every status (draft included) — backs the
+// Dashboard/Listings pages' empty-state check.
+export type BrokerPropertyListItem = PropertyListItem & { status: PropertyStatus };
+
+export function listMyProperties(): Promise<BrokerPropertyListItem[]> {
+  return apiRequest<BrokerPropertyListItem[]>("/properties/mine");
+}
 
 export function createProperty(data: PropertyCreateInput): Promise<PropertyRead> {
   return apiRequest<PropertyRead>("/properties", { method: "POST", body: data });
@@ -219,6 +257,18 @@ export function uploadPropertyMedia(propertyId: string, images: File[]): Promise
   const formData = new FormData();
   for (const image of images) formData.append("images", image);
   return apiRequestMultipart<PropertyMediaRead[]>(`/properties/${propertyId}/media`, formData);
+}
+
+export function uploadPropertyVideo(propertyId: string, video: File): Promise<PropertyMediaRead> {
+  const formData = new FormData();
+  formData.append("video", video);
+  return apiRequestMultipart<PropertyMediaRead>(`/properties/${propertyId}/media/video`, formData);
+}
+
+export function uploadJvAgreement(propertyId: string, document: File): Promise<PropertyRead> {
+  const formData = new FormData();
+  formData.append("document", document);
+  return apiRequestMultipart<PropertyRead>(`/properties/${propertyId}/jv-agreement`, formData);
 }
 
 export function submitProperty(propertyId: string): Promise<PropertyRead> {

@@ -4,10 +4,11 @@
 // matching the Homigrow auth/onboarding Figma flow's dropdown fields
 // (label + full-width underline with a chevron, no boxed border).
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useRef } from "react";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-type SelectOption = string | { value: string; label: string };
+type SelectOption = string | { value: string; label: string; disabled?: boolean };
 
 type AuthSelectFieldProps = {
   label: string;
@@ -17,11 +18,23 @@ type AuthSelectFieldProps = {
   // Plain strings when the value and its display label are the same
   // (e.g. a city name); { value, label } pairs when they diverge (e.g.
   // an enum key like "independent_house" displayed as "Independent House").
-  options: SelectOption[];
+  // Mutually exclusive with `groups` below.
+  options?: SelectOption[];
+  // Grouped variant — renders a muted section header per group (e.g. the
+  // Post Property wizard's "RESIDENTIAL" / "COMMERCIAL & LAND" Property
+  // Type dropdown sections). Takes precedence over `options` when set.
+  groups?: { label: string; options: SelectOption[] }[];
   error?: string;
   disabled?: boolean;
   className?: string;
+  // Overrides the default label color — e.g. the Post Property wizard's
+  // Figma labels are darker (rgba(26,26,26,0.8)) than the auth flow's.
+  labelClassName?: string;
 };
+
+function normalizeOption(option: SelectOption) {
+  return typeof option === "string" ? { value: option, label: option, disabled: false } : { disabled: false, ...option };
+}
 
 export function AuthSelectField({
   label,
@@ -29,32 +42,59 @@ export function AuthSelectField({
   value,
   onValueChange,
   options,
+  groups,
   error,
   disabled,
   className,
+  labelClassName,
 }: AuthSelectFieldProps) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Radix re-focuses the trigger after a selection closes the dropdown, so a
+  // mouse-picked option still lights up the focus-visible green underline —
+  // blur it back out once that refocus has happened (hence the deferred tick).
+  const handleValueChange = (next: string) => {
+    onValueChange(next);
+    setTimeout(() => triggerRef.current?.blur(), 0);
+  };
+
   return (
     <div className={cn("flex w-full flex-col gap-3", className)}>
-      <span className="font-body font-bold text-[12px] leading-[18px] text-brand-primary-100">{label}</span>
-      <Select value={value || undefined} onValueChange={onValueChange} disabled={disabled}>
+      <span className={cn("font-body font-bold text-[12px] leading-[18px] text-brand-primary-100", labelClassName)}>{label}</span>
+      <Select value={value || undefined} onValueChange={handleValueChange} disabled={disabled}>
         <SelectTrigger
+          ref={triggerRef}
           aria-invalid={Boolean(error)}
           className={cn(
             "h-auto w-full rounded-none border-0 border-b bg-transparent px-0 pb-[5px] pt-1 font-heading text-[20px] leading-[28px] text-foreground shadow-none focus-visible:ring-0 disabled:cursor-default disabled:opacity-100",
-            error ? "border-destructive" : "border-foreground focus:border-brand-green-600",
+            error ? "border-destructive" : "border-foreground focus-visible:border-brand-green-600",
           )}
         >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {options.map((option) => {
-            const { value: optionValue, label: optionLabel } = typeof option === "string" ? { value: option, label: option } : option;
-            return (
-              <SelectItem key={optionValue} value={optionValue}>
-                {optionLabel}
-              </SelectItem>
-            );
-          })}
+          {groups
+            ? groups.map((group) => (
+                <SelectGroup key={group.label}>
+                  <SelectLabel>{group.label}</SelectLabel>
+                  {group.options.map((option) => {
+                    const { value: optionValue, label: optionLabel, disabled: optionDisabled } = normalizeOption(option);
+                    return (
+                      <SelectItem key={optionValue} value={optionValue} disabled={optionDisabled}>
+                        {optionLabel}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectGroup>
+              ))
+            : (options ?? []).map((option) => {
+                const { value: optionValue, label: optionLabel, disabled: optionDisabled } = normalizeOption(option);
+                return (
+                  <SelectItem key={optionValue} value={optionValue} disabled={optionDisabled}>
+                    {optionLabel}
+                  </SelectItem>
+                );
+              })}
         </SelectContent>
       </Select>
       {error && <p className="text-[12px] text-destructive">{error}</p>}

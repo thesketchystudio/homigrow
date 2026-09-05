@@ -17,6 +17,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api/client";
 import { login, type TokenResponse } from "@/lib/api/endpoints/auth";
+import { getRoleHomePath } from "@/lib/auth/roleHome";
 import { useAuthStore } from "@/lib/stores/auth";
 import { toast } from "@/lib/toast";
 import { AuthTextField } from "@/components/forms/AuthTextField";
@@ -34,7 +35,7 @@ export function LoginForm() {
   const handleAuthenticated = (session: TokenResponse) => {
     setAuth(session.user, session.access_token);
     toast.success(session.user.full_name ? `Welcome back, ${session.user.full_name}!` : "Welcome back!");
-    router.push(searchParams.get("returnTo") || "/");
+    router.push(searchParams.get("returnTo") || getRoleHomePath(session.user.role));
   };
 
   const {
