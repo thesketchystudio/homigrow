@@ -29,7 +29,7 @@ import { LISTING_TYPE_LABELS, ListingType, PropertyStatus } from "@/lib/enums";
 import { formatListedAgo, formatListingPrice } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 10;
 
 const TYPE_FILTER_OPTIONS = [
   { value: "all", label: "All Types" },

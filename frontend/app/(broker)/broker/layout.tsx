@@ -25,7 +25,13 @@
 // navigating this one away — the wizard is a standalone flow (its own
 // route group/layout, no sidebar; see app/(broker-post)/broker/listings/
 // new/layout.tsx) that a broker may want to fill out alongside the portal
-// they were already looking at.
+// they were already looking at. Hidden on the Listings page itself, which
+// has its own "Add Listing" button in its header (BrokerListingsTable.tsx)
+// — showing both there was redundant.
+//
+// No top header bar (sidebar-toggle icon, page label) above the content —
+// the Figma "Real Estate Broker Portal" screens (e.g. node 176:789) don't
+// have one; the sidebar is always visible with no collapse control.
 
 "use client";
 
@@ -34,7 +40,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { BarChart3, FileText, Home, Plus, UserRound, Users2 } from "lucide-react";
 
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar, { type SidebarNavGroup } from "@/components/shared/Sidebar";
 import { AuthGuard } from "@/components/shared/AuthGuard";
 import { useAuthStore } from "@/lib/stores/auth";
@@ -119,22 +125,20 @@ export default function BrokerLayout({ children }: { children: React.ReactNode }
             }
           />
           <SidebarInset>
-            <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-              <SidebarTrigger />
-              <span className="text-sm font-medium">Broker Portal</span>
-            </header>
             <main className="relative flex-1 p-6">
               {children}
-              <Link
-                href="/broker/listings/new"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Post a new property"
-                title="Post a new property"
-                className="fixed bottom-8 right-8 flex size-14 items-center justify-center rounded-full bg-brand-green-500 text-brand-primary-700 shadow-lg"
-              >
-                <Plus size={24} />
-              </Link>
+              {pathname !== "/broker/listings" && (
+                <Link
+                  href="/broker/listings/new"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Post a new property"
+                  title="Post a new property"
+                  className="fixed bottom-8 right-8 flex size-14 items-center justify-center rounded-full bg-brand-green-500 text-brand-primary-700 shadow-lg"
+                >
+                  <Plus size={24} />
+                </Link>
+              )}
             </main>
           </SidebarInset>
         </SidebarProvider>
