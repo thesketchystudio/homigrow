@@ -11,6 +11,46 @@ import { useEffect, useRef, useState } from "react";
 import { ImageIcon, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Each tile owns its own object URL instead of the parent computing one
+// array of urls. The URL is created and assigned to the <img> imperatively
+// inside an effect (a ref may only be touched outside render, and the linter
+// forbids calling setState synchronously inside an effect) — this also
+// happens to be what makes it survive React 18 Strict Mode's dev-only
+// double-invoke of effects: the phantom replay creates and assigns a fresh
+// url rather than revoking the one already painted with nothing to replace
+// it, since creation lives in the effect body itself, not in state.
+function MediaPreviewTile({ file, isCover, onRemove }: { file: File; isCover: boolean; onRemove: () => void }) {
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    if (imgRef.current) imgRef.current.src = url;
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  return (
+    <div className="relative flex flex-col gap-1">
+      <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
+        <img ref={imgRef} alt={file.name} className="size-full object-cover" />
+        {isCover && (
+          <span className="absolute left-1 top-1 rounded bg-foreground px-1.5 py-0.5 font-heading text-[10px] font-bold text-background">
+            Cover
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={onRemove}
+          className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-foreground/80 text-background"
+          aria-label={`Remove ${file.name}`}
+        >
+          <X size={12} />
+        </button>
+      </div>
+      <p className="truncate font-body text-[11px] text-muted-foreground">{file.name}</p>
+    </div>
+  );
+}
+
 type PropertyMediaDropzoneProps = {
   images: File[];
   onChange: (images: File[]) => void;
@@ -41,27 +81,6 @@ export function PropertyMediaDropzone({
   const [isDragOver, setIsDragOver] = useState(false);
   const [capMessage, setCapMessage] = useState<string | undefined>(undefined);
   const isFull = maxFiles !== undefined && images.length >= maxFiles;
-
-  // previewUrls is state, not a useMemo derived from `images`, because the
-  // object URLs must be created and revoked together inside the same effect
-  // run. A useMemo-computed value revoked by a separate cleanup-only effect
-  // breaks under React 18 StrictMode in dev: mount fires the effect once,
-  // then StrictMode immediately replays cleanup+setup to check for missing
-  // cleanup — the phantom cleanup revokes the very URLs already painted to
-  // the DOM, and since the memo's inputs never changed, nothing recreates
-  // them until the images array itself changes (which is why they'd only
-  // reappear after adding/removing a file). Creating fresh URLs inside the
-  // effect body itself means the phantom replay just swaps in a second,
-  // still-valid batch instead of leaving the visible one revoked.
-  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
-
-  useEffect(() => {
-    const urls = images.map((file) => URL.createObjectURL(file));
-    setPreviewUrls(urls);
-    return () => {
-      for (const url of urls) URL.revokeObjectURL(url);
-    };
-  }, [images]);
 
   const addFiles = (files: FileList | File[]) => {
     const incoming = Array.from(files);
@@ -133,25 +152,12 @@ export function PropertyMediaDropzone({
       {images.length > 0 && showPreviews && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {images.map((file, index) => (
-            <div key={`${file.name}-${index}`} className="relative flex flex-col gap-1">
-              <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
-                {previewUrls[index] && <img src={previewUrls[index]} alt={file.name} className="size-full object-cover" />}
-                {index === 0 && (
-                  <span className="absolute left-1 top-1 rounded bg-foreground px-1.5 py-0.5 font-heading text-[10px] font-bold text-background">
-                    Cover
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={() => removeAt(index)}
-                  className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-foreground/80 text-background"
-                  aria-label={`Remove ${file.name}`}
-                >
-                  <X size={12} />
-                </button>
-              </div>
-              <p className="truncate font-body text-[11px] text-muted-foreground">{file.name}</p>
-            </div>
+            <MediaPreviewTile
+              key={`${file.name}-${index}`}
+              file={file}
+              isCover={index === 0}
+              onRemove={() => removeAt(index)}
+            />
           ))}
         </div>
       )}
