@@ -24,9 +24,10 @@
 // navigating this one away — the wizard is a standalone flow (its own
 // route group/layout, no sidebar; see app/(broker-post)/broker/listings/
 // new/layout.tsx) that a broker may want to fill out alongside the portal
-// they were already looking at. Hidden on the Listings page itself, which
-// has its own "Add Listing" button in its header (BrokerListingsTable.tsx)
-// — showing both there was redundant.
+// they were already looking at. Hidden on the Listings and Dashboard pages,
+// which each have their own "Add Listing" button in their header
+// (BrokerListingsTable.tsx, BrokerHomeDashboard.tsx) — showing both there
+// was redundant.
 //
 // No top header bar (sidebar-toggle icon, page label) above the content —
 // the Figma "Real Estate Broker Portal" screens (e.g. node 176:789) don't
@@ -126,7 +127,7 @@ export default function BrokerLayout({ children }: { children: React.ReactNode }
           <SidebarInset>
             <main className="relative flex-1 p-6">
               {children}
-              {pathname !== "/broker/listings" && (
+              {pathname !== "/broker/listings" && pathname !== "/broker/dashboard" && (
                 <Link
                   href="/broker/listings/new"
                   target="_blank"
