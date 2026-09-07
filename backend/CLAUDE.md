@@ -436,6 +436,31 @@ commits to `dev` before starting)
   changes (Property Type dropdown, conditional Plot/Land sub-forms)
   not started — separate task, backend-first per your explicit
   ordering.**
+- **Broker lead pipeline shipped 2026-09-07** — on `feature/phase_3_backend_client`,
+  alongside the `POST /properties/{id}/enquire` endpoint from the same
+  branch: new broker-authenticated `GET /leads` (list, newest first),
+  `GET /leads/{id}` (detail + note history), `PATCH /leads/{id}`
+  (status and/or `follow_up_at`), and `POST /leads/{id}/notes` — the
+  first routes to actually read/write `Lead`/`LeadNote`, both of which
+  existed since the original Phase 1 schema with no consumer. New
+  `app/api/v1/routes/leads.py`; `lead_service.py` gained
+  `list_leads_for_broker`/`get_lead_for_broker`/`update_lead`/
+  `add_lead_note`, all scoped by `broker_id` (404 `LEAD_NOT_FOUND` on
+  any lead not owned by the caller — no cross-broker leak path).
+  `LeadListItem` flattens in the lead's property title/locality/city/
+  price/listing_type (avoids a second round trip for the table's
+  Property Interest/Budget columns) and a computed `last_contacted_at`
+  (the most recent note's timestamp, `null` if none exist yet — not the
+  lead's own `created_at`, which would misleadingly read as "already
+  contacted" for a brand-new lead). 242→257 tests pass (15 new); `ruff`
+  clean. Live-verified
+  end-to-end with Playwright against the real Supabase dev DB, logged
+  in as the demo broker (`vikram.broker.test@homigrow.local`): a real
+  enquiry submitted via `POST /properties/{id}/enquire` appeared in the
+  broker's `/broker/leads` table, status change persisted (`PATCH`),
+  a note round-tripped and flipped `last_contacted_at` from `null` to a
+  live relative timestamp, and a follow-up date persisted — confirmed
+  via a direct DB query, then all test rows deleted afterward.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
