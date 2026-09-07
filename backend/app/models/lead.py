@@ -40,6 +40,14 @@ class Lead(Base, TimestampMixin):
     message = Column(Text, nullable=True)
     follow_up_at = Column(DateTime(timezone=True), nullable=True)
 
+    # Always populated from the submitted contact form regardless of login
+    # state — the Property Contact Card is never gated behind auth, and an
+    # anonymous enquirer has no `client_id`/account to read a name/phone
+    # from. Kept even when client_id is set, since the form isn't prefilled
+    # from the account either.
+    contact_name = Column(String(100), nullable=True)
+    contact_phone = Column(String(15), nullable=True)
+
     property = relationship("Property")
     client = relationship("User", foreign_keys=[client_id])
     broker = relationship("User", foreign_keys=[broker_id])
@@ -51,6 +59,10 @@ class Lead(Base, TimestampMixin):
         # column object, to get descending order in the index.
         Index("ix_leads_broker_status_created", "broker_id", "status", text("created_at DESC")),
         Index("ix_leads_property", "property_id"),
+        # Backs the anonymous-enquiry dedup lookup (property_id + contact_phone);
+        # ix_leads_property alone would force a scan of every lead on the
+        # property for that filter as leads grow.
+        Index("ix_leads_property_contact_phone", "property_id", "contact_phone"),
     )
 
 

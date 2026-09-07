@@ -1,10 +1,33 @@
 // lib/api/endpoints/leads.ts
-// Broker-authenticated lead pipeline: list every lead across the broker's
-// properties, view one in detail with its note history, update its
-// status/follow-up date, and log a note. Backed by /api/v1/leads.
+// Client-facing property-enquiry endpoint plus the broker-authenticated
+// lead pipeline (list/detail/status update/notes) — both live under
+// /api/v1/leads or /api/v1/properties/{id}/enquire. LeadSource lives here
+// (not lib/enums.ts) since it mirrors a plain String(30) source column, not
+// a real backend Enum/Postgres-enum type like LeadStatus.
 
 import { apiRequest } from "@/lib/api/client";
 import type { LeadStatus, ListingType } from "@/lib/enums";
+
+export type LeadSource = "tour_request" | "number_request";
+
+export type EnquireInput = {
+  name: string;
+  phone: string;
+  source: LeadSource;
+  message?: string;
+  preferred_date?: string; // yyyy-mm-dd, matches <input type="date">'s value format
+};
+
+export type EnquireResponse = {
+  id: string;
+  status: LeadStatus;
+  broker_name: string | null;
+  broker_phone: string | null;
+};
+
+export function enquireProperty(propertyId: string, data: EnquireInput): Promise<EnquireResponse> {
+  return apiRequest<EnquireResponse>(`/properties/${propertyId}/enquire`, { method: "POST", body: data });
+}
 
 export type LeadListItem = {
   id: string;
