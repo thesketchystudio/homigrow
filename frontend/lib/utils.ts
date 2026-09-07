@@ -52,3 +52,17 @@ export function formatListedAgo(dateString: string): string {
   const days = Math.max(0, Math.floor((Date.now() - new Date(dateString).getTime()) / (1000 * 60 * 60 * 24)));
   return days === 0 ? "Listed today" : `Listed ${days}d ago`;
 }
+
+// Generic "X minutes/hours/days ago" formatter for the broker Leads table's
+// Last Contacted column, matching the Figma design's relative-time style
+// ("2 hours ago") without the "Listed"-specific wording formatListedAgo uses.
+export function formatRelativeTime(dateString: string): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(dateString).getTime()) / 1000));
+  if (seconds < 60) return "Just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}

@@ -10,16 +10,15 @@
 // the shared sidebar's global tokens, since components/shared/Sidebar.tsx
 // is also used by the Admin portal.
 //
-// Dashboard and Listings always navigate — both render real content
-// either way (BrokerListingsPanel shows the empty state or the actual
-// list). Leads and Analytics have no real feature behind them yet, so
-// they're gated on whether the broker has ANY listing at all: zero
-// listings routes there to the "add a listing first" empty state (nudging
-// a brand-new broker toward posting one); once they have at least one,
-// those links go back to the old "coming soon" toast instead of a page
-// that would otherwise misleadingly repeat the same empty-state pitch.
-// Profile still always toasts (same pattern PropertyContactCard.tsx uses
-// for unbuilt actions).
+// Dashboard, Listings, and Leads always navigate — all three render real
+// content either way (each shows its own empty state or the actual list/
+// table). Analytics has no real feature behind it yet, so it's gated on
+// whether the broker has ANY listing at all: zero listings routes there to
+// the "add a listing first" empty state (nudging a brand-new broker toward
+// posting one); once they have at least one, that link goes back to the
+// old "coming soon" toast instead of a page that would otherwise
+// misleadingly repeat the same empty-state pitch. Profile still always
+// toasts (same pattern PropertyContactCard.tsx uses for unbuilt actions).
 //
 // The floating "+" opens the Post Property wizard in a new tab rather than
 // navigating this one away — the wizard is a standalone flow (its own
@@ -60,12 +59,12 @@ const NAV_GROUPS: SidebarNavGroup[] = [
   },
 ];
 
-// Always navigate — both render real content regardless of listing count.
-const ALWAYS_BUILT_ROUTES = new Set(["/broker/dashboard", "/broker/listings"]);
+// Always navigate — all three render real content regardless of listing count.
+const ALWAYS_BUILT_ROUTES = new Set(["/broker/dashboard", "/broker/listings", "/broker/leads"]);
 // Navigate only while the broker has zero listings; once they have one,
-// these fall back to the "coming soon" toast (see BrokerLeadsPage/
-// BrokerAnalyticsPage, which self-correct the same way on a direct visit).
-const GATED_ON_NO_LISTINGS_ROUTES = new Set(["/broker/leads", "/broker/analytics"]);
+// this falls back to the "coming soon" toast (see BrokerAnalyticsPage,
+// which self-corrects the same way on a direct visit).
+const GATED_ON_NO_LISTINGS_ROUTES = new Set(["/broker/analytics"]);
 
 function initials(name?: string) {
   if (!name) return "?";
