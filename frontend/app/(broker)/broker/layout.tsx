@@ -10,22 +10,27 @@
 // the shared sidebar's global tokens, since components/shared/Sidebar.tsx
 // is also used by the Admin portal.
 //
-// Dashboard and Listings always navigate — both render real content
-// either way (BrokerListingsPanel shows the empty state or the actual
-// list). Leads and Analytics have no real feature behind them yet, so
-// they're gated on whether the broker has ANY listing at all: zero
-// listings routes there to the "add a listing first" empty state (nudging
-// a brand-new broker toward posting one); once they have at least one,
-// those links go back to the old "coming soon" toast instead of a page
-// that would otherwise misleadingly repeat the same empty-state pitch.
-// Profile still always toasts (same pattern PropertyContactCard.tsx uses
-// for unbuilt actions).
+// Dashboard, Listings, and Leads always navigate — all three render real
+// content either way (each shows its own empty state or the actual list/
+// table). Analytics has no real feature behind it yet, so it's gated on
+// whether the broker has ANY listing at all: zero listings routes there to
+// the "add a listing first" empty state (nudging a brand-new broker toward
+// posting one); once they have at least one, that link goes back to the
+// old "coming soon" toast instead of a page that would otherwise
+// misleadingly repeat the same empty-state pitch. Profile still always
+// toasts (same pattern PropertyContactCard.tsx uses for unbuilt actions).
 //
 // The floating "+" opens the Post Property wizard in a new tab rather than
 // navigating this one away — the wizard is a standalone flow (its own
 // route group/layout, no sidebar; see app/(broker-post)/broker/listings/
 // new/layout.tsx) that a broker may want to fill out alongside the portal
-// they were already looking at.
+// they were already looking at. Hidden on the Listings page itself, which
+// has its own "Add Listing" button in its header (BrokerListingsTable.tsx)
+// — showing both there was redundant.
+//
+// No top header bar (sidebar-toggle icon, page label) above the content —
+// the Figma "Real Estate Broker Portal" screens (e.g. node 176:789) don't
+// have one; the sidebar is always visible with no collapse control.
 
 "use client";
 
@@ -34,7 +39,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { BarChart3, FileText, Home, Plus, UserRound, Users2 } from "lucide-react";
 
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar, { type SidebarNavGroup } from "@/components/shared/Sidebar";
 import { AuthGuard } from "@/components/shared/AuthGuard";
 import { useAuthStore } from "@/lib/stores/auth";
@@ -54,12 +59,12 @@ const NAV_GROUPS: SidebarNavGroup[] = [
   },
 ];
 
-// Always navigate — both render real content regardless of listing count.
-const ALWAYS_BUILT_ROUTES = new Set(["/broker/dashboard", "/broker/listings"]);
+// Always navigate — all three render real content regardless of listing count.
+const ALWAYS_BUILT_ROUTES = new Set(["/broker/dashboard", "/broker/listings", "/broker/leads"]);
 // Navigate only while the broker has zero listings; once they have one,
-// these fall back to the "coming soon" toast (see BrokerLeadsPage/
-// BrokerAnalyticsPage, which self-correct the same way on a direct visit).
-const GATED_ON_NO_LISTINGS_ROUTES = new Set(["/broker/leads", "/broker/analytics"]);
+// this falls back to the "coming soon" toast (see BrokerAnalyticsPage,
+// which self-corrects the same way on a direct visit).
+const GATED_ON_NO_LISTINGS_ROUTES = new Set(["/broker/analytics"]);
 
 function initials(name?: string) {
   if (!name) return "?";
@@ -119,22 +124,20 @@ export default function BrokerLayout({ children }: { children: React.ReactNode }
             }
           />
           <SidebarInset>
-            <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-              <SidebarTrigger />
-              <span className="text-sm font-medium">Broker Portal</span>
-            </header>
             <main className="relative flex-1 p-6">
               {children}
-              <Link
-                href="/broker/listings/new"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Post a new property"
-                title="Post a new property"
-                className="fixed bottom-8 right-8 flex size-14 items-center justify-center rounded-full bg-brand-green-500 text-brand-primary-700 shadow-lg"
-              >
-                <Plus size={24} />
-              </Link>
+              {pathname !== "/broker/listings" && (
+                <Link
+                  href="/broker/listings/new"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Post a new property"
+                  title="Post a new property"
+                  className="fixed bottom-8 right-8 flex size-14 items-center justify-center rounded-full bg-brand-green-500 text-brand-primary-700 shadow-lg"
+                >
+                  <Plus size={24} />
+                </Link>
+              )}
             </main>
           </SidebarInset>
         </SidebarProvider>

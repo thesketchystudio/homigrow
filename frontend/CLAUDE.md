@@ -1295,4 +1295,108 @@ separate from the general `<phase>_frontend_client` branch)
   misleadingly as a CORS failure. Uncommented them back (values already
   correct, just disabled) and restarted the dev server; not a code
   change, so nothing to commit.
+- **Broker Listings table shipped 2026-09-05** — real `/broker/listings`
+  page (previously the same plain empty-state/status-list as Dashboard,
+  `BrokerListingsPanel`), matching Figma node `176:789`
+  ("Real Estate Broker Portal > MyListings"). New
+  `features/broker/listings/BrokerListingsTable.tsx`: search + Type/
+  Status filter dropdowns, and the shared `SharedTable`/`StatusPill`
+  composites (first real consumer of `SharedTable` — previously unused
+  outside its own file) for Property (thumbnail + title + "Listed Xd
+  ago") / Location / Price / Details (BHK + sq.ft) / Performance /
+  Status / Actions columns. Filtering, search, and pagination (8 rows/
+  page, matching the Figma mock) are all client-side against
+  `listMyProperties()`'s existing unpaginated `/properties/mine` result
+  — no new list endpoint needed. `BrokerListingsPanel.tsx` now backs the
+  Dashboard page only; its header comment updated to say so.
+  **Performance (views/leads) is hardcoded to 0/0**, your explicit
+  instruction — no per-property view/lead-count aggregate exists on the
+  backend yet. **Boost** (the header button and each row's action, which
+  Figma's icon reads as the same action, not two different ones) always
+  toasts "Boost Listing — coming soon!" — `BoostPlan` is a catalog table
+  only, no purchase/assignment flow exists to call. **Edit opens the Post
+  Property wizard in a new tab** with `?propertyId=<id>` on the URL —
+  navigation-only per your explicit scope call: the wizard has no
+  prefill/edit mode and no `PATCH /properties/{id}` exists yet, both
+  deliberately deferred to a follow-up task rather than built here.
+  Backend gained one small, targeted addition to support the "Listed Xd
+  ago" column: `BrokerPropertyListItem.created_at` (see backend
+  CLAUDE.md, 2026-09-05) — `published_at` alone is null for the
+  draft/pending listings a broker mostly sees. New `formatListedAgo()` in
+  `lib/utils.ts`. `tsc`/`eslint`/`next build` all clean (one pre-existing-
+  pattern `<img>` warning, matching `PropertyCard.tsx`'s own convention).
+  Live-verified with Playwright against the real backend + Supabase dev
+  DB, logged in as the demo-data broker (`vikram.broker.test@homigrow.local`,
+  11 real listings): full table renders correctly across 2 pages; the
+  Status filter narrows correctly including to a genuine empty state
+  ("Draft" — zero of this broker's listings are drafts); search narrows
+  correctly (`villa` → exactly the 2 matching titles); both Boost toasts
+  fire; Edit's link `href` carries the correct property id. Screenshot-
+  compared against the Figma reference — close match.
+- **Broker Leads pipeline table shipped 2026-09-07** — real
+  `/broker/leads` page (Figma "Real Estate Broker Portal >
+  LeadsManagement", node 176:1436), replacing the placeholder that only
+  redirected a broker with existing listings to a "coming soon" toast.
+  New `features/broker/leads/`: `BrokerLeadsTable.tsx` (status filter
+  pill-tabs with live counts, search, and the Name/Phone/Property
+  Interest/Budget/Source/Last Contacted/Status/Actions table — first
+  new consumer of `SharedTable` after `BrokerListingsTable.tsx`),
+  `LeadStatusTabs.tsx`, `LeadActionDialogs.tsx` (`AddLeadNoteDialog`/
+  `SetFollowUpDialog`), `queryKey.ts`. New `lib/api/endpoints/leads.ts`
+  against the matching backend task's new `/leads` routes. New
+  `formatRelativeTime()` in `lib/utils.ts` ("2 hours ago" style, generic —
+  distinct from `formatListedAgo()`'s "Listed Xd ago" wording).
+  **Two intentional deviations from Figma's literal mock, decided before
+  implementing:** the row's phone number ("+91 98765•••••") and Source
+  pill ("Portal", a static string on every row) read as demo-data
+  blurring rather than a real product requirement — shown here as the
+  full number (the Call action needs it, and the broker already
+  receives it in cleartext via the `lead_received` notification) and
+  the lead's real `tour_request`/`number_request` source instead.
+  Figma's status tab row also only showed 5 buckets (New/Contacted/
+  Site Visit/Closed/Lost, no separate Negotiation); built one tab per
+  real `LeadStatus` value instead so Negotiation and the Won/Lost split
+  are never silently unreachable as filters. **Status pill is a real
+  `Select`** (`PATCH /leads/{id}`) since Figma's table has no separate
+  detail screen a status control could otherwise live on; the pill
+  visual itself is passed as the `SelectTrigger`'s children rather than
+  `SelectValue`, which the shadcn primitive's plain children-then-icon
+  render order happens to support directly, no fork needed. The three
+  Figma row-action icons map onto real backend capability: phone → a
+  `tel:` link, chat → `AddLeadNoteDialog` (`POST /leads/{id}/notes`),
+  calendar → `SetFollowUpDialog` (`PATCH .../follow_up_at` — `Lead.
+  follow_up_at` existed on the model with no UI reading or writing it
+  until now). `(broker)/broker/layout.tsx`'s nav gating updated: Leads
+  moves from `GATED_ON_NO_LISTINGS_ROUTES` to `ALWAYS_BUILT_ROUTES`
+  alongside Dashboard/Listings — only Analytics is still gated.
+  **One real accessibility bug found live, not by inspection:**
+  `SetFollowUpDialog`'s `Modal` call passed no `description`, and Radix
+  logged a `Missing Description` warning on open — the same issue class
+  already fixed once for the Listings mobile filter drawer. Fixed by
+  adding a real description line, matching `AddLeadNoteDialog`'s
+  existing one. **A second gap, also only visible with real data:**
+  the zero-leads empty state used one static "No leads match your
+  filters" message regardless of whether that was actually true — a
+  broker with genuinely zero leads (not just a filtered-to-empty view)
+  saw language implying they had leads hidden by a filter. Fixed by
+  branching the `SharedTable` `emptyTitle`/`emptyBody` on
+  `leads.length === 0` (true zero) vs. a non-empty list filtered down
+  to nothing. `tsc`/`eslint`/`next build` all clean. Live-verified with
+  Playwright against the real backend worktree + Supabase dev DB,
+  logged in as the demo-data broker (`vikram.broker.test@homigrow.local`):
+  submitted a real enquiry via `POST /properties/{id}/enquire`, confirmed
+  it rendered correctly in the table (name/phone/property link/budget/
+  source/"Not yet contacted"/status), changed status via the Select
+  (tab counts updated live), added a note (toast fired, Last Contacted
+  flipped to "Just now" then "1 minute ago" on reload — confirming
+  `formatRelativeTime()` itself, not just the initial render), scheduled
+  a follow-up date, confirmed all three writes via a direct DB query,
+  filtered to the "New" tab to see the real empty state, then cleaned up
+  the test lead/notification row afterward. **Also hit, unrelated to this
+  feature's own code:** the frontend dev server on port 3000 (long-running
+  across earlier sessions per the "keep dev servers running" convention)
+  had gone stale and 404'd on already-existing routes like
+  `/broker/dashboard` — restarted fresh, same "don't trust a long-running
+  dev server after a large branch merge" lesson already documented for
+  the backend worktree, now confirmed to apply to `next dev` too.
 
