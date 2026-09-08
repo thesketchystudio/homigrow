@@ -1399,4 +1399,58 @@ separate from the general `<phase>_frontend_client` branch)
   `/broker/dashboard` — restarted fresh, same "don't trust a long-running
   dev server after a large branch merge" lesson already documented for
   the backend worktree, now confirmed to apply to `next dev` too.
+- **Broker Property Detail page shipped 2026-09-08** — new
+  `/broker/listings/[id]` route, reached by clicking a row in
+  `BrokerListingsTable.tsx` (previously the Property column rendered
+  plain text with no link at all), matching Figma node `177:3345`
+  ("Real Estate Broker Portal > Property Detail" — both frames on that
+  node turned out to be the identical page, just clipped to different
+  canvas heights, so only one design to build). New
+  `features/broker/listings/BrokerPropertyDetail.tsx` (data fetching,
+  loading skeleton, 404/403 error state, header actions, Property
+  Details/Description/Amenities cards, and the Performance sidebar)
+  plus `BrokerPropertyGallery.tsx` (an embla carousel via the existing
+  shadcn `Carousel` primitive, with its own overlaid prev/next buttons
+  and dot indicators rather than the primitive's own outside-the-frame
+  buttons, plus the `StatusPill` overlay — only rendered when there's
+  more than one photo). Built against a new backend endpoint,
+  `GET /properties/mine/{id}` (see backend CLAUDE.md, 2026-09-08):
+  Total Views/Leads Generated/Shortlisted are real numbers, not
+  hardcoded like `BrokerListingsTable`'s own Performance column still
+  is. **The "Views - Last 30 Days" chart has no backing data at all**
+  (no per-day time series exists anywhere in the schema) — renders an
+  honest "Coming soon" placeholder instead of fabricating trend data,
+  same call already made for Total Views on the broker Home dashboard.
+  "Mark as Sold"/"Mark as Rented" (label and target status both depend
+  on the listing's `listing_type`, only shown for an active listing)
+  calls the new `POST /properties/{id}/close` behind the existing
+  `ConfirmDialog` — the only genuinely irreversible action on this
+  page, unlike Edit (same `?propertyId=` navigation-only pattern
+  `BrokerListingsTable.tsx` already uses) and Boost Listing (same
+  `toast.info("Boost Listing — coming soon!")` as that table's own
+  Boost action). New `FURNISHING_LABELS` in `lib/enums.ts` (was only
+  ever inlined as a ternary in `PropertyInfoStep.tsx` before — this is
+  the first *display*, not *collect*, consumer of a property's
+  furnishing value, so it earned a proper shared label map instead of
+  a second inline ternary). `tsc`/`eslint`/`next build` all clean.
+  Live-verified with Playwright against the real backend worktree +
+  Supabase dev DB, logged in as the demo-data broker
+  (`vikram.broker.test@homigrow.local`): clicked from the real
+  Listings table into a real listing, confirmed the Property Details
+  grid correctly omits fields that listing doesn't have (Floor/Facing/
+  Parking, all null on this record) rather than rendering empty
+  values, confirmed the Performance card's real numbers (a genuine
+  attached lead showed as both `Leads Generated: 1` and in the Recent
+  Leads list), opened the "Mark as Sold" confirm dialog and read its
+  copy, then cancelled rather than confirmed — this broker's 11
+  listings are shared demo data used elsewhere in the app, so the
+  mutation itself was left to the backend's own test coverage instead
+  of executed live against real shared rows. **Not independently
+  live-verified: the multi-photo carousel's prev/next/dot navigation**
+  — every one of this demo broker's 11 seeded listings has exactly one
+  photo, so there was no real multi-image record to click through;
+  the wiring (`api.scrollNext()`/`scrollTo()`/`selectedScrollSnap()`)
+  is the same embla API the shadcn `Carousel` primitive's own bundled
+  buttons already call, reviewed but not exercised live. Flag if a
+  multi-photo listing ever surfaces a real bug here.
 

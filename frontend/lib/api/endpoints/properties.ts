@@ -4,7 +4,7 @@
 // GET /properties serves the Listings search grid.
 
 import { apiRequest, apiRequestMultipart } from "@/lib/api/client";
-import type { Furnishing, ListingType, MediaType, PaymentStructure, PriceFlexibility, PropertyStatus, PropertyType, VerificationStatus } from "@/lib/enums";
+import type { Furnishing, LeadStatus, ListingType, MediaType, PaymentStructure, PriceFlexibility, PropertyStatus, PropertyType, VerificationStatus } from "@/lib/enums";
 import type { JVDetailsValues, LandDetailsValues, PGDetailsValues, PlotDetailsValues } from "@/lib/validation/postProperty";
 
 export type PropertyMediaRead = {
@@ -275,4 +275,34 @@ export function uploadJvAgreement(propertyId: string, document: File): Promise<P
 
 export function submitProperty(propertyId: string): Promise<PropertyRead> {
   return apiRequest<PropertyRead>(`/properties/${propertyId}/submit`, { method: "POST" });
+}
+
+// GET /properties/mine/{id} — the broker-owned counterpart to getProperty
+// above: any status (not just active), plus the Property Detail page's
+// Performance card numbers. leads_count/recent_leads and shortlisted_count
+// are real, computed from the Lead/SavedProperty tables; there's no per-day
+// view time series anywhere in the schema, so the page renders its own
+// "coming soon" placeholder for that chart rather than requesting fake data.
+export type BrokerPropertyLeadSummary = {
+  id: string;
+  contact_name: string | null;
+  status: LeadStatus;
+  created_at: string;
+};
+
+export type BrokerPropertyDetailRead = PropertyRead & {
+  views_count: number;
+  leads_count: number;
+  shortlisted_count: number;
+  recent_leads: BrokerPropertyLeadSummary[];
+};
+
+export function getMyProperty(propertyId: string): Promise<BrokerPropertyDetailRead> {
+  return apiRequest<BrokerPropertyDetailRead>(`/properties/mine/${propertyId}`);
+}
+
+// Marks an active listing sold (sale) or rented (rent/PG) — the Property
+// Detail page's "Mark as Sold"/"Mark as Rented" action.
+export function closeProperty(propertyId: string): Promise<PropertyRead> {
+  return apiRequest<PropertyRead>(`/properties/${propertyId}/close`, { method: "POST" });
 }
