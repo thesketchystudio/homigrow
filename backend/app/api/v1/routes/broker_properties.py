@@ -59,6 +59,17 @@ def close_property(
     return PropertyRead.model_validate(property_)
 
 
+@router.post("/{property_id}/reopen", response_model=PropertyRead)
+def reopen_property(
+    property_id: UUID,
+    user: RequireBroker,
+    db: Session = Depends(get_db),
+) -> PropertyRead:
+    """Reopens a sold/rented listing back to active — undoes an accidental "Mark as Sold"/"Mark as Rented" click."""
+    property_ = broker_property_service.reopen_property(db, user, property_id)
+    return PropertyRead.model_validate(property_)
+
+
 @router.post("", response_model=PropertyRead)
 def create_property(
     data: PropertyCreateRequest,
