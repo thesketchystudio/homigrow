@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.deps import RequireBroker
 from app.db.session import get_db
-from app.schemas.properties import BrokerPropertyListItem, PropertyCreateRequest, PropertyMediaRead, PropertyRead
+from app.schemas.properties import BrokerPropertyDetailRead, BrokerPropertyListItem, PropertyCreateRequest, PropertyMediaRead, PropertyRead
 from app.services import broker_property_service
 
 router = APIRouter(prefix="/properties", tags=["properties", "broker"])
@@ -32,6 +32,31 @@ def list_my_properties(
 ) -> list[BrokerPropertyListItem]:
     """Lists every property owned by the calling broker, across all statuses — backs the Dashboard's empty state."""
     return broker_property_service.list_my_properties(db, user)
+
+
+# Nested under the literal "/mine" segment (never "/properties/{property_id}"
+# directly), so it can't collide with properties.router's public,
+# active-only GET /properties/{property_id} regardless of router
+# registration order.
+@router.get("/mine/{property_id}", response_model=BrokerPropertyDetailRead)
+def get_my_property(
+    property_id: UUID,
+    user: RequireBroker,
+    db: Session = Depends(get_db),
+) -> BrokerPropertyDetailRead:
+    """Returns one of the broker's own properties in full detail, any status — backs the Property Detail page."""
+    return broker_property_service.get_property_detail(db, user, property_id)
+
+
+@router.post("/{property_id}/close", response_model=PropertyRead)
+def close_property(
+    property_id: UUID,
+    user: RequireBroker,
+    db: Session = Depends(get_db),
+) -> PropertyRead:
+    """Marks an active listing sold (sale) or rented (rent/PG) — the Property Detail page's "Mark as Sold" action."""
+    property_ = broker_property_service.close_property(db, user, property_id)
+    return PropertyRead.model_validate(property_)
 
 
 @router.post("", response_model=PropertyRead)

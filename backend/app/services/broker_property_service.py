@@ -11,16 +11,24 @@ would break its existing "no owner-preview path" contract.
 
 from uuid import UUID
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationFailed
-from app.models.enums import MediaType, PropertyStatus
+from app.models.enums import ListingType, MediaType, PropertyStatus
+from app.models.lead import Lead
 from app.models.property import Property, PropertyMedia
+from app.models.saved_property import SavedProperty
 from app.models.user import User
-from app.schemas.properties import BrokerPropertyListItem, PropertyCreateRequest
+from app.schemas.properties import BrokerPropertyDetailRead, BrokerPropertyLeadSummary, BrokerPropertyListItem, PropertyCreateRequest, PropertyRead
 from app.services import storage_service
 from app.services._property_query_helpers import build_property_list_item, cover_image_subquery
 from app.services.property_lifecycle import transition_property_status
+
+# How many of a property's most recent leads the Property Detail page's
+# Recent Leads card shows — a product/layout constraint (the card has room
+# for a handful of rows, not the full pipeline), not a pagination limit.
+RECENT_LEADS_LIMIT = 4
 
 
 def _get_owned_property(db: Session, broker: User, property_id: UUID) -> Property:
@@ -55,6 +63,48 @@ def list_my_properties(db: Session, broker: User) -> list[BrokerPropertyListItem
         BrokerPropertyListItem(**build_property_list_item(property_, cover_image_url), status=property_.status)
         for property_, cover_image_url in rows
     ]
+
+
+def get_property_detail(db: Session, broker: User, property_id: UUID) -> BrokerPropertyDetailRead:
+    """
+    Returns one of the broker's own properties in full detail, any status
+    (unlike property_service.get_property_detail, which is public/active-
+    only) — backs the Property Detail page reached by clicking a listing
+    row. Adds the Performance card's real, computed numbers: leads_count
+    and recent_leads from the Lead table, shortlisted_count from the
+    SavedProperty watchlist join table. There is no per-day view time
+    series anywhere in the schema, so that chart isn't backed here at all.
+    """
+    property_ = _get_owned_property(db, broker, property_id)
+    leads = db.query(Lead).filter(Lead.property_id == property_id).order_by(Lead.created_at.desc()).all()
+    shortlisted_count = db.query(func.count(SavedProperty.property_id)).filter(SavedProperty.property_id == property_id).scalar()
+    return BrokerPropertyDetailRead(
+        **PropertyRead.model_validate(property_).model_dump(),
+        views_count=property_.views_count,
+        leads_count=len(leads),
+        shortlisted_count=shortlisted_count,
+        recent_leads=[BrokerPropertyLeadSummary.model_validate(lead) for lead in leads[:RECENT_LEADS_LIMIT]],
+    )
+
+
+def close_property(db: Session, broker: User, property_id: UUID) -> Property:
+    """
+    Closes an active listing: marks a sale listing "sold" or a rent/PG
+    listing "rented" — the Property Detail page's single "Mark as
+    Sold"/"Mark as Rented" action, which the lifecycle state machine
+    already treats as the same active -> terminal-state transition.
+    """
+    property_ = _get_owned_property(db, broker, property_id)
+    target_status = PropertyStatus.rented if property_.listing_type in (ListingType.rent, ListingType.pg) else PropertyStatus.sold
+    if not transition_property_status(property_.status, target_status):
+        raise ValidationFailed(
+            "INVALID_STATUS_TRANSITION",
+            f"Cannot mark a listing in '{property_.status.value}' status as {target_status.value}.",
+        )
+    property_.status = target_status
+    db.commit()
+    db.refresh(property_)
+    return property_
 
 
 def create_property(db: Session, broker: User, data: PropertyCreateRequest) -> Property:
