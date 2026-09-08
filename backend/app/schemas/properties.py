@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.models.enums import (
     Furnishing,
+    LeadStatus,
     ListingType,
     MediaType,
     PaymentStructure,
@@ -229,6 +230,34 @@ class BrokerPropertyListItem(PropertyListItem):
     """
 
     status: PropertyStatus
+
+
+class BrokerPropertyLeadSummary(BaseModel):
+    """One row of a BrokerPropertyDetailRead's recent-leads list — just enough to render a name/time/status row."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    contact_name: Optional[str] = None
+    status: LeadStatus
+    created_at: datetime
+
+
+class BrokerPropertyDetailRead(PropertyRead):
+    """
+    GET /properties/mine/{id}'s shape — PropertyRead plus the broker
+    Property Detail page's Performance card. leads_count/recent_leads and
+    shortlisted_count are computed from the real Lead/SavedProperty tables.
+    There is no per-day view time series anywhere in the schema (no events
+    table exists to build one), so the page renders an honest "coming soon"
+    placeholder for that chart instead of fabricating trend data — same
+    call already made for Total Views on the broker Home dashboard.
+    """
+
+    views_count: int
+    leads_count: int
+    shortlisted_count: int
+    recent_leads: list[BrokerPropertyLeadSummary]
 
 
 class PropertyCompareResponse(BaseModel):

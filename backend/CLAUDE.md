@@ -436,6 +436,53 @@ commits to `dev` before starting)
   changes (Property Type dropdown, conditional Plot/Land sub-forms)
   not started — separate task, backend-first per your explicit
   ordering.**
+- **Broker Property Detail API shipped 2026-09-08** — on a new
+  `feature/phase_3_backend_broker_detail` branch (cut fresh from
+  `dev` rather than reopening the already-merged
+  `feature/phase_3_backend_broker`), backing the matching frontend
+  Property Detail page (Figma node `177:3345`). New
+  `GET /properties/mine/{id}` (`broker_property_service.
+  get_property_detail`): the broker-owned counterpart to
+  `property_service.get_property_detail` — any status, not just
+  active — returning `BrokerPropertyDetailRead` (`PropertyRead` plus
+  `views_count` from the existing-but-previously-unexposed
+  `Property.views_count` column, `leads_count`/`recent_leads` computed
+  from the `Lead` table, and `shortlisted_count` computed from the
+  `SavedProperty` watchlist join table via its existing
+  `ix_saved_properties_property` index). Registered under the literal
+  `/properties/mine/` prefix (not `/properties/{id}`), so it can never
+  collide with `properties.router`'s public active-only route
+  regardless of router registration order — a stronger guarantee than
+  the existing `/properties/mine` list route gets from registration
+  order alone. New `POST /properties/{id}/close`
+  (`broker_property_service.close_property`): the single "Mark as
+  Sold"/"Mark as Rented" action, using the existing lifecycle state
+  machine's active -> sold|rented transition — targets `sold` for a
+  sale listing, `rented` for rent/PG, `422 INVALID_STATUS_TRANSITION`
+  for anything not currently active. **No per-day view time series
+  exists anywhere in the schema** (no events table), so the response
+  deliberately has no field for one — the frontend's "Views - Last 30
+  Days" chart renders its own honest "coming soon" placeholder rather
+  than the backend fabricating trend data. 226→234 tests pass (8 new
+  in `test_broker_properties.py`: full detail shape with real
+  leads/shortlisted numbers and ordered recent-leads, draft-listing
+  visibility unlike the public endpoint, ownership 403/401, sold vs.
+  rented targeting by listing type, invalid-transition 422). Verified
+  clean via 3 separate real-Supabase-dev-DB test runs — two full-suite
+  runs each hit one unrelated statement-timeout on a plain `users`
+  INSERT near the end of the file (transient DB contention from
+  running the same 36-test file back-to-back three times in a few
+  minutes, confirmed by both failures being on different, unrelated
+  tests each time), while running only the 8 new tests in isolation
+  passed cleanly twice. Live-verified end-to-end with Playwright
+  against this worktree's own `uvicorn` (confirmed via
+  `GET /openapi.json` showing both new paths registered) + the real
+  Supabase dev DB, logged in as the demo-data broker
+  (`vikram.broker.test@homigrow.local`): the real Property Detail page
+  rendered real `leads_count`/`recent_leads` for a listing with an
+  actual lead attached; the "Mark as Sold" confirm dialog opens
+  correctly (cancelled rather than confirmed, to avoid mutating this
+  shared demo broker's 11 real listings used elsewhere in the app).
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
