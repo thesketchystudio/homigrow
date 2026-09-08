@@ -11,14 +11,16 @@
 // call already made for Total Views on the broker Home dashboard
 // (BrokerHomeDashboard.tsx). Boost Listing always toasts "coming soon",
 // same as BrokerListingsTable's Boost action — BoostPlan is a catalog table
-// only, there's no purchase/assignment flow to call.
+// only, there's no purchase/assignment flow to call. Closing (Mark as
+// Sold/Rented) is reversible: a sold/rented listing shows a Reopen
+// Listing action instead, recovering from an accidental click.
 
 "use client";
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BedDouble, Building2, Car, Compass, Pencil, Ruler, Sofa, TrendingUp } from "lucide-react";
+import { ArrowLeft, BedDouble, Building2, Car, Compass, Pencil, RotateCcw, Ruler, Sofa, TrendingUp } from "lucide-react";
 
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import ErrorState from "@/components/shared/ErrorState";
@@ -27,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BrokerPropertyGallery } from "@/features/broker/listings/BrokerPropertyGallery";
 import { ApiError } from "@/lib/api/client";
-import { closeProperty, getMyProperty, type BrokerPropertyLeadSummary } from "@/lib/api/endpoints/properties";
+import { closeProperty, getMyProperty, reopenProperty, type BrokerPropertyLeadSummary } from "@/lib/api/endpoints/properties";
 import { FURNISHING_LABELS, ListingType, PropertyStatus } from "@/lib/enums";
 import { cn, formatListingPrice, formatRelativeTime } from "@/lib/utils";
 import { toast } from "@/lib/toast";
@@ -105,6 +107,7 @@ function RecentLeadRow({ lead }: { lead: BrokerPropertyLeadSummary }) {
 export function BrokerPropertyDetail({ propertyId }: { propertyId: string }) {
   const queryClient = useQueryClient();
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const [confirmReopenOpen, setConfirmReopenOpen] = useState(false);
 
   const { data: property, isLoading, error } = useQuery({
     queryKey: ["broker-property-detail", propertyId],
@@ -120,6 +123,16 @@ export function BrokerPropertyDetail({ propertyId }: { propertyId: string }) {
       toast.success(property?.listing_type === ListingType.sale ? "Listing marked as sold." : "Listing marked as rented.");
     },
     onError: () => toast.error("Couldn't update this listing. Please try again."),
+  });
+
+  const reopenMutation = useMutation({
+    mutationFn: () => reopenProperty(propertyId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["broker-property-detail", propertyId] });
+      queryClient.invalidateQueries({ queryKey: ["broker-my-properties"] });
+      toast.success("Listing reopened and marked active.");
+    },
+    onError: () => toast.error("Couldn't reopen this listing. Please try again."),
   });
 
   if (isLoading) {
@@ -187,6 +200,12 @@ export function BrokerPropertyDetail({ propertyId }: { propertyId: string }) {
           {property.status === PropertyStatus.active && (
             <Button className="bg-brand-green-500 text-brand-primary-700 hover:opacity-90" onClick={() => setConfirmCloseOpen(true)}>
               {closeLabel}
+            </Button>
+          )}
+          {(property.status === PropertyStatus.sold || property.status === PropertyStatus.rented) && (
+            <Button variant="outline" onClick={() => setConfirmReopenOpen(true)}>
+              <RotateCcw className="size-4" />
+              Reopen Listing
             </Button>
           )}
           <Button variant="outline" onClick={handleBoost}>
@@ -286,10 +305,21 @@ export function BrokerPropertyDetail({ propertyId }: { propertyId: string }) {
         open={confirmCloseOpen}
         onOpenChange={setConfirmCloseOpen}
         title={`${closeLabel}?`}
-        body={`This marks the listing as ${closeVerb} and removes it from active search results. This can't be undone from here.`}
+        body={`This marks the listing as ${closeVerb} and removes it from active search results. You can reopen it from here if this was a mistake.`}
         confirmLabel={closeLabel}
         onConfirm={async () => {
           await closeMutation.mutateAsync();
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmReopenOpen}
+        onOpenChange={setConfirmReopenOpen}
+        title="Reopen this listing?"
+        body="This marks the listing active again and makes it visible in search results."
+        confirmLabel="Reopen Listing"
+        onConfirm={async () => {
+          await reopenMutation.mutateAsync();
         }}
       />
     </div>
