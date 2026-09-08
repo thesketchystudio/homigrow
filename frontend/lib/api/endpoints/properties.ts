@@ -306,3 +306,9 @@ export function getMyProperty(propertyId: string): Promise<BrokerPropertyDetailR
 export function closeProperty(propertyId: string): Promise<PropertyRead> {
   return apiRequest<PropertyRead>(`/properties/${propertyId}/close`, { method: "POST" });
 }
+
+// Reopens a sold/rented listing back to active — undoes an accidental
+// closeProperty click.
+export function reopenProperty(propertyId: string): Promise<PropertyRead> {
+  return apiRequest<PropertyRead>(`/properties/${propertyId}/reopen`, { method: "POST" });
+}

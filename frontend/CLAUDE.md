@@ -1453,4 +1453,26 @@ separate from the general `<phase>_frontend_client` branch)
   is the same embla API the shadcn `Carousel` primitive's own bundled
   buttons already call, reviewed but not exercised live. Flag if a
   multi-photo listing ever surfaces a real bug here.
+- **Reopen Listing action added, 2026-09-08 (same day)** — your
+  explicit call: closing a listing (Mark as Sold/Rented) had no way
+  back, so an accidental click was permanent from this page. A sold
+  or rented listing now shows a "Reopen Listing" button instead of
+  Mark as Sold/Rented, behind its own `ConfirmDialog` (lighter copy
+  than the close dialog, since this direction is itself reversible —
+  you can just close it again), calling the new
+  `POST /properties/{id}/reopen` (see backend CLAUDE.md, 2026-09-08).
+  The close dialog's own copy updated too — it used to claim "this
+  can't be undone from here," which stopped being true the moment
+  this shipped. `tsc`/`eslint`/`next build` all clean. Live-verified
+  end-to-end with Playwright against the real backend worktree +
+  Supabase dev DB, logged in as the demo-data broker: the full
+  `Active -> Mark as Sold -> Sold -> Reopen Listing -> Active` round
+  trip on a real listing, confirmed via the status pill at each step
+  — safe to actually execute against this shared demo broker's data
+  now that it's reversible, unlike the close-only version verified
+  earlier the same day. **Hit the backend's stale-orphaned-server bug
+  (see backend CLAUDE.md) mid-verification** — the first attempt
+  404'd against a worktree server that had been running for hours
+  and never picked up the new route; resolved on the backend side, not
+  a frontend issue.
 
