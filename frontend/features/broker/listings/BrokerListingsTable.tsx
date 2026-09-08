@@ -3,13 +3,14 @@
 // Portal > MyListings", node 176:789): search + Type/Status filters, a
 // property/location/price/details/performance/status/actions table, and
 // pagination. Performance (views/leads) is hardcoded to 0/0 for now — no
-// per-property view/lead-count aggregate exists on the backend yet. Boost
-// (both the header button and each row's action) always toasts "coming
-// soon" — BoostPlan is a catalog table only, there's no purchase/assignment
-// flow to call. Edit opens the Post Property wizard in a new tab with the
-// property id on the URL; the wizard itself doesn't read it yet (no
-// prefill/update flow exists), this is navigation-only scaffolding for a
-// follow-up task.
+// per-property view/lead-count aggregate exists on this table yet (the
+// Property Detail page linked from the Property column has the real
+// numbers, computed server-side). Boost (both the header button and each
+// row's action) always toasts "coming soon" — BoostPlan is a catalog table
+// only, there's no purchase/assignment flow to call. Edit opens the Post
+// Property wizard in a new tab with the property id on the URL; the wizard
+// itself doesn't read it yet (no prefill/update flow exists), this is
+// navigation-only scaffolding for a follow-up task.
 
 "use client";
 
@@ -91,7 +92,7 @@ export function BrokerListingsTable() {
       key: "property",
       header: "Property",
       render: (property) => (
-        <div className="flex items-center gap-3.5">
+        <Link href={`/broker/listings/${property.id}`} className="flex items-center gap-3.5 hover:underline">
           <div className="size-6 shrink-0 overflow-hidden rounded-[4px] bg-muted">
             {property.cover_image_url && <img src={property.cover_image_url} alt="" className="size-full object-cover" />}
           </div>
@@ -99,7 +100,7 @@ export function BrokerListingsTable() {
             <span className="font-heading text-[14px] font-medium text-foreground">{property.title}</span>
             <span className="font-body text-[12px] text-muted-foreground">{formatListedAgo(property.created_at)}</span>
           </div>
-        </div>
+        </Link>
       ),
     },
     {

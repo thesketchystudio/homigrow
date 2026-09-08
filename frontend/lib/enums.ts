@@ -109,6 +109,16 @@ export const Furnishing = {
 } as const;
 export type Furnishing = (typeof Furnishing)[keyof typeof Furnishing];
 
+// Human-readable labels for each Furnishing value, shared by any screen
+// that displays (rather than collects, like PropertyInfoStep's own select
+// options) a property's furnishing status — e.g. the broker Property
+// Detail page's spec grid.
+export const FURNISHING_LABELS: Record<Furnishing, string> = {
+  [Furnishing.unfurnished]: "Unfurnished",
+  [Furnishing.semi_furnished]: "Semi-Furnished",
+  [Furnishing.fully_furnished]: "Fully Furnished",
+};
+
 export const MediaType = {
   image: "image",
   video: "video",
