@@ -483,6 +483,42 @@ commits to `dev` before starting)
   actual lead attached; the "Mark as Sold" confirm dialog opens
   correctly (cancelled rather than confirmed, to avoid mutating this
   shared demo broker's 11 real listings used elsewhere in the app).
+- **Reopen action added, 2026-09-08 (same day, same branch)** — your
+  explicit call after reviewing the above: a broker who clicks "Mark
+  as Sold"/"Mark as Rented" by mistake had no way back — `sold`/
+  `rented` were coded as fully terminal states with zero outgoing
+  transitions. `property_lifecycle.py`'s state machine now allows
+  `sold -> active` and `rented -> active` ("reopen") as the only
+  outgoing edge from either — everything else about them stays
+  terminal (still can't go to `draft`/`pending` directly). New
+  `POST /properties/{id}/reopen`
+  (`broker_property_service.reopen_property`), the mirror image of
+  `close_property`. 234→238 tests pass (4 new in
+  `test_broker_properties.py`: sold->active, rented->active,
+  reopening a non-sold/rented listing 422s, ownership 403) plus
+  `test_property_lifecycle.py` updated — `(sold, active)`/
+  `(rented, active)` moved from its `ILLEGAL` table to `LEGAL`, and
+  its "terminal states have no outgoing transitions" comment/grouping
+  rewritten since that's no longer true. **Real bug hit live while
+  verifying this, unrelated to the new code's own correctness:** the
+  worktree's `uvicorn --reload` process had an orphaned
+  `--multiprocessing-fork` worker still bound to port 8000 from hours
+  earlier in the session, silently serving stale pre-`/close`-and-
+  `/reopen` code the entire time — `netstat`/`Get-NetTCPConnection`
+  both still attributed the listening socket to the original
+  reloader's PID even though `Get-CimInstance`/`Get-Process` confirmed
+  that PID no longer existed, so a plain "kill that PID and restart"
+  didn't help until the actual orphaned child process was found and
+  killed directly. A real `POST .../reopen` 404'd against this stale
+  server before the fix, then round-tripped correctly (`active ->
+  sold -> reopen -> active`, confirmed via the status pill) once a
+  single clean server was actually running. **Lesson for next time:**
+  when a worktree server has been running a long time across several
+  restart attempts, don't trust that killing the PID `netstat` names
+  actually frees the port — enumerate every `python.exe`
+  (`Get-CimInstance Win32_Process -Filter "Name='python.exe'"`,
+  which also shows each one's full command line) and kill anything
+  stale before starting fresh.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

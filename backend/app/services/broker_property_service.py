@@ -90,9 +90,10 @@ def get_property_detail(db: Session, broker: User, property_id: UUID) -> BrokerP
 def close_property(db: Session, broker: User, property_id: UUID) -> Property:
     """
     Closes an active listing: marks a sale listing "sold" or a rent/PG
-    listing "rented" — the Property Detail page's single "Mark as
-    Sold"/"Mark as Rented" action, which the lifecycle state machine
-    already treats as the same active -> terminal-state transition.
+    listing "rented" — the Property Detail page's "Mark as Sold"/"Mark as
+    Rented" action, which the lifecycle state machine treats as the same
+    active -> sold|rented transition. Reversible via reopen_property
+    below, for an accidental click.
     """
     property_ = _get_owned_property(db, broker, property_id)
     target_status = PropertyStatus.rented if property_.listing_type in (ListingType.rent, ListingType.pg) else PropertyStatus.sold
@@ -102,6 +103,25 @@ def close_property(db: Session, broker: User, property_id: UUID) -> Property:
             f"Cannot mark a listing in '{property_.status.value}' status as {target_status.value}.",
         )
     property_.status = target_status
+    db.commit()
+    db.refresh(property_)
+    return property_
+
+
+def reopen_property(db: Session, broker: User, property_id: UUID) -> Property:
+    """
+    Reopens a sold or rented listing back to active — undoes an
+    accidental close_property click. Nothing else about the listing
+    changes; a broker who genuinely wants to re-list would edit and
+    resubmit it instead.
+    """
+    property_ = _get_owned_property(db, broker, property_id)
+    if not transition_property_status(property_.status, PropertyStatus.active):
+        raise ValidationFailed(
+            "INVALID_STATUS_TRANSITION",
+            f"Cannot reopen a listing in '{property_.status.value}' status.",
+        )
+    property_.status = PropertyStatus.active
     db.commit()
     db.refresh(property_)
     return property_

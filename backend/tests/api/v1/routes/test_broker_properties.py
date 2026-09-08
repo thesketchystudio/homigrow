@@ -590,3 +590,54 @@ class TestCloseProperty:
         response = client.post(f"/api/v1/properties/{property_id}/close", headers=_auth_headers(other))
 
         assert response.status_code == 403
+
+
+class TestReopenProperty:
+    def test_reopens_a_sold_listing_to_active(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546043")
+        property_id = client.post(
+            "/api/v1/properties", headers=_auth_headers(broker), json=_VALID_PAYLOAD
+        ).json()["id"]
+        db_session.query(Property).filter(Property.id == UUID(property_id)).update({"status": PropertyStatus.sold})
+        db_session.flush()
+
+        response = client.post(f"/api/v1/properties/{property_id}/reopen", headers=_auth_headers(broker))
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "active"
+
+    def test_reopens_a_rented_listing_to_active(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546044")
+        payload = {**_VALID_PAYLOAD, "listing_type": "rent", "deposit": 50000}
+        property_id = client.post("/api/v1/properties", headers=_auth_headers(broker), json=payload).json()["id"]
+        db_session.query(Property).filter(Property.id == UUID(property_id)).update({"status": PropertyStatus.rented})
+        db_session.flush()
+
+        response = client.post(f"/api/v1/properties/{property_id}/reopen", headers=_auth_headers(broker))
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "active"
+
+    def test_reopening_a_draft_listing_returns_422(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546045")
+        property_id = client.post(
+            "/api/v1/properties", headers=_auth_headers(broker), json=_VALID_PAYLOAD
+        ).json()["id"]
+
+        response = client.post(f"/api/v1/properties/{property_id}/reopen", headers=_auth_headers(broker))
+
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "INVALID_STATUS_TRANSITION"
+
+    def test_non_owner_broker_is_forbidden(self, client, db_session):
+        owner = _make_broker(db_session, phone="+919876546046")
+        other = _make_broker(db_session, phone="+919876546047")
+        property_id = client.post(
+            "/api/v1/properties", headers=_auth_headers(owner), json=_VALID_PAYLOAD
+        ).json()["id"]
+        db_session.query(Property).filter(Property.id == UUID(property_id)).update({"status": PropertyStatus.sold})
+        db_session.flush()
+
+        response = client.post(f"/api/v1/properties/{property_id}/reopen", headers=_auth_headers(other))
+
+        assert response.status_code == 403
