@@ -149,6 +149,15 @@ class OTPPurpose(str, Enum):
     broker_verification = "broker_verification"
 
 
+class OwnershipType(str, Enum):
+    """Legal ownership basis of a property listing, shown on the Edit Listing form."""
+
+    freehold = "freehold"
+    leasehold = "leasehold"
+    co_operative_society = "co_operative_society"
+    power_of_attorney = "power_of_attorney"
+
+
 class BrokerDocumentType(str, Enum):
     """
     Kind of a broker verification document. Not a Postgres enum type —

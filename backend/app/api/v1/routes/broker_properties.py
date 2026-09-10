@@ -11,12 +11,19 @@ register under one prefix.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import RequireBroker
 from app.db.session import get_db
-from app.schemas.properties import BrokerPropertyListItem, PropertyCreateRequest, PropertyMediaRead, PropertyRead
+from app.schemas.properties import (
+    BrokerPropertyDetailRead,
+    BrokerPropertyListItem,
+    PropertyCreateRequest,
+    PropertyMediaRead,
+    PropertyRead,
+    PropertyUpdateRequest,
+)
 from app.services import broker_property_service
 
 router = APIRouter(prefix="/properties", tags=["properties", "broker"])
@@ -34,6 +41,42 @@ def list_my_properties(
     return broker_property_service.list_my_properties(db, user)
 
 
+# Nested under the literal "/mine" segment (never "/properties/{property_id}"
+# directly), so it can't collide with properties.router's public,
+# active-only GET /properties/{property_id} regardless of router
+# registration order.
+@router.get("/mine/{property_id}", response_model=BrokerPropertyDetailRead)
+def get_my_property(
+    property_id: UUID,
+    user: RequireBroker,
+    db: Session = Depends(get_db),
+) -> BrokerPropertyDetailRead:
+    """Returns one of the broker's own properties in full detail, any status — backs the Property Detail page."""
+    return broker_property_service.get_property_detail(db, user, property_id)
+
+
+@router.post("/{property_id}/close", response_model=PropertyRead)
+def close_property(
+    property_id: UUID,
+    user: RequireBroker,
+    db: Session = Depends(get_db),
+) -> PropertyRead:
+    """Marks an active listing sold (sale) or rented (rent/PG) — the Property Detail page's "Mark as Sold" action."""
+    property_ = broker_property_service.close_property(db, user, property_id)
+    return PropertyRead.model_validate(property_)
+
+
+@router.post("/{property_id}/reopen", response_model=PropertyRead)
+def reopen_property(
+    property_id: UUID,
+    user: RequireBroker,
+    db: Session = Depends(get_db),
+) -> PropertyRead:
+    """Reopens a sold/rented listing back to active — undoes an accidental "Mark as Sold"/"Mark as Rented" click."""
+    property_ = broker_property_service.reopen_property(db, user, property_id)
+    return PropertyRead.model_validate(property_)
+
+
 @router.post("", response_model=PropertyRead)
 def create_property(
     data: PropertyCreateRequest,
@@ -43,6 +86,29 @@ def create_property(
     """Creates a new draft listing — the Post Property wizard's final submit action."""
     property_ = broker_property_service.create_property(db, user, data)
     return PropertyRead.model_validate(property_)
+
+
+@router.patch("/{property_id}", response_model=PropertyRead)
+def update_property(
+    property_id: UUID,
+    data: PropertyUpdateRequest,
+    user: RequireBroker,
+    db: Session = Depends(get_db),
+) -> PropertyRead:
+    """Applies a partial edit to a broker-owned listing — the Edit Listing form's submit action."""
+    property_ = broker_property_service.update_property(db, user, property_id, data)
+    return PropertyRead.model_validate(property_)
+
+
+@router.delete("/{property_id}/media/{media_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_property_media(
+    property_id: UUID,
+    media_id: UUID,
+    user: RequireBroker,
+    db: Session = Depends(get_db),
+) -> None:
+    """Removes one photo/video from a listing's gallery; 403 if the property isn't owned by the caller."""
+    broker_property_service.delete_media(db, user, property_id, media_id)
 
 
 @router.post("/{property_id}/media", response_model=list[PropertyMediaRead])
