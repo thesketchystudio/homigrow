@@ -103,9 +103,10 @@ def compare_properties(
 
 
 @router.get("/{property_id}", response_model=PropertyRead)
-def get_property(property_id: UUID, db: Session = Depends(get_db)) -> PropertyRead:
-    """Returns an active property's full detail; 404 if missing or not active."""
+def get_property(property_id: UUID, requester: OptionalCurrentUser, db: Session = Depends(get_db)) -> PropertyRead:
+    """Returns an active property's full detail; 404 if missing or not active. Logs a view for the broker Analytics page."""
     property_ = property_service.get_property_detail(db, property_id)
+    property_service.record_view(db, property_id, requester.id if requester else None)
     return PropertyRead.model_validate(property_)
 
 
