@@ -10,15 +10,14 @@
 // the shared sidebar's global tokens, since components/shared/Sidebar.tsx
 // is also used by the Admin portal.
 //
-// Dashboard, Listings, and Leads always navigate — all three render real
-// content either way (each shows its own empty state or the actual list/
-// table). Analytics has no real feature behind it yet, so it's gated on
-// whether the broker has ANY listing at all: zero listings routes there to
-// the "add a listing first" empty state (nudging a brand-new broker toward
-// posting one); once they have at least one, that link goes back to the
-// old "coming soon" toast instead of a page that would otherwise
-// misleadingly repeat the same empty-state pitch. Profile still always
-// toasts (same pattern PropertyContactCard.tsx uses for unbuilt actions).
+// Dashboard, Listings, Leads, and Profile always navigate — all four render
+// real content either way (each shows its own empty state or the actual
+// list/table). Analytics has no real feature behind it yet, so it's gated
+// on whether the broker has ANY listing at all: zero listings routes there
+// to the "add a listing first" empty state (nudging a brand-new broker
+// toward posting one); once they have at least one, that link goes back to
+// the old "coming soon" toast instead of a page that would otherwise
+// misleadingly repeat the same empty-state pitch.
 //
 // The floating "+" opens the Post Property wizard in a new tab rather than
 // navigating this one away — the wizard is a standalone flow (its own
@@ -46,6 +45,7 @@ import { AuthGuard } from "@/components/shared/AuthGuard";
 import { useAuthStore } from "@/lib/stores/auth";
 import { UserRole } from "@/lib/enums";
 import { toast } from "@/lib/toast";
+import { initials } from "@/lib/utils";
 import { listMyProperties } from "@/lib/api/endpoints/properties";
 
 const NAV_GROUPS: SidebarNavGroup[] = [
@@ -60,23 +60,12 @@ const NAV_GROUPS: SidebarNavGroup[] = [
   },
 ];
 
-// Always navigate — all three render real content regardless of listing count.
-const ALWAYS_BUILT_ROUTES = new Set(["/broker/dashboard", "/broker/listings", "/broker/leads"]);
+// Always navigate — all four render real content regardless of listing count.
+const ALWAYS_BUILT_ROUTES = new Set(["/broker/dashboard", "/broker/listings", "/broker/leads", "/broker/profile"]);
 // Navigate only while the broker has zero listings; once they have one,
 // this falls back to the "coming soon" toast (see BrokerAnalyticsPage,
 // which self-corrects the same way on a direct visit).
 const GATED_ON_NO_LISTINGS_ROUTES = new Set(["/broker/analytics"]);
-
-function initials(name?: string) {
-  if (!name) return "?";
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
 
 export default function BrokerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

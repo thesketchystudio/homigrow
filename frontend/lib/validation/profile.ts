@@ -25,6 +25,19 @@ export const notificationsFormSchema = z.object({
 });
 export type NotificationsFormValues = z.infer<typeof notificationsFormSchema>;
 
+export const brokerProfileFormSchema = z.object({
+  full_name: z.string().trim().min(1, "Full name is required"),
+  bio: z.string().trim().max(1000, "Bio must be 1000 characters or fewer"),
+  company_name: z.string().trim().max(150, "Company name must be 150 characters or fewer"),
+  experience_years: z.number().int().min(0).max(80, "Enter a number between 0 and 80").optional(),
+  // Comma-separated free text — BrokerProfile.specializations/service_areas
+  // are plain JSONB string lists with no fixed vocabulary, so this is
+  // split into an array on submit rather than driven by a fixed option set.
+  specializations: z.string(),
+  service_areas: z.string(),
+});
+export type BrokerProfileFormValues = z.infer<typeof brokerProfileFormSchema>;
+
 export const changePasswordSchema = z
   .object({
     current_password: z.string().min(1, "Current password is required"),

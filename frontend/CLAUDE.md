@@ -1579,4 +1579,59 @@ separate from the general `<phase>_frontend_client` branch)
   (no redirect to `/login`) the whole time, proving an ordinary
   timeout only fails that request rather than logging the user out;
   removing the interception and reloading recovered the page cleanly.
+- **Broker Profile page shipped 2026-09-10** — new `/broker/profile`
+  page (Figma "Real Estate Broker Portal > Profile", node `177:2805`).
+  The Figma export's own sidebar/app-shell chrome is unused — the
+  broker portal's shared `AppSidebar` (`(broker)/broker/layout.tsx`)
+  already provides it, so this task only built the content area, and
+  `/broker/profile` moved from a "coming soon" toast stub into
+  `ALWAYS_BUILT_ROUTES` alongside Dashboard/Listings/Leads. New
+  `features/broker/profile/BrokerProfilePage.tsx` +
+  `EditBrokerProfileDialog.tsx`. Only the Overview tab has a real
+  design at this node — Settings/Subscription toast "coming soon", same
+  pattern every other unbuilt broker destination already uses.
+  **Several Figma sections have no backing data model at all** (Avg
+  Rating, a Recent Activity feed, NAR/MagicBricks-style third-party
+  certifications) — per your explicit scope call, these render an
+  honest empty/coming-soon state instead of fabricated numbers, rather
+  than building the backend to support them. Active Listings/Leads
+  Closed/Properties Sold are real, computed client-side from the
+  already-fetched `listMyProperties()`/`listLeads()` results (`status
+  === active`/`closed_won`/`sold` respectively) — no new endpoint
+  needed. Certifications shows only the real RERA registration
+  (`BrokerProfile.rera_number`, empty state if unset); Expertise shows
+  only Primary Cities (`service_areas`) and Member Since (`User.
+  created_at`, newly exposed — see backend CLAUDE.md). Edit Profile is
+  a real dialog (RHF + zod, `lib/validation/profile.ts`'s new
+  `brokerProfileFormSchema`) against the backend's newly-extended
+  `PATCH /users/me` (nested `broker_profile` field): full name, agency/
+  firm name, years of experience, bio, and specializations/service
+  areas as comma-separated free text (`BrokerProfile.specializations`/
+  `service_areas` are plain JSONB string lists with no fixed
+  vocabulary, so no new option taxonomy was invented for them).
+  `experience_years` uses the existing `toOptionalNumber` `setValueAs`
+  helper (documented RHF-blank-becomes-NaN gotcha), not
+  `valueAsNumber`. Extracted the sidebar footer's local `initials()`
+  helper (`(broker)/broker/layout.tsx`) into `lib/utils.ts` so both it
+  and the new page's avatar share one implementation instead of two
+  copies. `tsc`/`eslint`/`next build` all clean. Live-verified with
+  Playwright against the real backend worktree + Supabase dev DB, logged
+  in as the standing `broker.login.test@homigrow.local` test broker
+  (chosen over the demo-data broker so a real Edit Profile save didn't
+  need to be reverted off shared listings/leads data afterward): page
+  loads with real zero-value stats and honest empty states for every
+  field this account hadn't set; opened Edit Profile, filled in agency
+  name/experience/bio/specializations/service areas, saved (`PATCH →
+  200`), and confirmed every field re-rendered correctly (subtitle,
+  About bio + chips, Expertise Primary Cities); clicked Settings and
+  confirmed the "coming soon" toast fires without switching the active
+  tab. **Found and fixed a real gap while wiring this, not part of the
+  page's own UI:** `UserRead` never exposed `created_at` at all despite
+  the column existing since Phase 1 — added it (backend CLAUDE.md) since
+  Member Since needed a real value to show, not a fabricated one.
+  **Unrelated gap surfaced during verification, not fixed here:** the
+  broker Leads backend was sitting unmerged on `feature/phase_3_backend_client`
+  (see backend CLAUDE.md) — `/broker/leads` and this page's own Leads
+  Closed stat both 404'd against a fresh `dev`-based server until that
+  was resolved with a separate PR.
 
