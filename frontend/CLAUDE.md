@@ -1523,4 +1523,60 @@ separate from the general `<phase>_frontend_client` branch)
   amenities, status) was reverted to its original values afterward via
   a direct DB fix, same cleanup convention as other live verifications
   against this shared broker's real data.
+- **Silent-refresh deadlock fixed, 2026-09-10** — reported live: the
+  Leads table sometimes wouldn't load (or took a long time), and
+  upload buttons sometimes got stuck non-clickable, both "especially
+  after leaving the tab open a long time." Root cause found in
+  `lib/api/client.ts`, not in either symptom's own component: every
+  caller that hits a 401 (the Leads table's `listLeads()` query, the
+  Post Property wizard's media/JV-agreement upload, Edit Listing's
+  photo upload) awaits the shared `refreshAccessToken()` single-flight
+  promise (`refreshPromise`), which only ever resets via that promise's
+  own `.finally()` — but the underlying `POST /auth/refresh` fetch
+  inside `performRefresh()` had no timeout at all. A tab backgrounded
+  for a long stretch (sleep/wake, Wi-Fi handoff) can leave that
+  socket stalled with no error and no data, so the fetch — and every
+  request queued behind it, in every open tab sharing the Web Locks
+  cross-tab lock — hangs forever instead of failing: the Leads table
+  spins indefinitely (`isLoading` never flips), and any upload button's
+  `disabled={uploading}` never resets since its `finally` block never
+  runs. Fixed with a single `AbortSignal.timeout(10_000)` on that one
+  fetch call — `refreshAccessToken()`'s existing `.catch()`/`.finally()`
+  already correctly resets the lock and clears the auth store once the
+  promise settles; it just needed the fetch to be guaranteed to settle.
+  `tsc`/`eslint` clean. Live-verified with Playwright: simulated a
+  permanently stalled `/auth/refresh` socket via route interception
+  (the route handler never calls `fulfill`/`continue`) — confirmed the
+  app previously would have hung with no bound (by inspection of the
+  un-timed-out code path) and now self-heals in ~10.5s, redirecting to
+  `/login?returnTo=...` instead of hanging; a follow-up normal login +
+  `/broker/leads` load with the interception removed confirmed zero
+  regression to the ordinary refresh path.
+- **Default per-request timeouts added everywhere, same day** — your
+  follow-up request, generalizing the refresh-specific fix above: every
+  other `apiRequest`/`apiRequestMultipart` call had no timeout of its
+  own either, so a stalled ordinary request (not `/auth/refresh`) could
+  still hang a query/mutation indefinitely, just without the session-
+  wide blast radius. `rawFetch` now applies `DEFAULT_REQUEST_TIMEOUT_MS`
+  (15s) via a new `boundedSignal()` helper — merges a caller-supplied
+  `AbortSignal` with the default via `AbortSignal.any()` when one is
+  passed, so an intentional cancellation (e.g. a component unmounting
+  mid-request) still works; `rawFetchMultipart` gets its own longer
+  `UPLOAD_TIMEOUT_MS` (60s), since uploads legitimately take longer than
+  a JSON call. **This is a plain per-request bound, not a session/login
+  timeout** — a timed-out ordinary request just fails that one call
+  (an `AbortError` surfaces to whatever query/mutation made it,
+  react-query retries per its own policy); only `/auth/refresh`
+  timing out ends the session, unchanged from the fix above, since
+  every other request's 401-retry path awaits that same
+  `refreshAccessToken()` promise rather than owning session state
+  itself. `tsc`/`eslint` clean. Live-verified with Playwright: baseline
+  `/broker/leads` load unaffected; then stalled the ordinary
+  `GET /leads` call itself (not refresh) via route interception —
+  confirmed via the network log it aborted client-side
+  (`net::ERR_ABORTED`) at the 15s mark on each of react-query's retry
+  attempts, and confirmed throughout that the session stayed logged in
+  (no redirect to `/login`) the whole time, proving an ordinary
+  timeout only fails that request rather than logging the user out;
+  removing the interception and reloading recovered the page cleanly.
 
