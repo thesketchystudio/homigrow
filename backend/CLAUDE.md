@@ -561,6 +561,54 @@ commits to `dev` before starting)
   reverted afterward via a direct DB fix to keep this shared broker's
   demo data clean.
 
+- **Broker profile self-edit shipped 2026-09-10** (backs the Figma
+  "Real Estate Broker Portal > Profile" screen, node `177:2805`,
+  frontend CLAUDE.md same day). `PATCH /users/me` gained a nested,
+  optional `broker_profile` field (new `BrokerProfileUpdateRequest` in
+  `app/schemas/users.py`: `bio`/`company_name`/`experience_years`/
+  `specializations`/`service_areas` — the editable subset of
+  `BrokerProfileOut`). Deliberately excludes `rera_number` and
+  `verification_status`: changing either belongs to the verification-
+  document resubmission flow (`POST /brokers/me/verification-documents`),
+  not a plain profile edit. `user_service.update_me()` applies only the
+  fields actually supplied (route passes
+  `payload.broker_profile.model_dump(exclude_unset=True)`), and is a
+  no-op when the caller isn't a broker or has no `broker_profile` row
+  yet rather than erroring — a client account simply has nothing here
+  to update. Also added `created_at` to `UserRead` (real column via
+  `TimestampMixin`, just never exposed via the API before) — needed
+  for the Profile page's real "Member Since" field. No migration
+  needed for either change (no new columns). Several Figma sections on
+  this screen have no backing data model at all — Avg Rating, a
+  per-broker activity feed, and NAR/MagicBricks-style third-party
+  certifications — deliberately left unbuilt (honest empty states on
+  the frontend) rather than fabricated, your explicit scope call.
+  291/291 tests pass (3 new across `test_user_service.py`/
+  `test_users.py`: partial broker_profile update, ignored for a
+  client/missing-row account, route-level shape). `ruff` clean. Live-verified end-to-end against the real
+  Supabase dev DB using the standing `broker.login.test@homigrow.local`
+  test broker (see frontend CLAUDE.md for the Playwright detail): a
+  real edit (bio/company/experience/specializations/service areas) via
+  the new page round-tripped correctly and rendered live; `rera_number`
+  stayed untouched since it isn't sent by this form. **Found the same
+  class of stale/orphaned-server bug documented above, twice in this
+  session** — an old `--reload` worker from the *main* `homigrow/backend`
+  checkout (not this worktree) was still holding port 8000 and serving
+  pre-change schemas with zero errors; then, after killing it, a second
+  orphaned `multiprocessing` child from an even older run of this same
+  worktree's server was *also* still bound to the port. Diagnosed both
+  via `Get-CimInstance Win32_Process` (parent/child chains, not just
+  `netstat`, since a dead PID can still show `LISTENING` briefly) and
+  killed explicitly before a genuinely fresh `python -m uvicorn` server
+  reflected the real code. **Separately found and fixed while setting up
+  verification, unrelated to this task's own code:** the broker Leads
+  backend (`feature/phase_3_backend_client`, 2026-09-07) was never
+  actually merged into `dev` — two commits
+  (`db8481d`/`8030d87`) sat unmerged on that branch with no PR ever
+  opened for them, even though the frontend Leads table already ships
+  against it. Opened as its own separate PR rather than folded into
+  this branch.
+
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
   docs/architecture/15_Decision_Log.md); integrate via
