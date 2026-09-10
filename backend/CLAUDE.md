@@ -461,6 +461,130 @@ commits to `dev` before starting)
   a note round-tripped and flipped `last_contacted_at` from `null` to a
   live relative timestamp, and a follow-up date persisted — confirmed
   via a direct DB query, then all test rows deleted afterward.
+- **Broker Property Detail API shipped 2026-09-08** — on a new
+  `feature/phase_3_backend_broker_detail` branch (cut fresh from
+  `dev` rather than reopening the already-merged
+  `feature/phase_3_backend_broker`), backing the matching frontend
+  Property Detail page (Figma node `177:3345`). New
+  `GET /properties/mine/{id}` (`broker_property_service.
+  get_property_detail`): the broker-owned counterpart to
+  `property_service.get_property_detail` — any status, not just
+  active — returning `BrokerPropertyDetailRead` (`PropertyRead` plus
+  `views_count` from the existing-but-previously-unexposed
+  `Property.views_count` column, `leads_count`/`recent_leads` computed
+  from the `Lead` table, and `shortlisted_count` computed from the
+  `SavedProperty` watchlist join table via its existing
+  `ix_saved_properties_property` index). Registered under the literal
+  `/properties/mine/` prefix (not `/properties/{id}`), so it can never
+  collide with `properties.router`'s public active-only route
+  regardless of router registration order — a stronger guarantee than
+  the existing `/properties/mine` list route gets from registration
+  order alone. New `POST /properties/{id}/close`
+  (`broker_property_service.close_property`): the single "Mark as
+  Sold"/"Mark as Rented" action, using the existing lifecycle state
+  machine's active -> sold|rented transition — targets `sold` for a
+  sale listing, `rented` for rent/PG, `422 INVALID_STATUS_TRANSITION`
+  for anything not currently active. **No per-day view time series
+  exists anywhere in the schema** (no events table), so the response
+  deliberately has no field for one — the frontend's "Views - Last 30
+  Days" chart renders its own honest "coming soon" placeholder rather
+  than the backend fabricating trend data. 226→234 tests pass (8 new
+  in `test_broker_properties.py`: full detail shape with real
+  leads/shortlisted numbers and ordered recent-leads, draft-listing
+  visibility unlike the public endpoint, ownership 403/401, sold vs.
+  rented targeting by listing type, invalid-transition 422). Verified
+  clean via 3 separate real-Supabase-dev-DB test runs — two full-suite
+  runs each hit one unrelated statement-timeout on a plain `users`
+  INSERT near the end of the file (transient DB contention from
+  running the same 36-test file back-to-back three times in a few
+  minutes, confirmed by both failures being on different, unrelated
+  tests each time), while running only the 8 new tests in isolation
+  passed cleanly twice. Live-verified end-to-end with Playwright
+  against this worktree's own `uvicorn` (confirmed via
+  `GET /openapi.json` showing both new paths registered) + the real
+  Supabase dev DB, logged in as the demo-data broker
+  (`vikram.broker.test@homigrow.local`): the real Property Detail page
+  rendered real `leads_count`/`recent_leads` for a listing with an
+  actual lead attached; the "Mark as Sold" confirm dialog opens
+  correctly (cancelled rather than confirmed, to avoid mutating this
+  shared demo broker's 11 real listings used elsewhere in the app).
+- **Reopen action added, 2026-09-08 (same day, same branch)** — your
+  explicit call after reviewing the above: a broker who clicks "Mark
+  as Sold"/"Mark as Rented" by mistake had no way back — `sold`/
+  `rented` were coded as fully terminal states with zero outgoing
+  transitions. `property_lifecycle.py`'s state machine now allows
+  `sold -> active` and `rented -> active` ("reopen") as the only
+  outgoing edge from either — everything else about them stays
+  terminal (still can't go to `draft`/`pending` directly). New
+  `POST /properties/{id}/reopen`
+  (`broker_property_service.reopen_property`), the mirror image of
+  `close_property`. 234→238 tests pass (4 new in
+  `test_broker_properties.py`: sold->active, rented->active,
+  reopening a non-sold/rented listing 422s, ownership 403) plus
+  `test_property_lifecycle.py` updated — `(sold, active)`/
+  `(rented, active)` moved from its `ILLEGAL` table to `LEGAL`, and
+  its "terminal states have no outgoing transitions" comment/grouping
+  rewritten since that's no longer true. **Real bug hit live while
+  verifying this, unrelated to the new code's own correctness:** the
+  worktree's `uvicorn --reload` process had an orphaned
+  `--multiprocessing-fork` worker still bound to port 8000 from hours
+  earlier in the session, silently serving stale pre-`/close`-and-
+  `/reopen` code the entire time — `netstat`/`Get-NetTCPConnection`
+  both still attributed the listening socket to the original
+  reloader's PID even though `Get-CimInstance`/`Get-Process` confirmed
+  that PID no longer existed, so a plain "kill that PID and restart"
+  didn't help until the actual orphaned child process was found and
+  killed directly. A real `POST .../reopen` 404'd against this stale
+  server before the fix, then round-tripped correctly (`active ->
+  sold -> reopen -> active`, confirmed via the status pill) once a
+  single clean server was actually running. **Lesson for next time:**
+  when a worktree server has been running a long time across several
+  restart attempts, don't trust that killing the PID `netstat` names
+  actually frees the port — enumerate every `python.exe`
+  (`Get-CimInstance Win32_Process -Filter "Name='python.exe'"`,
+  which also shows each one's full command line) and kill anything
+  stale before starting fresh.
+
+- **Edit Listing PATCH + delete-media endpoints shipped 2026-09-09**
+  (backs the Figma "Edit Listing" screen, node `177:4065`, frontend
+  CLAUDE.md same day). New `PATCH /properties/{id}`
+  (`update_property`) — a genuine partial update: `PropertyUpdateRequest`
+  (`app/schemas/properties.py`) has every field optional, and the
+  service reads it via `model_dump(exclude_unset=True)`, so an omitted
+  field is left untouched rather than nulled. Deliberately excludes
+  `listing_type`/`property_type` — both gate which type-specific
+  sub-form (plot/land/pg/jv) applies, and changing either post-creation
+  isn't supported here. Editing a currently-`active` listing now
+  transitions it to `pending` for re-moderation, closing the gap
+  `property_lifecycle.py` already documented (`active -> pending`) but
+  nothing implemented — your explicit call when this was scoped;
+  draft/pending/rejected listings keep their status since they haven't
+  been published yet. New `DELETE /properties/{id}/media/{media_id}`
+  (`delete_media`) removes one photo/video; if it was the cover image,
+  the next-lowest-position remaining item is promoted so a listing is
+  never left without one. Doesn't touch the underlying storage
+  object — `PropertyMedia` rows are this codebase's existing source of
+  truth for what's shown, and nothing else cleans up orphaned storage
+  objects either.
+  **Migration M10** (`b7e2f1a9c3d4`) adds two columns Figma's Edit
+  Listing screen needs that neither the `Property` model nor the Post
+  Property wizard ever collected: `ownership_type` (new
+  `OwnershipType` enum — freehold/leasehold/co_operative_society/
+  power_of_attorney) and `available_from` (`Date`), both nullable so
+  existing rows need no backfill. Upgrade → downgrade → upgrade
+  verified clean against the real dev DB (the only `alembic check`
+  drift is the pre-existing, unrelated `spatial_ref_sys` PostGIS
+  system table, not from this migration). 272/272 tests pass (12 new
+  in `test_broker_properties.py`: partial-field PATCH, active->pending
+  transition, draft-stays-draft, plot_details replaced whole, 404 on
+  an unknown media id, ownership 403/401 on both new endpoints, cover
+  promotion on delete). `ruff` clean. Live-verified end-to-end via the
+  real frontend against this worktree's own `uvicorn` + the real
+  Supabase dev DB (see frontend CLAUDE.md for the Playwright detail):
+  a real `PATCH` against the demo broker's active listing correctly
+  flipped it to `pending`; the edited title/amenities/status were
+  reverted afterward via a direct DB fix to keep this shared broker's
+  demo data clean.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

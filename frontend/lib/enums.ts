@@ -109,6 +109,16 @@ export const Furnishing = {
 } as const;
 export type Furnishing = (typeof Furnishing)[keyof typeof Furnishing];
 
+// Human-readable labels for each Furnishing value, shared by any screen
+// that displays (rather than collects, like PropertyInfoStep's own select
+// options) a property's furnishing status — e.g. the broker Property
+// Detail page's spec grid.
+export const FURNISHING_LABELS: Record<Furnishing, string> = {
+  [Furnishing.unfurnished]: "Unfurnished",
+  [Furnishing.semi_furnished]: "Semi-Furnished",
+  [Furnishing.fully_furnished]: "Fully Furnished",
+};
+
 export const MediaType = {
   image: "image",
   video: "video",
@@ -153,3 +163,20 @@ export const BrokerDocumentType = {
   government_id: "government_id",
 } as const;
 export type BrokerDocumentType = (typeof BrokerDocumentType)[keyof typeof BrokerDocumentType];
+
+export const OwnershipType = {
+  freehold: "freehold",
+  leasehold: "leasehold",
+  co_operative_society: "co_operative_society",
+  power_of_attorney: "power_of_attorney",
+} as const;
+export type OwnershipType = (typeof OwnershipType)[keyof typeof OwnershipType];
+
+// Human-readable labels for each OwnershipType, shown on the Edit Listing
+// form's Ownership dropdown (Figma node 177:4065).
+export const OWNERSHIP_TYPE_LABELS: Record<OwnershipType, string> = {
+  [OwnershipType.freehold]: "Freehold",
+  [OwnershipType.leasehold]: "Leasehold",
+  [OwnershipType.co_operative_society]: "Co-operative Society",
+  [OwnershipType.power_of_attorney]: "Power of Attorney",
+};

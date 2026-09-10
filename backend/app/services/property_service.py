@@ -12,12 +12,13 @@ from typing import Literal, Optional
 from uuid import UUID
 
 from sqlalchemy import Text, func, or_
-from sqlalchemy.dialects.postgresql import array
+from sqlalchemy.dialects.postgresql import array, insert as pg_insert
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.exceptions import NotFoundError, ValidationFailed
 from app.models.enums import ListingType, PropertyStatus, PropertyType
 from app.models.property import Property, PropertyMedia
+from app.models.property_view import PropertyView
 from app.models.user import User
 from app.schemas.properties import NeighborhoodSummary, PropertyListItem
 from app.services._property_query_helpers import build_property_list_item, cover_image_subquery
@@ -122,6 +123,24 @@ def get_property_detail(db: Session, property_id: UUID) -> Property:
     if property_ is None or property_.status != PropertyStatus.active:
         raise NotFoundError("PROPERTY_NOT_FOUND", "Property not found.")
     return property_
+
+
+def record_view(db: Session, property_id: UUID, viewer_id: Optional[UUID]) -> None:
+    """
+    Logs one property-detail view for the broker Analytics page. Logged-in
+    viewers are deduped via ON CONFLICT DO NOTHING against the partial
+    unique index on (property_id, viewer_id) — a repeat view from the same
+    account is a no-op. Anonymous viewers (viewer_id is None) fall outside
+    that partial index, so every anonymous view is logged as its own row;
+    there's no stable identity to dedupe an anonymous visitor against.
+    """
+    stmt = pg_insert(PropertyView).values(property_id=property_id, viewer_id=viewer_id)
+    stmt = stmt.on_conflict_do_nothing(
+        index_elements=[PropertyView.property_id, PropertyView.viewer_id],
+        index_where=PropertyView.viewer_id.isnot(None),
+    )
+    db.execute(stmt)
+    db.commit()
 
 
 def compare_properties(db: Session, ids: list[UUID]) -> list[Property]:

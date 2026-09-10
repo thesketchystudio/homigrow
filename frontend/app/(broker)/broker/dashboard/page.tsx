@@ -1,10 +1,12 @@
 // app/(broker)/broker/dashboard/page.tsx
-// Real KPI/aggregate dashboard is a future task — until then this shows
-// the Figma "Blank screen" empty state (via BrokerListingsPanel) when the
-// broker has no listings yet, or a plain status list once they do.
+// Real Home/Dashboard (Figma "Real Estate Broker Portal" > Dashboard, node
+// 176:2 on the "Broker view" page) — KPI stat cards, Recent Leads preview,
+// and Active Listings preview. See BrokerHomeDashboard.tsx for the
+// implementation; the "Blank screen" empty state still covers a broker with
+// zero listings.
 
-import { BrokerListingsPanel } from "@/features/broker/BrokerListingsPanel";
+import { BrokerHomeDashboard } from "@/features/broker/BrokerHomeDashboard";
 
 export default function BrokerDashboardPage() {
-  return <BrokerListingsPanel heading="Your Listings" />;
+  return <BrokerHomeDashboard />;
 }

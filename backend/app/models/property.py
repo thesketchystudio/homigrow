@@ -12,6 +12,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -32,6 +33,7 @@ from app.models.enums import (
     Furnishing,
     ListingType,
     MediaType,
+    OwnershipType,
     PaymentStructure,
     PriceFlexibility,
     PropertyStatus,
@@ -113,6 +115,9 @@ class Property(Base, TimestampMixin):
     jv_details = Column(JSONB, nullable=True)
 
     virtual_tour_url = Column(String(500), nullable=True)
+
+    ownership_type = Column(_pg_enum(OwnershipType, "ownership_type"), nullable=True)
+    available_from = Column(Date, nullable=True)
 
     # Denormalized counter for fast reads; the events table is the source of truth.
     views_count = Column(Integer, nullable=False, server_default="0")

@@ -4,7 +4,7 @@
 // GET /properties serves the Listings search grid.
 
 import { apiRequest, apiRequestMultipart } from "@/lib/api/client";
-import type { Furnishing, ListingType, MediaType, PaymentStructure, PriceFlexibility, PropertyStatus, PropertyType, VerificationStatus } from "@/lib/enums";
+import type { Furnishing, LeadStatus, ListingType, MediaType, OwnershipType, PaymentStructure, PriceFlexibility, PropertyStatus, PropertyType, VerificationStatus } from "@/lib/enums";
 import type { JVDetailsValues, LandDetailsValues, PGDetailsValues, PlotDetailsValues } from "@/lib/validation/postProperty";
 
 export type PropertyMediaRead = {
@@ -61,6 +61,8 @@ export type PropertyRead = {
   is_jv_property: boolean;
   jv_details?: JVDetailsValues;
   virtual_tour_url?: string;
+  ownership_type?: OwnershipType;
+  available_from?: string;
   address_line: string;
   locality: string;
   city: string;
@@ -242,8 +244,10 @@ export type PropertyCreateInput = {
 };
 
 // Broker's own listings across every status (draft included) — backs the
-// Dashboard/Listings pages' empty-state check.
-export type BrokerPropertyListItem = PropertyListItem & { status: PropertyStatus };
+// Dashboard's empty-state check and the Listings table. created_at is
+// always present (unlike published_at, which is null until a listing goes
+// active) so the table's "Listed Xd ago" column always has a value.
+export type BrokerPropertyListItem = PropertyListItem & { status: PropertyStatus; created_at: string };
 
 export function listMyProperties(): Promise<BrokerPropertyListItem[]> {
   return apiRequest<BrokerPropertyListItem[]>("/properties/mine");
@@ -273,4 +277,67 @@ export function uploadJvAgreement(propertyId: string, document: File): Promise<P
 
 export function submitProperty(propertyId: string): Promise<PropertyRead> {
   return apiRequest<PropertyRead>(`/properties/${propertyId}/submit`, { method: "POST" });
+}
+
+// GET /properties/mine/{id} — the broker-owned counterpart to getProperty
+// above: any status (not just active), plus the Property Detail page's
+// Performance card numbers. leads_count/recent_leads and shortlisted_count
+// are real, computed from the Lead/SavedProperty tables; there's no per-day
+// view time series anywhere in the schema, so the page renders its own
+// "coming soon" placeholder for that chart rather than requesting fake data.
+export type BrokerPropertyLeadSummary = {
+  id: string;
+  contact_name: string | null;
+  status: LeadStatus;
+  created_at: string;
+};
+
+export type BrokerPropertyDetailRead = PropertyRead & {
+  views_count: number;
+  leads_count: number;
+  shortlisted_count: number;
+  recent_leads: BrokerPropertyLeadSummary[];
+};
+
+export function getMyProperty(propertyId: string): Promise<BrokerPropertyDetailRead> {
+  return apiRequest<BrokerPropertyDetailRead>(`/properties/mine/${propertyId}`);
+}
+
+// Marks an active listing sold (sale) or rented (rent/PG) — the Property
+// Detail page's "Mark as Sold"/"Mark as Rented" action.
+export function closeProperty(propertyId: string): Promise<PropertyRead> {
+  return apiRequest<PropertyRead>(`/properties/${propertyId}/close`, { method: "POST" });
+}
+
+// Reopens a sold/rented listing back to active — undoes an accidental
+// closeProperty click.
+export function reopenProperty(propertyId: string): Promise<PropertyRead> {
+  return apiRequest<PropertyRead>(`/properties/${propertyId}/reopen`, { method: "POST" });
+}
+
+// The Edit Listing form's submission (Figma node 177:4065). Every field is
+// optional — only the ones set are sent, and only those are applied server-
+// side (a genuine partial PATCH). Deliberately omits listing_type and
+// property_type: see PropertyUpdateRequest's backend docstring for why
+// changing either post-creation isn't supported by this endpoint.
+export type PropertyUpdateInput = Partial<
+  Omit<PropertyCreateInput, "listing_type" | "property_type" | "amenities"> & {
+    description: string;
+    floor: number;
+    total_floors: number;
+    parking_slots: number;
+    amenities: string[];
+    ownership_type: OwnershipType;
+    available_from: string;
+  }
+>;
+
+export function updateProperty(propertyId: string, data: PropertyUpdateInput): Promise<PropertyRead> {
+  return apiRequest<PropertyRead>(`/properties/${propertyId}`, { method: "PATCH", body: data });
+}
+
+// Removes one photo/video from a listing's gallery — the Edit Listing
+// form's photo grid delete action.
+export function deletePropertyMedia(propertyId: string, mediaId: string): Promise<void> {
+  return apiRequest<void>(`/properties/${propertyId}/media/${mediaId}`, { method: "DELETE" });
 }
