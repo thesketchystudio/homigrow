@@ -227,12 +227,15 @@ class PropertyListResponse(PaginatedResponse[PropertyListItem]):
 
 class BrokerPropertyListItem(PropertyListItem):
     """
-    GET /properties/mine's card shape — PropertyListItem plus status, since
-    a broker (unlike the public search grid) needs to see draft/pending
-    listings too, not just active ones.
+    GET /properties/mine's card shape — PropertyListItem plus status and
+    created_at, since a broker (unlike the public search grid) needs to see
+    draft/pending listings too (which have no published_at yet) and the
+    Listings table's "Listed Xd ago" column needs a timestamp that's always
+    present regardless of status.
     """
 
     status: PropertyStatus
+    created_at: datetime
 
 
 class BrokerPropertyLeadSummary(BaseModel):

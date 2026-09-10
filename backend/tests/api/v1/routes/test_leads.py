@@ -1,16 +1,18 @@
 """
 tests/api/v1/routes/test_leads.py
 
-Integration tests for POST /api/v1/properties/{id}/enquire through the
-TestClient — anonymous vs logged-in submission, contact-info capture,
-open-lead dedup for both paths, broker-phone reveal, and rate limiting.
+Integration tests for POST /api/v1/properties/{id}/enquire (anonymous vs
+logged-in submission, contact-info capture, open-lead dedup, broker-phone
+reveal, rate limiting) and for the broker-authenticated lead pipeline under
+/api/v1/leads (list/detail/status update/notes).
 """
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from app.core.security import create_access_token
-from app.models.enums import ListingType, PropertyStatus, PropertyType, UserRole
-from app.models.lead import Lead
+from app.models.enums import LeadStatus, ListingType, PropertyStatus, PropertyType, UserRole
+from app.models.lead import Lead, LeadNote
 from app.models.notification import Notification
 from app.models.property import Property
 from tests.conftest import make_user
@@ -177,3 +179,117 @@ class TestEnquireRateLimiting:
 
         assert sixth.status_code == 429
         assert sixth.json()["error"]["code"] == "RATE_LIMITED"
+
+
+def _make_lead(db_session, *, property_, **overrides) -> Lead:
+    defaults = dict(
+        property_id=property_.id,
+        broker_id=property_.broker_id,
+        contact_name="Test Visitor",
+        contact_phone="+919876500200",
+        source="number_request",
+    )
+    defaults.update(overrides)
+    lead = Lead(**defaults)
+    db_session.add(lead)
+    db_session.flush()
+    return lead
+
+
+class TestBrokerLeadPipeline:
+    def test_list_leads_returns_only_this_brokers_leads_newest_first(self, client, db_session):
+        broker = make_user(db_session, phone="+919812340001", role=UserRole.broker)
+        other_broker = make_user(db_session, phone="+919812340002", role=UserRole.broker)
+        property_ = _make_property(db_session, broker=broker)
+        other_property = _make_property(db_session, broker=other_broker)
+
+        yesterday = datetime.now(timezone.utc) - timedelta(days=1)
+        older = _make_lead(db_session, property_=property_, contact_name="Older Lead", created_at=yesterday)
+        _make_lead(db_session, property_=other_property, contact_name="Not This Broker's Lead")
+        newer = _make_lead(db_session, property_=property_, contact_name="Newer Lead")
+        db_session.commit()
+
+        response = client.get("/api/v1/leads", headers=_auth_headers(broker))
+
+        assert response.status_code == 200
+        body = response.json()
+        assert [item["id"] for item in body] == [str(newer.id), str(older.id)]
+        assert body[0]["property_title"] == property_.title
+        assert body[0]["last_contacted_at"] is None
+
+    def test_list_leads_requires_broker_role(self, client, db_session):
+        client_user = make_user(db_session, phone="+919876580200")
+
+        response = client.get("/api/v1/leads", headers=_auth_headers(client_user))
+
+        assert response.status_code == 403
+
+    def test_get_lead_returns_notes(self, client, db_session):
+        broker = make_user(db_session, phone="+919812340003", role=UserRole.broker)
+        property_ = _make_property(db_session, broker=broker)
+        lead = _make_lead(db_session, property_=property_)
+        note = LeadNote(lead_id=lead.id, author_id=broker.id, body="Called, left a voicemail.")
+        db_session.add(note)
+        db_session.commit()
+
+        response = client.get(f"/api/v1/leads/{lead.id}", headers=_auth_headers(broker))
+
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body["notes"]) == 1
+        assert body["notes"][0]["body"] == "Called, left a voicemail."
+        assert body["last_contacted_at"] is not None
+
+    def test_get_lead_not_owned_returns_404(self, client, db_session):
+        broker = make_user(db_session, phone="+919812340004", role=UserRole.broker)
+        other_broker = make_user(db_session, phone="+919812340005", role=UserRole.broker)
+        property_ = _make_property(db_session, broker=other_broker)
+        lead = _make_lead(db_session, property_=property_)
+
+        response = client.get(f"/api/v1/leads/{lead.id}", headers=_auth_headers(broker))
+
+        assert response.status_code == 404
+        assert response.json()["error"]["code"] == "LEAD_NOT_FOUND"
+
+    def test_update_lead_status_persists(self, client, db_session):
+        broker = make_user(db_session, phone="+919812340006", role=UserRole.broker)
+        property_ = _make_property(db_session, broker=broker)
+        lead = _make_lead(db_session, property_=property_)
+
+        response = client.patch(
+            f"/api/v1/leads/{lead.id}", headers=_auth_headers(broker), json={"status": "contacted"}
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "contacted"
+        db_session.refresh(lead)
+        assert lead.status == LeadStatus.contacted
+
+    def test_update_lead_not_owned_returns_404(self, client, db_session):
+        broker = make_user(db_session, phone="+919812340007", role=UserRole.broker)
+        other_broker = make_user(db_session, phone="+919812340008", role=UserRole.broker)
+        property_ = _make_property(db_session, broker=other_broker)
+        lead = _make_lead(db_session, property_=property_)
+
+        response = client.patch(
+            f"/api/v1/leads/{lead.id}", headers=_auth_headers(broker), json={"status": "contacted"}
+        )
+
+        assert response.status_code == 404
+
+    def test_add_note_creates_note_and_updates_last_contacted(self, client, db_session):
+        broker = make_user(db_session, phone="+919812340009", role=UserRole.broker, full_name="Vikram Sethi")
+        property_ = _make_property(db_session, broker=broker)
+        lead = _make_lead(db_session, property_=property_)
+
+        response = client.post(
+            f"/api/v1/leads/{lead.id}/notes", headers=_auth_headers(broker), json={"body": "Scheduled a site visit."}
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["body"] == "Scheduled a site visit."
+        assert body["author_name"] == "Vikram Sethi"
+
+        list_response = client.get("/api/v1/leads", headers=_auth_headers(broker))
+        assert list_response.json()[0]["last_contacted_at"] is not None

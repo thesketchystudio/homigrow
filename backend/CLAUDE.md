@@ -436,6 +436,44 @@ commits to `dev` before starting)
   changes (Property Type dropdown, conditional Plot/Land sub-forms)
   not started — separate task, backend-first per your explicit
   ordering.**
+- **`BrokerPropertyListItem.created_at` added, 2026-09-05** — small,
+  targeted addition for the frontend broker Listings table (Figma node
+  `176:789`), which needs a "Listed Xd ago" column that's always present
+  regardless of status; `published_at` (the only timestamp
+  `PropertyListItem` already had) is null for draft/pending listings,
+  which is most of what a broker actually sees day-to-day. `Property.
+  created_at` already existed as a column — just wasn't exposed on this
+  schema. `list_my_properties()` now passes it through alongside
+  `status`. No migration, no other endpoint touched (the public
+  `PropertyListItem` base class is unchanged). 242/242 tests pass
+  (pre-existing `test_broker_properties.py` assertions check specific
+  keys, not full-object equality, so none needed updating); `ruff`
+  clean.
+- **Broker lead pipeline shipped 2026-09-07** — on `feature/phase_3_backend_client`,
+  alongside the `POST /properties/{id}/enquire` endpoint from the same
+  branch: new broker-authenticated `GET /leads` (list, newest first),
+  `GET /leads/{id}` (detail + note history), `PATCH /leads/{id}`
+  (status and/or `follow_up_at`), and `POST /leads/{id}/notes` — the
+  first routes to actually read/write `Lead`/`LeadNote`, both of which
+  existed since the original Phase 1 schema with no consumer. New
+  `app/api/v1/routes/leads.py`; `lead_service.py` gained
+  `list_leads_for_broker`/`get_lead_for_broker`/`update_lead`/
+  `add_lead_note`, all scoped by `broker_id` (404 `LEAD_NOT_FOUND` on
+  any lead not owned by the caller — no cross-broker leak path).
+  `LeadListItem` flattens in the lead's property title/locality/city/
+  price/listing_type (avoids a second round trip for the table's
+  Property Interest/Budget columns) and a computed `last_contacted_at`
+  (the most recent note's timestamp, `null` if none exist yet — not the
+  lead's own `created_at`, which would misleadingly read as "already
+  contacted" for a brand-new lead). 242→257 tests pass (15 new); `ruff`
+  clean. Live-verified
+  end-to-end with Playwright against the real Supabase dev DB, logged
+  in as the demo broker (`vikram.broker.test@homigrow.local`): a real
+  enquiry submitted via `POST /properties/{id}/enquire` appeared in the
+  broker's `/broker/leads` table, status change persisted (`PATCH`),
+  a note round-tripped and flipped `last_contacted_at` from `null` to a
+  live relative timestamp, and a follow-up date persisted — confirmed
+  via a direct DB query, then all test rows deleted afterward.
 - **Broker Property Detail API shipped 2026-09-08** — on a new
   `feature/phase_3_backend_broker_detail` branch (cut fresh from
   `dev` rather than reopening the already-merged
@@ -560,6 +598,117 @@ commits to `dev` before starting)
   flipped it to `pending`; the edited title/amenities/status were
   reverted afterward via a direct DB fix to keep this shared broker's
   demo data clean.
+
+- **Broker profile self-edit shipped 2026-09-10** (backs the Figma
+  "Real Estate Broker Portal > Profile" screen, node `177:2805`,
+  frontend CLAUDE.md same day). `PATCH /users/me` gained a nested,
+  optional `broker_profile` field (new `BrokerProfileUpdateRequest` in
+  `app/schemas/users.py`: `bio`/`company_name`/`experience_years`/
+  `specializations`/`service_areas` — the editable subset of
+  `BrokerProfileOut`). Deliberately excludes `rera_number` and
+  `verification_status`: changing either belongs to the verification-
+  document resubmission flow (`POST /brokers/me/verification-documents`),
+  not a plain profile edit. `user_service.update_me()` applies only the
+  fields actually supplied (route passes
+  `payload.broker_profile.model_dump(exclude_unset=True)`), and is a
+  no-op when the caller isn't a broker or has no `broker_profile` row
+  yet rather than erroring — a client account simply has nothing here
+  to update. Also added `created_at` to `UserRead` (real column via
+  `TimestampMixin`, just never exposed via the API before) — needed
+  for the Profile page's real "Member Since" field. No migration
+  needed for either change (no new columns). Several Figma sections on
+  this screen have no backing data model at all — Avg Rating, a
+  per-broker activity feed, and NAR/MagicBricks-style third-party
+  certifications — deliberately left unbuilt (honest empty states on
+  the frontend) rather than fabricated, your explicit scope call.
+  291/291 tests pass (3 new across `test_user_service.py`/
+  `test_users.py`: partial broker_profile update, ignored for a
+  client/missing-row account, route-level shape). `ruff` clean. Live-verified end-to-end against the real
+  Supabase dev DB using the standing `broker.login.test@homigrow.local`
+  test broker (see frontend CLAUDE.md for the Playwright detail): a
+  real edit (bio/company/experience/specializations/service areas) via
+  the new page round-tripped correctly and rendered live; `rera_number`
+  stayed untouched since it isn't sent by this form. **Found the same
+  class of stale/orphaned-server bug documented above, twice in this
+  session** — an old `--reload` worker from the *main* `homigrow/backend`
+  checkout (not this worktree) was still holding port 8000 and serving
+  pre-change schemas with zero errors; then, after killing it, a second
+  orphaned `multiprocessing` child from an even older run of this same
+  worktree's server was *also* still bound to the port. Diagnosed both
+  via `Get-CimInstance Win32_Process` (parent/child chains, not just
+  `netstat`, since a dead PID can still show `LISTENING` briefly) and
+  killed explicitly before a genuinely fresh `python -m uvicorn` server
+  reflected the real code. **Separately found and fixed while setting up
+  verification, unrelated to this task's own code:** the broker Leads
+  backend (`feature/phase_3_backend_client`, 2026-09-07) was never
+  actually merged into `dev` — two commits
+  (`db8481d`/`8030d87`) sat unmerged on that branch with no PR ever
+  opened for them, even though the frontend Leads table already ships
+  against it. Opened as its own separate PR rather than folded into
+  this branch.
+- **Boost Listing checkout (no payment yet) shipped 2026-09-10** — the
+  boost/payments system was originally scoped whole to Phase 6
+  (`20_Phase_6.md`: coupons, `boost_orders` with required Razorpay
+  fields, webhook idempotency, admin plan CRUD), but the Figma "Boost
+  Listing" checkout page (node `178:5300`) was ready and you asked to
+  pull the plan/duration selection + order creation forward now,
+  explicitly deferring the actual payment gateway — same "design ready,
+  pull it forward" precedent as the P1 homepage. Confirmed the pull-
+  forward's exact shape with you first (three scope questions): real
+  order persistence (not just a UI stub), `boost_plans.price`
+  repurposed as a ₹/day rate with duration chosen per-order instead of
+  fixed per plan (the existing M1 schema's `duration_days` on the plan
+  conflicted with the Figma design's independent 7/15/30-day selector +
+  volume discount), and the Figma "Optional Add-ons" section (no
+  backend model exists for it) shipped as a static, disabled "coming
+  soon" section rather than modeled. Migration M12
+  (`cde17bb27e5c`): drops `boost_plans.duration_days`, adds
+  `boost_plans.reach_estimate` (jsonb — the checkout page's "Expected
+  Reach" views/leads/calls ranges, admin-editable marketing copy, not
+  measured analytics), and creates `boost_orders` (broker_id/
+  property_id/plan_id, duration_days, frozen `base_amount`/
+  `discount_amount`/`gst_amount`/`total_amount`, `status` defaulting
+  `created`, nullable `starts_at`/`ends_at`) — deliberately **without**
+  `razorpay_order_id`/`razorpay_payment_id`/`coupon_id`/
+  `activation_failed`, since nothing here ever moves an order past
+  `created` yet; those columns land with real Razorpay integration
+  later. Verified up/down/up clean against the real dev DB (only
+  pre-existing `spatial_ref_sys` autogenerate noise, unrelated).
+  New `app/services/boost_service.py`: `DURATION_DISCOUNT_PERCENT`
+  (`{7: 0, 15: 10, 30: 20}`, not admin-editable yet — that's the
+  coupon/plan-admin work P6 already scopes) × flat 18% GST, plain
+  Decimal rupee math (not the real billing service's integer-paise
+  math — no money is actually moving yet, so the P6 precision
+  requirement doesn't apply here); `create_order()` enforces own +
+  `PropertyStatus.active` (409 `PROPERTY_NOT_ACTIVE` otherwise, 403 if
+  not owned) before freezing the price breakdown onto the order — a
+  later admin price edit to the plan must never alter an already-placed
+  order's amount. New `GET /boost-plans` (public, active only, per
+  `05_API_Design.md`'s original spec) and `POST /boost-orders`
+  (broker-only). New `scripts/seed_boost_plans.py` (idempotent per
+  tier) seeded the 3 real plans/copy from the Figma design (Basic/
+  Featured/Premium Spotlight) into the real dev DB. 315/315 tests pass
+  (17 new: pricing math incl. exact rounding at each duration tier,
+  ownership/active/plan-not-found guards, route-level auth/role/status
+  codes). Live-verified end-to-end against the real dev DB (see
+  frontend CLAUDE.md for the Playwright detail): a real order round-
+  tripped through the actual checkout UI, confirmed via direct SQL —
+  `base_amount=1485.00, discount_amount=148.50, gst_amount=240.57,
+  total_amount=1577.07, status=created` for a Basic/15-day selection
+  on the demo broker's real "Bandra Garden Villa" listing (left in
+  place — a `created`-status order has no visible effect anywhere,
+  same as other harmless verification artifacts documented elsewhere
+  in this file). **Hit the exact same stale-orphaned-server class of
+  bug documented twice above, a third time**: the process bound to
+  port 8000 was `python -m uvicorn` running from the *main*
+  `homigrow/backend` checkout (currently on `feature/phase_3_frontend_broker`,
+  not this worktree) — confirmed via `Get-CimInstance Win32_Process`'s
+  `CommandLine` column before killing it and starting a genuinely fresh
+  server from this worktree.
+  **Deliberately not built here, per the phase-6 scope it was pulled
+  from:** the actual Razorpay order/webhook, coupons, admin plan CRUD,
+  and boost-tier search/ranking surfacing — this task only unblocks the
+  frontend checkout UI + a real `created`-status order row.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
