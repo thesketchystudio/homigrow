@@ -8,6 +8,7 @@ filters, sort, pagination), through the TestClient.
 
 import uuid
 
+from app.core.security import create_access_token
 from app.models.broker_profile import BrokerProfile
 from app.models.enums import (
     ListingType,
@@ -18,6 +19,7 @@ from app.models.enums import (
     VerificationStatus,
 )
 from app.models.property import Property, PropertyMedia
+from app.models.property_view import PropertyView
 from app.models.user import User
 from tests.conftest import make_user
 
@@ -116,6 +118,39 @@ class TestGetProperty:
 
         assert response.status_code == 404
         assert response.json()["error"]["code"] == "PROPERTY_NOT_FOUND"
+
+    def test_anonymous_views_each_log_their_own_row(self, client, db_session):
+        property_ = _make_property(db_session)
+
+        client.get(f"/api/v1/properties/{property_.id}")
+        client.get(f"/api/v1/properties/{property_.id}")
+
+        rows = db_session.query(PropertyView).filter(PropertyView.property_id == property_.id).all()
+        assert len(rows) == 2
+        assert all(row.viewer_id is None for row in rows)
+
+    def test_logged_in_viewer_is_deduped_across_repeat_views(self, client, db_session):
+        property_ = _make_property(db_session)
+        viewer = make_user(db_session, phone="+919876590001", role=UserRole.client)
+        headers = {"Authorization": f"Bearer {create_access_token(viewer.id, viewer.role.value)}"}
+
+        client.get(f"/api/v1/properties/{property_.id}", headers=headers)
+        client.get(f"/api/v1/properties/{property_.id}", headers=headers)
+
+        rows = db_session.query(PropertyView).filter(PropertyView.property_id == property_.id).all()
+        assert len(rows) == 1
+        assert rows[0].viewer_id == viewer.id
+
+    def test_different_logged_in_viewers_each_count(self, client, db_session):
+        property_ = _make_property(db_session)
+        first = make_user(db_session, phone="+919876590002", role=UserRole.client)
+        second = make_user(db_session, phone="+919876590003", role=UserRole.client)
+
+        client.get(f"/api/v1/properties/{property_.id}", headers={"Authorization": f"Bearer {create_access_token(first.id, first.role.value)}"})
+        client.get(f"/api/v1/properties/{property_.id}", headers={"Authorization": f"Bearer {create_access_token(second.id, second.role.value)}"})
+
+        rows = db_session.query(PropertyView).filter(PropertyView.property_id == property_.id).all()
+        assert len(rows) == 2
 
 
 def _unique_city() -> str:

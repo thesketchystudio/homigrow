@@ -1242,3 +1242,396 @@ starting)
   sat at the row's far right on `/compare` with the Saved page's inline
   layout unaffected.
 
+### Frontend Phase 3 — Post Property broker types (on
+`feature/phase_3_frontend_broker`, cut from `origin/dev` 2026-08-30 —
+first use of the new `<phase>_frontend_broker`/`<phase>_backend_broker`
+naming convention going forward for broker-only Post Property work,
+separate from the general `<phase>_frontend_client` branch)
+- **Plot + Land added to the Post Property wizard, 2026-08-30** — first
+  of a planned one-at-a-time rollout (Plot+Land now, PG/Co-living and
+  Commercial Building later) closing the gap between the wizard
+  (previously residential-only: apartment/villa/independent_house) and
+  the real Figma "Broker view > post property" design's full Property
+  Type dropdown, following the matching backend work on
+  `feature/phase_3_backend_broker`. `PropertyInfoStep.tsx`'s Step 1 now
+  swaps in a type-specific sub-form below Built Year: Plot gets Plot
+  Dimension, a Facing dropdown, and a Corner Plot Yes/No toggle; Land
+  gets a Land Use dropdown (Residential/Commercial), reuses the existing
+  Total Area field, and an "Approval / Classification" checklist (Podi,
+  Change of Land, Conversion, RERA, BMRDA) — matching the Figma "Plot
+  Details"/"Land Details" blocks exactly. Bed/Bath/Furnishing/Amenities
+  stay scoped to residential types only, unchanged. Facing's 8-point
+  compass option list isn't from Figma (its Plot Details frame only
+  showed a placeholder, no real option list) — standard Indian
+  real-estate convention used instead, same judgment call this codebase
+  already made for the Amenities list. New `PropertyType.land` in
+  `lib/enums.ts` (was missing entirely — a real gap, since that file's
+  own comment requires it stay byte-identical to the backend enum); new
+  `plotDetailsSchema`/`landDetailsSchema`/`POSTABLE_PROPERTY_TYPES`/
+  `FACING_OPTIONS`/`LAND_APPROVAL_OPTIONS` in
+  `lib/validation/postProperty.ts`; `PropertyCreateInput`/`PropertyRead`
+  in `lib/api/endpoints/properties.ts` gained `facing`/`plot_details`/
+  `land_details`. **Found and fixed a real backend gap while building
+  this**, on `feature/phase_3_backend_broker`: `Property.facing` has
+  existed as a column since M1 and was already readable via
+  `PropertyRead`, but `PropertyCreateRequest` never accepted it as
+  input, so there was no way for any wizard step to actually set it —
+  added `facing: Optional[str]` to the create schema and wired it
+  through `broker_property_service.create_property()`. `next build` and
+  `tsc --noEmit` both clean. Live-verified end-to-end with Playwright
+  against the real backend + Supabase dev DB, logged in as the standing
+  test broker: created one real Land listing (Land Use, Total Area,
+  Podi approval checked) and one real Plot listing (Plot Dimension,
+  Facing = North-East, Corner Plot = Yes) all the way through photo
+  upload and final submit — both landed in `status: pending` with
+  `facing`/`plot_details`/`land_details` persisted exactly as entered,
+  confirmed via direct SQL; both deleted afterward.
+  **Incidental fix, not part of this task's scope but blocking its own
+  verification:** the backend worktree's `.env` had all 7
+  `SUPABASE_S3_*`/`SUPABASE_URL` storage keys commented out (stale state
+  left over from a previous session, matching the documented worktree-env
+  gotcha) — caused every media upload to 500 with an unhandled
+  `ValueError: Invalid endpoint` from boto3, which the browser reported
+  misleadingly as a CORS failure. Uncommented them back (values already
+  correct, just disabled) and restarted the dev server; not a code
+  change, so nothing to commit.
+- **Broker Listings table shipped 2026-09-05** — real `/broker/listings`
+  page (previously the same plain empty-state/status-list as Dashboard,
+  `BrokerListingsPanel`), matching Figma node `176:789`
+  ("Real Estate Broker Portal > MyListings"). New
+  `features/broker/listings/BrokerListingsTable.tsx`: search + Type/
+  Status filter dropdowns, and the shared `SharedTable`/`StatusPill`
+  composites (first real consumer of `SharedTable` — previously unused
+  outside its own file) for Property (thumbnail + title + "Listed Xd
+  ago") / Location / Price / Details (BHK + sq.ft) / Performance /
+  Status / Actions columns. Filtering, search, and pagination (8 rows/
+  page, matching the Figma mock) are all client-side against
+  `listMyProperties()`'s existing unpaginated `/properties/mine` result
+  — no new list endpoint needed. `BrokerListingsPanel.tsx` now backs the
+  Dashboard page only; its header comment updated to say so.
+  **Performance (views/leads) is hardcoded to 0/0**, your explicit
+  instruction — no per-property view/lead-count aggregate exists on the
+  backend yet. **Boost** (the header button and each row's action, which
+  Figma's icon reads as the same action, not two different ones) always
+  toasts "Boost Listing — coming soon!" — `BoostPlan` is a catalog table
+  only, no purchase/assignment flow exists to call. **Edit opens the Post
+  Property wizard in a new tab** with `?propertyId=<id>` on the URL —
+  navigation-only per your explicit scope call: the wizard has no
+  prefill/edit mode and no `PATCH /properties/{id}` exists yet, both
+  deliberately deferred to a follow-up task rather than built here.
+  Backend gained one small, targeted addition to support the "Listed Xd
+  ago" column: `BrokerPropertyListItem.created_at` (see backend
+  CLAUDE.md, 2026-09-05) — `published_at` alone is null for the
+  draft/pending listings a broker mostly sees. New `formatListedAgo()` in
+  `lib/utils.ts`. `tsc`/`eslint`/`next build` all clean (one pre-existing-
+  pattern `<img>` warning, matching `PropertyCard.tsx`'s own convention).
+  Live-verified with Playwright against the real backend + Supabase dev
+  DB, logged in as the demo-data broker (`vikram.broker.test@homigrow.local`,
+  11 real listings): full table renders correctly across 2 pages; the
+  Status filter narrows correctly including to a genuine empty state
+  ("Draft" — zero of this broker's listings are drafts); search narrows
+  correctly (`villa` → exactly the 2 matching titles); both Boost toasts
+  fire; Edit's link `href` carries the correct property id. Screenshot-
+  compared against the Figma reference — close match.
+- **Broker Leads pipeline table shipped 2026-09-07** — real
+  `/broker/leads` page (Figma "Real Estate Broker Portal >
+  LeadsManagement", node 176:1436), replacing the placeholder that only
+  redirected a broker with existing listings to a "coming soon" toast.
+  New `features/broker/leads/`: `BrokerLeadsTable.tsx` (status filter
+  pill-tabs with live counts, search, and the Name/Phone/Property
+  Interest/Budget/Source/Last Contacted/Status/Actions table — first
+  new consumer of `SharedTable` after `BrokerListingsTable.tsx`),
+  `LeadStatusTabs.tsx`, `LeadActionDialogs.tsx` (`AddLeadNoteDialog`/
+  `SetFollowUpDialog`), `queryKey.ts`. New `lib/api/endpoints/leads.ts`
+  against the matching backend task's new `/leads` routes. New
+  `formatRelativeTime()` in `lib/utils.ts` ("2 hours ago" style, generic —
+  distinct from `formatListedAgo()`'s "Listed Xd ago" wording).
+  **Two intentional deviations from Figma's literal mock, decided before
+  implementing:** the row's phone number ("+91 98765•••••") and Source
+  pill ("Portal", a static string on every row) read as demo-data
+  blurring rather than a real product requirement — shown here as the
+  full number (the Call action needs it, and the broker already
+  receives it in cleartext via the `lead_received` notification) and
+  the lead's real `tour_request`/`number_request` source instead.
+  Figma's status tab row also only showed 5 buckets (New/Contacted/
+  Site Visit/Closed/Lost, no separate Negotiation); built one tab per
+  real `LeadStatus` value instead so Negotiation and the Won/Lost split
+  are never silently unreachable as filters. **Status pill is a real
+  `Select`** (`PATCH /leads/{id}`) since Figma's table has no separate
+  detail screen a status control could otherwise live on; the pill
+  visual itself is passed as the `SelectTrigger`'s children rather than
+  `SelectValue`, which the shadcn primitive's plain children-then-icon
+  render order happens to support directly, no fork needed. The three
+  Figma row-action icons map onto real backend capability: phone → a
+  `tel:` link, chat → `AddLeadNoteDialog` (`POST /leads/{id}/notes`),
+  calendar → `SetFollowUpDialog` (`PATCH .../follow_up_at` — `Lead.
+  follow_up_at` existed on the model with no UI reading or writing it
+  until now). `(broker)/broker/layout.tsx`'s nav gating updated: Leads
+  moves from `GATED_ON_NO_LISTINGS_ROUTES` to `ALWAYS_BUILT_ROUTES`
+  alongside Dashboard/Listings — only Analytics is still gated.
+  **One real accessibility bug found live, not by inspection:**
+  `SetFollowUpDialog`'s `Modal` call passed no `description`, and Radix
+  logged a `Missing Description` warning on open — the same issue class
+  already fixed once for the Listings mobile filter drawer. Fixed by
+  adding a real description line, matching `AddLeadNoteDialog`'s
+  existing one. **A second gap, also only visible with real data:**
+  the zero-leads empty state used one static "No leads match your
+  filters" message regardless of whether that was actually true — a
+  broker with genuinely zero leads (not just a filtered-to-empty view)
+  saw language implying they had leads hidden by a filter. Fixed by
+  branching the `SharedTable` `emptyTitle`/`emptyBody` on
+  `leads.length === 0` (true zero) vs. a non-empty list filtered down
+  to nothing. `tsc`/`eslint`/`next build` all clean. Live-verified with
+  Playwright against the real backend worktree + Supabase dev DB,
+  logged in as the demo-data broker (`vikram.broker.test@homigrow.local`):
+  submitted a real enquiry via `POST /properties/{id}/enquire`, confirmed
+  it rendered correctly in the table (name/phone/property link/budget/
+  source/"Not yet contacted"/status), changed status via the Select
+  (tab counts updated live), added a note (toast fired, Last Contacted
+  flipped to "Just now" then "1 minute ago" on reload — confirming
+  `formatRelativeTime()` itself, not just the initial render), scheduled
+  a follow-up date, confirmed all three writes via a direct DB query,
+  filtered to the "New" tab to see the real empty state, then cleaned up
+  the test lead/notification row afterward. **Also hit, unrelated to this
+  feature's own code:** the frontend dev server on port 3000 (long-running
+  across earlier sessions per the "keep dev servers running" convention)
+  had gone stale and 404'd on already-existing routes like
+  `/broker/dashboard` — restarted fresh, same "don't trust a long-running
+  dev server after a large branch merge" lesson already documented for
+  the backend worktree, now confirmed to apply to `next dev` too.
+- **Broker Property Detail page shipped 2026-09-08** — new
+  `/broker/listings/[id]` route, reached by clicking a row in
+  `BrokerListingsTable.tsx` (previously the Property column rendered
+  plain text with no link at all), matching Figma node `177:3345`
+  ("Real Estate Broker Portal > Property Detail" — both frames on that
+  node turned out to be the identical page, just clipped to different
+  canvas heights, so only one design to build). New
+  `features/broker/listings/BrokerPropertyDetail.tsx` (data fetching,
+  loading skeleton, 404/403 error state, header actions, Property
+  Details/Description/Amenities cards, and the Performance sidebar)
+  plus `BrokerPropertyGallery.tsx` (an embla carousel via the existing
+  shadcn `Carousel` primitive, with its own overlaid prev/next buttons
+  and dot indicators rather than the primitive's own outside-the-frame
+  buttons, plus the `StatusPill` overlay — only rendered when there's
+  more than one photo). Built against a new backend endpoint,
+  `GET /properties/mine/{id}` (see backend CLAUDE.md, 2026-09-08):
+  Total Views/Leads Generated/Shortlisted are real numbers, not
+  hardcoded like `BrokerListingsTable`'s own Performance column still
+  is. **The "Views - Last 30 Days" chart has no backing data at all**
+  (no per-day time series exists anywhere in the schema) — renders an
+  honest "Coming soon" placeholder instead of fabricating trend data,
+  same call already made for Total Views on the broker Home dashboard.
+  "Mark as Sold"/"Mark as Rented" (label and target status both depend
+  on the listing's `listing_type`, only shown for an active listing)
+  calls the new `POST /properties/{id}/close` behind the existing
+  `ConfirmDialog` — the only genuinely irreversible action on this
+  page, unlike Edit (same `?propertyId=` navigation-only pattern
+  `BrokerListingsTable.tsx` already uses) and Boost Listing (same
+  `toast.info("Boost Listing — coming soon!")` as that table's own
+  Boost action). New `FURNISHING_LABELS` in `lib/enums.ts` (was only
+  ever inlined as a ternary in `PropertyInfoStep.tsx` before — this is
+  the first *display*, not *collect*, consumer of a property's
+  furnishing value, so it earned a proper shared label map instead of
+  a second inline ternary). `tsc`/`eslint`/`next build` all clean.
+  Live-verified with Playwright against the real backend worktree +
+  Supabase dev DB, logged in as the demo-data broker
+  (`vikram.broker.test@homigrow.local`): clicked from the real
+  Listings table into a real listing, confirmed the Property Details
+  grid correctly omits fields that listing doesn't have (Floor/Facing/
+  Parking, all null on this record) rather than rendering empty
+  values, confirmed the Performance card's real numbers (a genuine
+  attached lead showed as both `Leads Generated: 1` and in the Recent
+  Leads list), opened the "Mark as Sold" confirm dialog and read its
+  copy, then cancelled rather than confirmed — this broker's 11
+  listings are shared demo data used elsewhere in the app, so the
+  mutation itself was left to the backend's own test coverage instead
+  of executed live against real shared rows. **Not independently
+  live-verified: the multi-photo carousel's prev/next/dot navigation**
+  — every one of this demo broker's 11 seeded listings has exactly one
+  photo, so there was no real multi-image record to click through;
+  the wiring (`api.scrollNext()`/`scrollTo()`/`selectedScrollSnap()`)
+  is the same embla API the shadcn `Carousel` primitive's own bundled
+  buttons already call, reviewed but not exercised live. Flag if a
+  multi-photo listing ever surfaces a real bug here.
+- **Reopen Listing action added, 2026-09-08 (same day)** — your
+  explicit call: closing a listing (Mark as Sold/Rented) had no way
+  back, so an accidental click was permanent from this page. A sold
+  or rented listing now shows a "Reopen Listing" button instead of
+  Mark as Sold/Rented, behind its own `ConfirmDialog` (lighter copy
+  than the close dialog, since this direction is itself reversible —
+  you can just close it again), calling the new
+  `POST /properties/{id}/reopen` (see backend CLAUDE.md, 2026-09-08).
+  The close dialog's own copy updated too — it used to claim "this
+  can't be undone from here," which stopped being true the moment
+  this shipped. `tsc`/`eslint`/`next build` all clean. Live-verified
+  end-to-end with Playwright against the real backend worktree +
+  Supabase dev DB, logged in as the demo-data broker: the full
+  `Active -> Mark as Sold -> Sold -> Reopen Listing -> Active` round
+  trip on a real listing, confirmed via the status pill at each step
+  — safe to actually execute against this shared demo broker's data
+  now that it's reversible, unlike the close-only version verified
+  earlier the same day. **Hit the backend's stale-orphaned-server bug
+  (see backend CLAUDE.md) mid-verification** — the first attempt
+  404'd against a worktree server that had been running for hours
+  and never picked up the new route; resolved on the backend side, not
+  a frontend issue.
+- **Edit Listing page shipped 2026-09-09** (Figma "Real Estate Broker
+  Portal > Edit Listing", node 177:4065) — new
+  `features/broker/edit-listing/EditListingForm.tsx` +
+  `app/(broker)/broker/listings/[id]/edit/page.tsx`. Deliberately a
+  fresh single flat page, not the 4-step Post Property wizard: the
+  Figma design is one scrollable page, and it uses this app's plain
+  boxed Input/Select/Textarea/Checkbox + white SectionCard styling
+  (matching BrokerPropertyDetail) rather than the wizard's bold
+  underline-field visual language — the two screens were never meant
+  to share a look. Prefilled from `getMyProperty`, saved via the new
+  `PATCH /properties/{id}` (`updateProperty`, backend CLAUDE.md same
+  day) — a genuine partial update, only touched fields are sent.
+  Property Type and Transaction Type render read-only (disabled
+  `Input`s showing the current value): both gate which type-specific
+  sub-form (plot/land/pg/jv) applies, and this form doesn't cover
+  editing those JSONB blobs — out of scope, matches the backend
+  `PropertyUpdateRequest`'s own docstring. "Society / Project Name"
+  maps to `address_line`, the only free-text address field the model
+  has; Figma's Location Details card has no separate street-address
+  field either. Photos: existing images render as a grid with an
+  immediate-delete button (`deletePropertyMedia`, promotes a new
+  cover if the deleted one was it) and a dropzone that uploads new
+  photos immediately (`uploadPropertyMedia`) rather than staging
+  `File[]` until a final submit like the wizard — there's already a
+  real `property_id` to upload against the moment this page opens.
+  Footer's "Save as Draft" vs "Publish Listing" (labeled "Save
+  Changes" once a listing is no longer a draft) both PATCH the same
+  way; Publish additionally calls `submitProperty` when the listing
+  is still `draft`, moving it to `pending` — the only way this form
+  triggers a status change on a currently-draft listing. Amenities
+  render as a toggle-chip grid over Figma's 18-item list (a different,
+  larger vocabulary than the wizard's own `AMENITY_OPTIONS`, kept
+  local to this file rather than merged, since the two chip sets serve
+  different Figma screens with different item sets). `Edit` links on
+  both `BrokerListingsTable.tsx` and `BrokerPropertyDetail.tsx`
+  repointed from `/broker/listings/new?propertyId=...` (a dead
+  new-tab query param the wizard never read) to
+  `/broker/listings/{id}/edit`, same tab. `tsc`/`eslint` both clean.
+  Live-verified end-to-end with Playwright against the real backend
+  worktree + Supabase dev DB, logged in as the demo-data broker: an
+  active listing's real title/amenities were edited and saved,
+  `PATCH` succeeded, the page navigated to the Property Detail view,
+  and its status pill showed "Pending Review" — confirming the
+  backend's active-listing re-moderation transition fires from a real
+  save, not just its own unit tests. The edited demo listing (title,
+  amenities, status) was reverted to its original values afterward via
+  a direct DB fix, same cleanup convention as other live verifications
+  against this shared broker's real data.
+- **Silent-refresh deadlock fixed, 2026-09-10** — reported live: the
+  Leads table sometimes wouldn't load (or took a long time), and
+  upload buttons sometimes got stuck non-clickable, both "especially
+  after leaving the tab open a long time." Root cause found in
+  `lib/api/client.ts`, not in either symptom's own component: every
+  caller that hits a 401 (the Leads table's `listLeads()` query, the
+  Post Property wizard's media/JV-agreement upload, Edit Listing's
+  photo upload) awaits the shared `refreshAccessToken()` single-flight
+  promise (`refreshPromise`), which only ever resets via that promise's
+  own `.finally()` — but the underlying `POST /auth/refresh` fetch
+  inside `performRefresh()` had no timeout at all. A tab backgrounded
+  for a long stretch (sleep/wake, Wi-Fi handoff) can leave that
+  socket stalled with no error and no data, so the fetch — and every
+  request queued behind it, in every open tab sharing the Web Locks
+  cross-tab lock — hangs forever instead of failing: the Leads table
+  spins indefinitely (`isLoading` never flips), and any upload button's
+  `disabled={uploading}` never resets since its `finally` block never
+  runs. Fixed with a single `AbortSignal.timeout(10_000)` on that one
+  fetch call — `refreshAccessToken()`'s existing `.catch()`/`.finally()`
+  already correctly resets the lock and clears the auth store once the
+  promise settles; it just needed the fetch to be guaranteed to settle.
+  `tsc`/`eslint` clean. Live-verified with Playwright: simulated a
+  permanently stalled `/auth/refresh` socket via route interception
+  (the route handler never calls `fulfill`/`continue`) — confirmed the
+  app previously would have hung with no bound (by inspection of the
+  un-timed-out code path) and now self-heals in ~10.5s, redirecting to
+  `/login?returnTo=...` instead of hanging; a follow-up normal login +
+  `/broker/leads` load with the interception removed confirmed zero
+  regression to the ordinary refresh path.
+- **Default per-request timeouts added everywhere, same day** — your
+  follow-up request, generalizing the refresh-specific fix above: every
+  other `apiRequest`/`apiRequestMultipart` call had no timeout of its
+  own either, so a stalled ordinary request (not `/auth/refresh`) could
+  still hang a query/mutation indefinitely, just without the session-
+  wide blast radius. `rawFetch` now applies `DEFAULT_REQUEST_TIMEOUT_MS`
+  (15s) via a new `boundedSignal()` helper — merges a caller-supplied
+  `AbortSignal` with the default via `AbortSignal.any()` when one is
+  passed, so an intentional cancellation (e.g. a component unmounting
+  mid-request) still works; `rawFetchMultipart` gets its own longer
+  `UPLOAD_TIMEOUT_MS` (60s), since uploads legitimately take longer than
+  a JSON call. **This is a plain per-request bound, not a session/login
+  timeout** — a timed-out ordinary request just fails that one call
+  (an `AbortError` surfaces to whatever query/mutation made it,
+  react-query retries per its own policy); only `/auth/refresh`
+  timing out ends the session, unchanged from the fix above, since
+  every other request's 401-retry path awaits that same
+  `refreshAccessToken()` promise rather than owning session state
+  itself. `tsc`/`eslint` clean. Live-verified with Playwright: baseline
+  `/broker/leads` load unaffected; then stalled the ordinary
+  `GET /leads` call itself (not refresh) via route interception —
+  confirmed via the network log it aborted client-side
+  (`net::ERR_ABORTED`) at the 15s mark on each of react-query's retry
+  attempts, and confirmed throughout that the session stayed logged in
+  (no redirect to `/login`) the whole time, proving an ordinary
+  timeout only fails that request rather than logging the user out;
+  removing the interception and reloading recovered the page cleanly.
+- **Broker Profile page shipped 2026-09-10** — new `/broker/profile`
+  page (Figma "Real Estate Broker Portal > Profile", node `177:2805`).
+  The Figma export's own sidebar/app-shell chrome is unused — the
+  broker portal's shared `AppSidebar` (`(broker)/broker/layout.tsx`)
+  already provides it, so this task only built the content area, and
+  `/broker/profile` moved from a "coming soon" toast stub into
+  `ALWAYS_BUILT_ROUTES` alongside Dashboard/Listings/Leads. New
+  `features/broker/profile/BrokerProfilePage.tsx` +
+  `EditBrokerProfileDialog.tsx`. Only the Overview tab has a real
+  design at this node — Settings/Subscription toast "coming soon", same
+  pattern every other unbuilt broker destination already uses.
+  **Several Figma sections have no backing data model at all** (Avg
+  Rating, a Recent Activity feed, NAR/MagicBricks-style third-party
+  certifications) — per your explicit scope call, these render an
+  honest empty/coming-soon state instead of fabricated numbers, rather
+  than building the backend to support them. Active Listings/Leads
+  Closed/Properties Sold are real, computed client-side from the
+  already-fetched `listMyProperties()`/`listLeads()` results (`status
+  === active`/`closed_won`/`sold` respectively) — no new endpoint
+  needed. Certifications shows only the real RERA registration
+  (`BrokerProfile.rera_number`, empty state if unset); Expertise shows
+  only Primary Cities (`service_areas`) and Member Since (`User.
+  created_at`, newly exposed — see backend CLAUDE.md). Edit Profile is
+  a real dialog (RHF + zod, `lib/validation/profile.ts`'s new
+  `brokerProfileFormSchema`) against the backend's newly-extended
+  `PATCH /users/me` (nested `broker_profile` field): full name, agency/
+  firm name, years of experience, bio, and specializations/service
+  areas as comma-separated free text (`BrokerProfile.specializations`/
+  `service_areas` are plain JSONB string lists with no fixed
+  vocabulary, so no new option taxonomy was invented for them).
+  `experience_years` uses the existing `toOptionalNumber` `setValueAs`
+  helper (documented RHF-blank-becomes-NaN gotcha), not
+  `valueAsNumber`. Extracted the sidebar footer's local `initials()`
+  helper (`(broker)/broker/layout.tsx`) into `lib/utils.ts` so both it
+  and the new page's avatar share one implementation instead of two
+  copies. `tsc`/`eslint`/`next build` all clean. Live-verified with
+  Playwright against the real backend worktree + Supabase dev DB, logged
+  in as the standing `broker.login.test@homigrow.local` test broker
+  (chosen over the demo-data broker so a real Edit Profile save didn't
+  need to be reverted off shared listings/leads data afterward): page
+  loads with real zero-value stats and honest empty states for every
+  field this account hadn't set; opened Edit Profile, filled in agency
+  name/experience/bio/specializations/service areas, saved (`PATCH →
+  200`), and confirmed every field re-rendered correctly (subtitle,
+  About bio + chips, Expertise Primary Cities); clicked Settings and
+  confirmed the "coming soon" toast fires without switching the active
+  tab. **Found and fixed a real gap while wiring this, not part of the
+  page's own UI:** `UserRead` never exposed `created_at` at all despite
+  the column existing since Phase 1 — added it (backend CLAUDE.md) since
+  Member Since needed a real value to show, not a fabricated one.
+  **Unrelated gap surfaced during verification, not fixed here:** the
+  broker Leads backend was sitting unmerged on `feature/phase_3_backend_client`
+  (see backend CLAUDE.md) — `/broker/leads` and this page's own Leads
+  Closed stat both 404'd against a fresh `dev`-based server until that
+  was resolved with a separate PR.
+

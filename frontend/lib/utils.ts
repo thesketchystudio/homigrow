@@ -22,6 +22,19 @@ export function toOptionalNumber(value: string): number | undefined {
   return value === "" ? undefined : Number(value);
 }
 
+// Two-letter initials from a full name, for avatar circles that have no
+// photo (the broker sidebar footer and the Broker Profile page header).
+export function initials(name?: string): string {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
 // Formats a rupee amount using Indian lakh/crore short-scale notation
 // (e.g. 7500000 -> "₹75L", 130000000 -> "₹13Cr"), matching the buyer
 // preference wizard's price-range display.
@@ -44,4 +57,25 @@ export function formatListingPrice(item: { listing_type: ListingType; price: num
     return formatINR(item.price);
   }
   return `₹${Math.round(item.price).toLocaleString("en-IN")}/mo`;
+}
+
+// Formats a timestamp as "Listed Xd ago" for the broker Listings table,
+// matching the Figma design's relative-age column.
+export function formatListedAgo(dateString: string): string {
+  const days = Math.max(0, Math.floor((Date.now() - new Date(dateString).getTime()) / (1000 * 60 * 60 * 24)));
+  return days === 0 ? "Listed today" : `Listed ${days}d ago`;
+}
+
+// Generic "X minutes/hours/days ago" formatter for the broker Leads table's
+// Last Contacted column, matching the Figma design's relative-time style
+// ("2 hours ago") without the "Listed"-specific wording formatListedAgo uses.
+export function formatRelativeTime(dateString: string): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(dateString).getTime()) / 1000));
+  if (seconds < 60) return "Just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
 }

@@ -50,9 +50,13 @@ export const PropertyType = {
   villa: "villa",
   independent_house: "independent_house",
   plot: "plot",
+  land: "land",
   office: "office",
   shop: "shop",
   pg_colive: "pg_colive",
+  // Rent-only, per the Post Property wizard's "Commercial & Spaces" dropdown group.
+  commercial_building: "commercial_building",
+  built_to_suit: "built_to_suit",
 } as const;
 export type PropertyType = (typeof PropertyType)[keyof typeof PropertyType];
 
@@ -64,9 +68,38 @@ export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
   [PropertyType.villa]: "Villa",
   [PropertyType.independent_house]: "Independent House",
   [PropertyType.plot]: "Plot",
+  [PropertyType.land]: "Land",
   [PropertyType.office]: "Office",
   [PropertyType.shop]: "Shop",
   [PropertyType.pg_colive]: "PG / Co-living",
+  [PropertyType.commercial_building]: "Commercial Building",
+  [PropertyType.built_to_suit]: "Built to Suit",
+};
+
+export const PriceFlexibility = {
+  fixed: "fixed",
+  negotiable: "negotiable",
+  highly_flexible: "highly_flexible",
+} as const;
+export type PriceFlexibility = (typeof PriceFlexibility)[keyof typeof PriceFlexibility];
+
+export const PRICE_FLEXIBILITY_LABELS: Record<PriceFlexibility, string> = {
+  [PriceFlexibility.fixed]: "Fixed Price",
+  [PriceFlexibility.negotiable]: "Negotiable",
+  [PriceFlexibility.highly_flexible]: "Highly Flexible",
+};
+
+export const PaymentStructure = {
+  full_payment: "full_payment",
+  emi_installments: "emi_installments",
+  construction_linked: "construction_linked",
+} as const;
+export type PaymentStructure = (typeof PaymentStructure)[keyof typeof PaymentStructure];
+
+export const PAYMENT_STRUCTURE_LABELS: Record<PaymentStructure, string> = {
+  [PaymentStructure.full_payment]: "Full Payment",
+  [PaymentStructure.emi_installments]: "EMI / Installments",
+  [PaymentStructure.construction_linked]: "Construction Linked",
 };
 
 export const Furnishing = {
@@ -75,6 +108,16 @@ export const Furnishing = {
   fully_furnished: "fully_furnished",
 } as const;
 export type Furnishing = (typeof Furnishing)[keyof typeof Furnishing];
+
+// Human-readable labels for each Furnishing value, shared by any screen
+// that displays (rather than collects, like PropertyInfoStep's own select
+// options) a property's furnishing status — e.g. the broker Property
+// Detail page's spec grid.
+export const FURNISHING_LABELS: Record<Furnishing, string> = {
+  [Furnishing.unfurnished]: "Unfurnished",
+  [Furnishing.semi_furnished]: "Semi-Furnished",
+  [Furnishing.fully_furnished]: "Fully Furnished",
+};
 
 export const MediaType = {
   image: "image",
@@ -120,3 +163,20 @@ export const BrokerDocumentType = {
   government_id: "government_id",
 } as const;
 export type BrokerDocumentType = (typeof BrokerDocumentType)[keyof typeof BrokerDocumentType];
+
+export const OwnershipType = {
+  freehold: "freehold",
+  leasehold: "leasehold",
+  co_operative_society: "co_operative_society",
+  power_of_attorney: "power_of_attorney",
+} as const;
+export type OwnershipType = (typeof OwnershipType)[keyof typeof OwnershipType];
+
+// Human-readable labels for each OwnershipType, shown on the Edit Listing
+// form's Ownership dropdown (Figma node 177:4065).
+export const OWNERSHIP_TYPE_LABELS: Record<OwnershipType, string> = {
+  [OwnershipType.freehold]: "Freehold",
+  [OwnershipType.leasehold]: "Leasehold",
+  [OwnershipType.co_operative_society]: "Co-operative Society",
+  [OwnershipType.power_of_attorney]: "Power of Attorney",
+};

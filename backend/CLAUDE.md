@@ -449,6 +449,203 @@ commits to `dev` before starting)
   (pre-existing `test_broker_properties.py` assertions check specific
   keys, not full-object equality, so none needed updating); `ruff`
   clean.
+- **Broker lead pipeline shipped 2026-09-07** — on `feature/phase_3_backend_client`,
+  alongside the `POST /properties/{id}/enquire` endpoint from the same
+  branch: new broker-authenticated `GET /leads` (list, newest first),
+  `GET /leads/{id}` (detail + note history), `PATCH /leads/{id}`
+  (status and/or `follow_up_at`), and `POST /leads/{id}/notes` — the
+  first routes to actually read/write `Lead`/`LeadNote`, both of which
+  existed since the original Phase 1 schema with no consumer. New
+  `app/api/v1/routes/leads.py`; `lead_service.py` gained
+  `list_leads_for_broker`/`get_lead_for_broker`/`update_lead`/
+  `add_lead_note`, all scoped by `broker_id` (404 `LEAD_NOT_FOUND` on
+  any lead not owned by the caller — no cross-broker leak path).
+  `LeadListItem` flattens in the lead's property title/locality/city/
+  price/listing_type (avoids a second round trip for the table's
+  Property Interest/Budget columns) and a computed `last_contacted_at`
+  (the most recent note's timestamp, `null` if none exist yet — not the
+  lead's own `created_at`, which would misleadingly read as "already
+  contacted" for a brand-new lead). 242→257 tests pass (15 new); `ruff`
+  clean. Live-verified
+  end-to-end with Playwright against the real Supabase dev DB, logged
+  in as the demo broker (`vikram.broker.test@homigrow.local`): a real
+  enquiry submitted via `POST /properties/{id}/enquire` appeared in the
+  broker's `/broker/leads` table, status change persisted (`PATCH`),
+  a note round-tripped and flipped `last_contacted_at` from `null` to a
+  live relative timestamp, and a follow-up date persisted — confirmed
+  via a direct DB query, then all test rows deleted afterward.
+- **Broker Property Detail API shipped 2026-09-08** — on a new
+  `feature/phase_3_backend_broker_detail` branch (cut fresh from
+  `dev` rather than reopening the already-merged
+  `feature/phase_3_backend_broker`), backing the matching frontend
+  Property Detail page (Figma node `177:3345`). New
+  `GET /properties/mine/{id}` (`broker_property_service.
+  get_property_detail`): the broker-owned counterpart to
+  `property_service.get_property_detail` — any status, not just
+  active — returning `BrokerPropertyDetailRead` (`PropertyRead` plus
+  `views_count` from the existing-but-previously-unexposed
+  `Property.views_count` column, `leads_count`/`recent_leads` computed
+  from the `Lead` table, and `shortlisted_count` computed from the
+  `SavedProperty` watchlist join table via its existing
+  `ix_saved_properties_property` index). Registered under the literal
+  `/properties/mine/` prefix (not `/properties/{id}`), so it can never
+  collide with `properties.router`'s public active-only route
+  regardless of router registration order — a stronger guarantee than
+  the existing `/properties/mine` list route gets from registration
+  order alone. New `POST /properties/{id}/close`
+  (`broker_property_service.close_property`): the single "Mark as
+  Sold"/"Mark as Rented" action, using the existing lifecycle state
+  machine's active -> sold|rented transition — targets `sold` for a
+  sale listing, `rented` for rent/PG, `422 INVALID_STATUS_TRANSITION`
+  for anything not currently active. **No per-day view time series
+  exists anywhere in the schema** (no events table), so the response
+  deliberately has no field for one — the frontend's "Views - Last 30
+  Days" chart renders its own honest "coming soon" placeholder rather
+  than the backend fabricating trend data. 226→234 tests pass (8 new
+  in `test_broker_properties.py`: full detail shape with real
+  leads/shortlisted numbers and ordered recent-leads, draft-listing
+  visibility unlike the public endpoint, ownership 403/401, sold vs.
+  rented targeting by listing type, invalid-transition 422). Verified
+  clean via 3 separate real-Supabase-dev-DB test runs — two full-suite
+  runs each hit one unrelated statement-timeout on a plain `users`
+  INSERT near the end of the file (transient DB contention from
+  running the same 36-test file back-to-back three times in a few
+  minutes, confirmed by both failures being on different, unrelated
+  tests each time), while running only the 8 new tests in isolation
+  passed cleanly twice. Live-verified end-to-end with Playwright
+  against this worktree's own `uvicorn` (confirmed via
+  `GET /openapi.json` showing both new paths registered) + the real
+  Supabase dev DB, logged in as the demo-data broker
+  (`vikram.broker.test@homigrow.local`): the real Property Detail page
+  rendered real `leads_count`/`recent_leads` for a listing with an
+  actual lead attached; the "Mark as Sold" confirm dialog opens
+  correctly (cancelled rather than confirmed, to avoid mutating this
+  shared demo broker's 11 real listings used elsewhere in the app).
+- **Reopen action added, 2026-09-08 (same day, same branch)** — your
+  explicit call after reviewing the above: a broker who clicks "Mark
+  as Sold"/"Mark as Rented" by mistake had no way back — `sold`/
+  `rented` were coded as fully terminal states with zero outgoing
+  transitions. `property_lifecycle.py`'s state machine now allows
+  `sold -> active` and `rented -> active` ("reopen") as the only
+  outgoing edge from either — everything else about them stays
+  terminal (still can't go to `draft`/`pending` directly). New
+  `POST /properties/{id}/reopen`
+  (`broker_property_service.reopen_property`), the mirror image of
+  `close_property`. 234→238 tests pass (4 new in
+  `test_broker_properties.py`: sold->active, rented->active,
+  reopening a non-sold/rented listing 422s, ownership 403) plus
+  `test_property_lifecycle.py` updated — `(sold, active)`/
+  `(rented, active)` moved from its `ILLEGAL` table to `LEGAL`, and
+  its "terminal states have no outgoing transitions" comment/grouping
+  rewritten since that's no longer true. **Real bug hit live while
+  verifying this, unrelated to the new code's own correctness:** the
+  worktree's `uvicorn --reload` process had an orphaned
+  `--multiprocessing-fork` worker still bound to port 8000 from hours
+  earlier in the session, silently serving stale pre-`/close`-and-
+  `/reopen` code the entire time — `netstat`/`Get-NetTCPConnection`
+  both still attributed the listening socket to the original
+  reloader's PID even though `Get-CimInstance`/`Get-Process` confirmed
+  that PID no longer existed, so a plain "kill that PID and restart"
+  didn't help until the actual orphaned child process was found and
+  killed directly. A real `POST .../reopen` 404'd against this stale
+  server before the fix, then round-tripped correctly (`active ->
+  sold -> reopen -> active`, confirmed via the status pill) once a
+  single clean server was actually running. **Lesson for next time:**
+  when a worktree server has been running a long time across several
+  restart attempts, don't trust that killing the PID `netstat` names
+  actually frees the port — enumerate every `python.exe`
+  (`Get-CimInstance Win32_Process -Filter "Name='python.exe'"`,
+  which also shows each one's full command line) and kill anything
+  stale before starting fresh.
+
+- **Edit Listing PATCH + delete-media endpoints shipped 2026-09-09**
+  (backs the Figma "Edit Listing" screen, node `177:4065`, frontend
+  CLAUDE.md same day). New `PATCH /properties/{id}`
+  (`update_property`) — a genuine partial update: `PropertyUpdateRequest`
+  (`app/schemas/properties.py`) has every field optional, and the
+  service reads it via `model_dump(exclude_unset=True)`, so an omitted
+  field is left untouched rather than nulled. Deliberately excludes
+  `listing_type`/`property_type` — both gate which type-specific
+  sub-form (plot/land/pg/jv) applies, and changing either post-creation
+  isn't supported here. Editing a currently-`active` listing now
+  transitions it to `pending` for re-moderation, closing the gap
+  `property_lifecycle.py` already documented (`active -> pending`) but
+  nothing implemented — your explicit call when this was scoped;
+  draft/pending/rejected listings keep their status since they haven't
+  been published yet. New `DELETE /properties/{id}/media/{media_id}`
+  (`delete_media`) removes one photo/video; if it was the cover image,
+  the next-lowest-position remaining item is promoted so a listing is
+  never left without one. Doesn't touch the underlying storage
+  object — `PropertyMedia` rows are this codebase's existing source of
+  truth for what's shown, and nothing else cleans up orphaned storage
+  objects either.
+  **Migration M10** (`b7e2f1a9c3d4`) adds two columns Figma's Edit
+  Listing screen needs that neither the `Property` model nor the Post
+  Property wizard ever collected: `ownership_type` (new
+  `OwnershipType` enum — freehold/leasehold/co_operative_society/
+  power_of_attorney) and `available_from` (`Date`), both nullable so
+  existing rows need no backfill. Upgrade → downgrade → upgrade
+  verified clean against the real dev DB (the only `alembic check`
+  drift is the pre-existing, unrelated `spatial_ref_sys` PostGIS
+  system table, not from this migration). 272/272 tests pass (12 new
+  in `test_broker_properties.py`: partial-field PATCH, active->pending
+  transition, draft-stays-draft, plot_details replaced whole, 404 on
+  an unknown media id, ownership 403/401 on both new endpoints, cover
+  promotion on delete). `ruff` clean. Live-verified end-to-end via the
+  real frontend against this worktree's own `uvicorn` + the real
+  Supabase dev DB (see frontend CLAUDE.md for the Playwright detail):
+  a real `PATCH` against the demo broker's active listing correctly
+  flipped it to `pending`; the edited title/amenities/status were
+  reverted afterward via a direct DB fix to keep this shared broker's
+  demo data clean.
+
+- **Broker profile self-edit shipped 2026-09-10** (backs the Figma
+  "Real Estate Broker Portal > Profile" screen, node `177:2805`,
+  frontend CLAUDE.md same day). `PATCH /users/me` gained a nested,
+  optional `broker_profile` field (new `BrokerProfileUpdateRequest` in
+  `app/schemas/users.py`: `bio`/`company_name`/`experience_years`/
+  `specializations`/`service_areas` — the editable subset of
+  `BrokerProfileOut`). Deliberately excludes `rera_number` and
+  `verification_status`: changing either belongs to the verification-
+  document resubmission flow (`POST /brokers/me/verification-documents`),
+  not a plain profile edit. `user_service.update_me()` applies only the
+  fields actually supplied (route passes
+  `payload.broker_profile.model_dump(exclude_unset=True)`), and is a
+  no-op when the caller isn't a broker or has no `broker_profile` row
+  yet rather than erroring — a client account simply has nothing here
+  to update. Also added `created_at` to `UserRead` (real column via
+  `TimestampMixin`, just never exposed via the API before) — needed
+  for the Profile page's real "Member Since" field. No migration
+  needed for either change (no new columns). Several Figma sections on
+  this screen have no backing data model at all — Avg Rating, a
+  per-broker activity feed, and NAR/MagicBricks-style third-party
+  certifications — deliberately left unbuilt (honest empty states on
+  the frontend) rather than fabricated, your explicit scope call.
+  291/291 tests pass (3 new across `test_user_service.py`/
+  `test_users.py`: partial broker_profile update, ignored for a
+  client/missing-row account, route-level shape). `ruff` clean. Live-verified end-to-end against the real
+  Supabase dev DB using the standing `broker.login.test@homigrow.local`
+  test broker (see frontend CLAUDE.md for the Playwright detail): a
+  real edit (bio/company/experience/specializations/service areas) via
+  the new page round-tripped correctly and rendered live; `rera_number`
+  stayed untouched since it isn't sent by this form. **Found the same
+  class of stale/orphaned-server bug documented above, twice in this
+  session** — an old `--reload` worker from the *main* `homigrow/backend`
+  checkout (not this worktree) was still holding port 8000 and serving
+  pre-change schemas with zero errors; then, after killing it, a second
+  orphaned `multiprocessing` child from an even older run of this same
+  worktree's server was *also* still bound to the port. Diagnosed both
+  via `Get-CimInstance Win32_Process` (parent/child chains, not just
+  `netstat`, since a dead PID can still show `LISTENING` briefly) and
+  killed explicitly before a genuinely fresh `python -m uvicorn` server
+  reflected the real code. **Separately found and fixed while setting up
+  verification, unrelated to this task's own code:** the broker Leads
+  backend (`feature/phase_3_backend_client`, 2026-09-07) was never
+  actually merged into `dev` — two commits
+  (`db8481d`/`8030d87`) sat unmerged on that branch with no PR ever
+  opened for them, even though the frontend Leads table already ships
+  against it. Opened as its own separate PR rather than folded into
+  this branch.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in

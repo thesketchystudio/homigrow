@@ -11,16 +11,31 @@ would break its existing "no owner-preview path" contract.
 
 from uuid import UUID
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationFailed
-from app.models.enums import MediaType, PropertyStatus
+from app.models.enums import ListingType, MediaType, PropertyStatus
+from app.models.lead import Lead
 from app.models.property import Property, PropertyMedia
+from app.models.saved_property import SavedProperty
 from app.models.user import User
-from app.schemas.properties import BrokerPropertyListItem, PropertyCreateRequest
+from app.schemas.properties import (
+    BrokerPropertyDetailRead,
+    BrokerPropertyLeadSummary,
+    BrokerPropertyListItem,
+    PropertyCreateRequest,
+    PropertyRead,
+    PropertyUpdateRequest,
+)
 from app.services import storage_service
 from app.services._property_query_helpers import build_property_list_item, cover_image_subquery
 from app.services.property_lifecycle import transition_property_status
+
+# How many of a property's most recent leads the Property Detail page's
+# Recent Leads card shows — a product/layout constraint (the card has room
+# for a handful of rows, not the full pipeline), not a pagination limit.
+RECENT_LEADS_LIMIT = 4
 
 
 def _get_owned_property(db: Session, broker: User, property_id: UUID) -> Property:
@@ -59,6 +74,68 @@ def list_my_properties(db: Session, broker: User) -> list[BrokerPropertyListItem
         )
         for property_, cover_image_url in rows
     ]
+
+
+def get_property_detail(db: Session, broker: User, property_id: UUID) -> BrokerPropertyDetailRead:
+    """
+    Returns one of the broker's own properties in full detail, any status
+    (unlike property_service.get_property_detail, which is public/active-
+    only) — backs the Property Detail page reached by clicking a listing
+    row. Adds the Performance card's real, computed numbers: leads_count
+    and recent_leads from the Lead table, shortlisted_count from the
+    SavedProperty watchlist join table. There is no per-day view time
+    series anywhere in the schema, so that chart isn't backed here at all.
+    """
+    property_ = _get_owned_property(db, broker, property_id)
+    leads = db.query(Lead).filter(Lead.property_id == property_id).order_by(Lead.created_at.desc()).all()
+    shortlisted_count = db.query(func.count(SavedProperty.property_id)).filter(SavedProperty.property_id == property_id).scalar()
+    return BrokerPropertyDetailRead(
+        **PropertyRead.model_validate(property_).model_dump(),
+        views_count=property_.views_count,
+        leads_count=len(leads),
+        shortlisted_count=shortlisted_count,
+        recent_leads=[BrokerPropertyLeadSummary.model_validate(lead) for lead in leads[:RECENT_LEADS_LIMIT]],
+    )
+
+
+def close_property(db: Session, broker: User, property_id: UUID) -> Property:
+    """
+    Closes an active listing: marks a sale listing "sold" or a rent/PG
+    listing "rented" — the Property Detail page's "Mark as Sold"/"Mark as
+    Rented" action, which the lifecycle state machine treats as the same
+    active -> sold|rented transition. Reversible via reopen_property
+    below, for an accidental click.
+    """
+    property_ = _get_owned_property(db, broker, property_id)
+    target_status = PropertyStatus.rented if property_.listing_type in (ListingType.rent, ListingType.pg) else PropertyStatus.sold
+    if not transition_property_status(property_.status, target_status):
+        raise ValidationFailed(
+            "INVALID_STATUS_TRANSITION",
+            f"Cannot mark a listing in '{property_.status.value}' status as {target_status.value}.",
+        )
+    property_.status = target_status
+    db.commit()
+    db.refresh(property_)
+    return property_
+
+
+def reopen_property(db: Session, broker: User, property_id: UUID) -> Property:
+    """
+    Reopens a sold or rented listing back to active — undoes an
+    accidental close_property click. Nothing else about the listing
+    changes; a broker who genuinely wants to re-list would edit and
+    resubmit it instead.
+    """
+    property_ = _get_owned_property(db, broker, property_id)
+    if not transition_property_status(property_.status, PropertyStatus.active):
+        raise ValidationFailed(
+            "INVALID_STATUS_TRANSITION",
+            f"Cannot reopen a listing in '{property_.status.value}' status.",
+        )
+    property_.status = PropertyStatus.active
+    db.commit()
+    db.refresh(property_)
+    return property_
 
 
 def create_property(db: Session, broker: User, data: PropertyCreateRequest) -> Property:
@@ -110,6 +187,67 @@ def create_property(db: Session, broker: User, data: PropertyCreateRequest) -> P
     db.commit()
     db.refresh(property_)
     return property_
+
+
+def update_property(db: Session, broker: User, property_id: UUID, data: PropertyUpdateRequest) -> Property:
+    """
+    Applies a partial edit to a broker-owned listing — the Edit Listing
+    form's submit action. Only fields present on the request are touched;
+    the plot/land/pg/jv JSONB blobs are replaced whole when present, same
+    as create_property, since nothing partially merges them elsewhere
+    either. Editing a currently-active listing sends it back to pending
+    for admin re-moderation, per the transition property_lifecycle.py
+    already documents; a draft/pending/rejected listing hasn't been
+    published yet, so its status is left untouched.
+    """
+    property_ = _get_owned_property(db, broker, property_id)
+    updates = data.model_dump(exclude_unset=True)
+
+    for field in ("plot_details", "land_details", "pg_details", "jv_details"):
+        value = getattr(data, field, None)
+        if field in updates:
+            updates[field] = value.model_dump() if value is not None else None
+
+    for field, value in updates.items():
+        setattr(property_, field, value)
+
+    if property_.status == PropertyStatus.active and transition_property_status(property_.status, PropertyStatus.pending):
+        property_.status = PropertyStatus.pending
+
+    db.commit()
+    db.refresh(property_)
+    return property_
+
+
+def delete_media(db: Session, broker: User, property_id: UUID, media_id: UUID) -> None:
+    """
+    Removes one photo/video from a listing's gallery — the Edit Listing
+    form's photo grid delete action. If the removed item was the cover
+    image, promotes the next-lowest-position remaining item so the listing
+    is never left without one. Does not delete the underlying storage
+    object; PropertyMedia rows are the source of truth for what's shown,
+    and this codebase doesn't clean up orphaned storage objects elsewhere.
+    """
+    property_ = _get_owned_property(db, broker, property_id)
+    media = db.query(PropertyMedia).filter(PropertyMedia.id == media_id, PropertyMedia.property_id == property_.id).first()
+    if media is None:
+        raise NotFoundError("MEDIA_NOT_FOUND", "This media item was not found on this property.")
+
+    was_cover = media.is_cover
+    db.delete(media)
+    db.flush()
+
+    if was_cover:
+        next_cover = (
+            db.query(PropertyMedia)
+            .filter(PropertyMedia.property_id == property_.id)
+            .order_by(PropertyMedia.position)
+            .first()
+        )
+        if next_cover is not None:
+            next_cover.is_cover = True
+
+    db.commit()
 
 
 def add_media(db: Session, broker: User, property_id: UUID, uploads: list[tuple[bytes, str]]) -> list[PropertyMedia]:

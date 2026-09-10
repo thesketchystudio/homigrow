@@ -35,6 +35,7 @@ def update_me(
     email: Optional[str],
     avatar_url: Optional[str],
     preferences: Optional[dict],
+    broker_profile: Optional[dict] = None,
 ) -> User:
     """
     Applies only the fields the caller actually supplied (None means
@@ -43,6 +44,10 @@ def update_me(
     path yet, so for now (like the existing OTP/reset-token paths) this
     only logs the notice in non-production environments.
     """
+    if broker_profile is not None and user.broker_profile is not None:
+        for field, value in broker_profile.items():
+            setattr(user.broker_profile, field, value)
+
     if email is not None and email != user.email:
         if db.query(User).filter(User.email == email, User.id != user.id).first() is not None:
             raise ConflictError("EMAIL_TAKEN", "This email is already registered.")
