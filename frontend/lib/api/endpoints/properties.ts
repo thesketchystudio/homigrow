@@ -4,7 +4,7 @@
 // GET /properties serves the Listings search grid.
 
 import { apiRequest, apiRequestMultipart } from "@/lib/api/client";
-import type { Furnishing, LeadStatus, ListingType, MediaType, PaymentStructure, PriceFlexibility, PropertyStatus, PropertyType, VerificationStatus } from "@/lib/enums";
+import type { Furnishing, LeadStatus, ListingType, MediaType, OwnershipType, PaymentStructure, PriceFlexibility, PropertyStatus, PropertyType, VerificationStatus } from "@/lib/enums";
 import type { JVDetailsValues, LandDetailsValues, PGDetailsValues, PlotDetailsValues } from "@/lib/validation/postProperty";
 
 export type PropertyMediaRead = {
@@ -61,6 +61,8 @@ export type PropertyRead = {
   is_jv_property: boolean;
   jv_details?: JVDetailsValues;
   virtual_tour_url?: string;
+  ownership_type?: OwnershipType;
+  available_from?: string;
   address_line: string;
   locality: string;
   city: string;
@@ -311,4 +313,31 @@ export function closeProperty(propertyId: string): Promise<PropertyRead> {
 // closeProperty click.
 export function reopenProperty(propertyId: string): Promise<PropertyRead> {
   return apiRequest<PropertyRead>(`/properties/${propertyId}/reopen`, { method: "POST" });
+}
+
+// The Edit Listing form's submission (Figma node 177:4065). Every field is
+// optional — only the ones set are sent, and only those are applied server-
+// side (a genuine partial PATCH). Deliberately omits listing_type and
+// property_type: see PropertyUpdateRequest's backend docstring for why
+// changing either post-creation isn't supported by this endpoint.
+export type PropertyUpdateInput = Partial<
+  Omit<PropertyCreateInput, "listing_type" | "property_type" | "amenities"> & {
+    description: string;
+    floor: number;
+    total_floors: number;
+    parking_slots: number;
+    amenities: string[];
+    ownership_type: OwnershipType;
+    available_from: string;
+  }
+>;
+
+export function updateProperty(propertyId: string, data: PropertyUpdateInput): Promise<PropertyRead> {
+  return apiRequest<PropertyRead>(`/properties/${propertyId}`, { method: "PATCH", body: data });
+}
+
+// Removes one photo/video from a listing's gallery — the Edit Listing
+// form's photo grid delete action.
+export function deletePropertyMedia(propertyId: string, mediaId: string): Promise<void> {
+  return apiRequest<void>(`/properties/${propertyId}/media/${mediaId}`, { method: "DELETE" });
 }

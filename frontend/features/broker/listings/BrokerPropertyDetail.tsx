@@ -192,7 +192,7 @@ export function BrokerPropertyDetail({ propertyId }: { propertyId: string }) {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" asChild>
-            <Link href={`/broker/listings/new?propertyId=${property.id}`} target="_blank" rel="noopener noreferrer">
+            <Link href={`/broker/listings/${property.id}/edit`}>
               <Pencil className="size-4" />
               Edit
             </Link>

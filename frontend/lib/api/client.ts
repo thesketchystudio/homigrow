@@ -6,6 +6,14 @@
 // under /auth/ are never retried this way — they carry no access token, and
 // a 401 there (e.g. bad login credentials) isn't a token-expiry signal.
 //
+// Every request carries a default timeout (DEFAULT_REQUEST_TIMEOUT_MS /
+// UPLOAD_TIMEOUT_MS below) so a stalled socket (sleep/wake, dropped Wi-Fi)
+// fails that one call with an ApiError-worthy rejection instead of hanging
+// forever — this is a plain per-request bound, unrelated to login state: it
+// only ever aborts *that* request. The one path where a timeout does end a
+// session is /auth/refresh specifically, via REFRESH_TIMEOUT_MS below, since
+// every other request awaits its shared refreshPromise (see performRefresh).
+//
 // `useAuthStore` is imported directly (not via endpoints/auth.ts, which
 // would create a runtime import cycle back into this file); `TokenResponse`
 // is a type-only import so it carries no runtime dependency.
@@ -33,6 +41,9 @@ import type { TokenResponse } from "@/lib/api/endpoints/auth";
 
 const REFRESH_LOCK_NAME = "homigrow-auth-refresh";
 const RECENT_REFRESH_WINDOW_MS = 5000;
+const REFRESH_TIMEOUT_MS = 10000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
+const UPLOAD_TIMEOUT_MS = 60000;
 
 const authChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(REFRESH_LOCK_NAME) : null;
 
@@ -68,6 +79,14 @@ type RequestOptions = {
   signal?: AbortSignal;
 };
 
+// Combines a caller-supplied AbortSignal (if any) with a default timeout so
+// no request can hang forever on a stalled socket, without dropping a
+// caller's own cancellation (e.g. a component unmounting mid-request).
+function boundedSignal(externalSignal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  return externalSignal ? AbortSignal.any([externalSignal, timeoutSignal]) : timeoutSignal;
+}
+
 function rawFetch(path: string, options: RequestOptions, accessToken: string | null) {
   return fetch(`${API_BASE_URL}${path}`, {
     method: options.method ?? "GET",
@@ -77,19 +96,21 @@ function rawFetch(path: string, options: RequestOptions, accessToken: string | n
     },
     credentials: "include",
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-    signal: options.signal,
+    signal: boundedSignal(options.signal, DEFAULT_REQUEST_TIMEOUT_MS),
   });
 }
 
 // No Content-Type header here — the browser sets multipart/form-data with
 // the correct boundary itself when the body is a FormData instance; setting
 // it manually strips that boundary and the server can't parse the request.
+// A longer timeout than rawFetch's default since these are file uploads.
 function rawFetchMultipart(path: string, formData: FormData, accessToken: string | null) {
   return fetch(`${API_BASE_URL}${path}`, {
     method: "POST",
     headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
     credentials: "include",
     body: formData,
+    signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
   });
 }
 
@@ -103,7 +124,20 @@ async function performRefresh(): Promise<string | null> {
     return recentRefresh.accessToken;
   }
 
-  const response = await rawFetch(REFRESH_PATH, { method: "POST" }, null);
+  // A bounded timeout here is load-bearing, not just a nicety: refreshAccessToken()
+  // below caches this call's promise in the module-level refreshPromise single-flight
+  // lock, which only clears once this promise settles. A tab backgrounded for a long
+  // stretch (sleep/wake, Wi-Fi handoff) can leave the underlying socket stalled with
+  // no error and no data — an un-timed-out fetch here would then never resolve or
+  // reject, permanently wedging refreshPromise and, via the Web Locks request in
+  // refreshAccessToken(), the cross-tab refresh lock too. Every subsequent request
+  // that hits a 401 (e.g. the leads table's query, or an upload button's submit
+  // handler awaiting this same promise) would then hang forever instead of failing.
+  const response = await rawFetch(
+    REFRESH_PATH,
+    { method: "POST", signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS) },
+    null,
+  );
   if (!response.ok) {
     useAuthStore.getState().clear();
     return null;

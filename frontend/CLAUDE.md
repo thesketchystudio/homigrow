@@ -1475,4 +1475,108 @@ separate from the general `<phase>_frontend_client` branch)
   404'd against a worktree server that had been running for hours
   and never picked up the new route; resolved on the backend side, not
   a frontend issue.
+- **Edit Listing page shipped 2026-09-09** (Figma "Real Estate Broker
+  Portal > Edit Listing", node 177:4065) — new
+  `features/broker/edit-listing/EditListingForm.tsx` +
+  `app/(broker)/broker/listings/[id]/edit/page.tsx`. Deliberately a
+  fresh single flat page, not the 4-step Post Property wizard: the
+  Figma design is one scrollable page, and it uses this app's plain
+  boxed Input/Select/Textarea/Checkbox + white SectionCard styling
+  (matching BrokerPropertyDetail) rather than the wizard's bold
+  underline-field visual language — the two screens were never meant
+  to share a look. Prefilled from `getMyProperty`, saved via the new
+  `PATCH /properties/{id}` (`updateProperty`, backend CLAUDE.md same
+  day) — a genuine partial update, only touched fields are sent.
+  Property Type and Transaction Type render read-only (disabled
+  `Input`s showing the current value): both gate which type-specific
+  sub-form (plot/land/pg/jv) applies, and this form doesn't cover
+  editing those JSONB blobs — out of scope, matches the backend
+  `PropertyUpdateRequest`'s own docstring. "Society / Project Name"
+  maps to `address_line`, the only free-text address field the model
+  has; Figma's Location Details card has no separate street-address
+  field either. Photos: existing images render as a grid with an
+  immediate-delete button (`deletePropertyMedia`, promotes a new
+  cover if the deleted one was it) and a dropzone that uploads new
+  photos immediately (`uploadPropertyMedia`) rather than staging
+  `File[]` until a final submit like the wizard — there's already a
+  real `property_id` to upload against the moment this page opens.
+  Footer's "Save as Draft" vs "Publish Listing" (labeled "Save
+  Changes" once a listing is no longer a draft) both PATCH the same
+  way; Publish additionally calls `submitProperty` when the listing
+  is still `draft`, moving it to `pending` — the only way this form
+  triggers a status change on a currently-draft listing. Amenities
+  render as a toggle-chip grid over Figma's 18-item list (a different,
+  larger vocabulary than the wizard's own `AMENITY_OPTIONS`, kept
+  local to this file rather than merged, since the two chip sets serve
+  different Figma screens with different item sets). `Edit` links on
+  both `BrokerListingsTable.tsx` and `BrokerPropertyDetail.tsx`
+  repointed from `/broker/listings/new?propertyId=...` (a dead
+  new-tab query param the wizard never read) to
+  `/broker/listings/{id}/edit`, same tab. `tsc`/`eslint` both clean.
+  Live-verified end-to-end with Playwright against the real backend
+  worktree + Supabase dev DB, logged in as the demo-data broker: an
+  active listing's real title/amenities were edited and saved,
+  `PATCH` succeeded, the page navigated to the Property Detail view,
+  and its status pill showed "Pending Review" — confirming the
+  backend's active-listing re-moderation transition fires from a real
+  save, not just its own unit tests. The edited demo listing (title,
+  amenities, status) was reverted to its original values afterward via
+  a direct DB fix, same cleanup convention as other live verifications
+  against this shared broker's real data.
+- **Silent-refresh deadlock fixed, 2026-09-10** — reported live: the
+  Leads table sometimes wouldn't load (or took a long time), and
+  upload buttons sometimes got stuck non-clickable, both "especially
+  after leaving the tab open a long time." Root cause found in
+  `lib/api/client.ts`, not in either symptom's own component: every
+  caller that hits a 401 (the Leads table's `listLeads()` query, the
+  Post Property wizard's media/JV-agreement upload, Edit Listing's
+  photo upload) awaits the shared `refreshAccessToken()` single-flight
+  promise (`refreshPromise`), which only ever resets via that promise's
+  own `.finally()` — but the underlying `POST /auth/refresh` fetch
+  inside `performRefresh()` had no timeout at all. A tab backgrounded
+  for a long stretch (sleep/wake, Wi-Fi handoff) can leave that
+  socket stalled with no error and no data, so the fetch — and every
+  request queued behind it, in every open tab sharing the Web Locks
+  cross-tab lock — hangs forever instead of failing: the Leads table
+  spins indefinitely (`isLoading` never flips), and any upload button's
+  `disabled={uploading}` never resets since its `finally` block never
+  runs. Fixed with a single `AbortSignal.timeout(10_000)` on that one
+  fetch call — `refreshAccessToken()`'s existing `.catch()`/`.finally()`
+  already correctly resets the lock and clears the auth store once the
+  promise settles; it just needed the fetch to be guaranteed to settle.
+  `tsc`/`eslint` clean. Live-verified with Playwright: simulated a
+  permanently stalled `/auth/refresh` socket via route interception
+  (the route handler never calls `fulfill`/`continue`) — confirmed the
+  app previously would have hung with no bound (by inspection of the
+  un-timed-out code path) and now self-heals in ~10.5s, redirecting to
+  `/login?returnTo=...` instead of hanging; a follow-up normal login +
+  `/broker/leads` load with the interception removed confirmed zero
+  regression to the ordinary refresh path.
+- **Default per-request timeouts added everywhere, same day** — your
+  follow-up request, generalizing the refresh-specific fix above: every
+  other `apiRequest`/`apiRequestMultipart` call had no timeout of its
+  own either, so a stalled ordinary request (not `/auth/refresh`) could
+  still hang a query/mutation indefinitely, just without the session-
+  wide blast radius. `rawFetch` now applies `DEFAULT_REQUEST_TIMEOUT_MS`
+  (15s) via a new `boundedSignal()` helper — merges a caller-supplied
+  `AbortSignal` with the default via `AbortSignal.any()` when one is
+  passed, so an intentional cancellation (e.g. a component unmounting
+  mid-request) still works; `rawFetchMultipart` gets its own longer
+  `UPLOAD_TIMEOUT_MS` (60s), since uploads legitimately take longer than
+  a JSON call. **This is a plain per-request bound, not a session/login
+  timeout** — a timed-out ordinary request just fails that one call
+  (an `AbortError` surfaces to whatever query/mutation made it,
+  react-query retries per its own policy); only `/auth/refresh`
+  timing out ends the session, unchanged from the fix above, since
+  every other request's 401-retry path awaits that same
+  `refreshAccessToken()` promise rather than owning session state
+  itself. `tsc`/`eslint` clean. Live-verified with Playwright: baseline
+  `/broker/leads` load unaffected; then stalled the ordinary
+  `GET /leads` call itself (not refresh) via route interception —
+  confirmed via the network log it aborted client-side
+  (`net::ERR_ABORTED`) at the 15s mark on each of react-query's retry
+  attempts, and confirmed throughout that the session stayed logged in
+  (no redirect to `/login`) the whole time, proving an ordinary
+  timeout only fails that request rather than logging the user out;
+  removing the interception and reloading recovered the page cleanly.
 
