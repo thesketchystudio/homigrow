@@ -156,7 +156,7 @@ export function BrokerListingsTable() {
       render: (property) => (
         <div className="flex items-center justify-end gap-2">
           <Button variant="outline" size="icon" className="size-8" aria-label="Edit listing" asChild>
-            <Link href={`/broker/listings/new?propertyId=${property.id}`} target="_blank" rel="noopener noreferrer">
+            <Link href={`/broker/listings/${property.id}/edit`}>
               <Pencil className="size-4" />
             </Link>
           </Button>

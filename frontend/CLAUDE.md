@@ -1475,4 +1475,52 @@ separate from the general `<phase>_frontend_client` branch)
   404'd against a worktree server that had been running for hours
   and never picked up the new route; resolved on the backend side, not
   a frontend issue.
+- **Edit Listing page shipped 2026-09-09** (Figma "Real Estate Broker
+  Portal > Edit Listing", node 177:4065) — new
+  `features/broker/edit-listing/EditListingForm.tsx` +
+  `app/(broker)/broker/listings/[id]/edit/page.tsx`. Deliberately a
+  fresh single flat page, not the 4-step Post Property wizard: the
+  Figma design is one scrollable page, and it uses this app's plain
+  boxed Input/Select/Textarea/Checkbox + white SectionCard styling
+  (matching BrokerPropertyDetail) rather than the wizard's bold
+  underline-field visual language — the two screens were never meant
+  to share a look. Prefilled from `getMyProperty`, saved via the new
+  `PATCH /properties/{id}` (`updateProperty`, backend CLAUDE.md same
+  day) — a genuine partial update, only touched fields are sent.
+  Property Type and Transaction Type render read-only (disabled
+  `Input`s showing the current value): both gate which type-specific
+  sub-form (plot/land/pg/jv) applies, and this form doesn't cover
+  editing those JSONB blobs — out of scope, matches the backend
+  `PropertyUpdateRequest`'s own docstring. "Society / Project Name"
+  maps to `address_line`, the only free-text address field the model
+  has; Figma's Location Details card has no separate street-address
+  field either. Photos: existing images render as a grid with an
+  immediate-delete button (`deletePropertyMedia`, promotes a new
+  cover if the deleted one was it) and a dropzone that uploads new
+  photos immediately (`uploadPropertyMedia`) rather than staging
+  `File[]` until a final submit like the wizard — there's already a
+  real `property_id` to upload against the moment this page opens.
+  Footer's "Save as Draft" vs "Publish Listing" (labeled "Save
+  Changes" once a listing is no longer a draft) both PATCH the same
+  way; Publish additionally calls `submitProperty` when the listing
+  is still `draft`, moving it to `pending` — the only way this form
+  triggers a status change on a currently-draft listing. Amenities
+  render as a toggle-chip grid over Figma's 18-item list (a different,
+  larger vocabulary than the wizard's own `AMENITY_OPTIONS`, kept
+  local to this file rather than merged, since the two chip sets serve
+  different Figma screens with different item sets). `Edit` links on
+  both `BrokerListingsTable.tsx` and `BrokerPropertyDetail.tsx`
+  repointed from `/broker/listings/new?propertyId=...` (a dead
+  new-tab query param the wizard never read) to
+  `/broker/listings/{id}/edit`, same tab. `tsc`/`eslint` both clean.
+  Live-verified end-to-end with Playwright against the real backend
+  worktree + Supabase dev DB, logged in as the demo-data broker: an
+  active listing's real title/amenities were edited and saved,
+  `PATCH` succeeded, the page navigated to the Property Detail view,
+  and its status pill showed "Pending Review" — confirming the
+  backend's active-listing re-moderation transition fires from a real
+  save, not just its own unit tests. The edited demo listing (title,
+  amenities, status) was reverted to its original values afterward via
+  a direct DB fix, same cleanup convention as other live verifications
+  against this shared broker's real data.
 
