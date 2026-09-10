@@ -5,9 +5,10 @@
 // pagination. Performance (views/leads) is hardcoded to 0/0 for now — no
 // per-property view/lead-count aggregate exists on this table yet (the
 // Property Detail page linked from the Property column has the real
-// numbers, computed server-side). Boost (both the header button and each
-// row's action) always toasts "coming soon" — BoostPlan is a catalog table
-// only, there's no purchase/assignment flow to call. Edit opens the Post
+// numbers, computed server-side). Each row's Boost action navigates to the
+// real Boost Listing checkout (features/broker/boost/BoostListingPage.tsx);
+// the header's Boost Listing button has no specific property in context, so
+// it just points the broker at the table below. Edit opens the Post
 // Property wizard in a new tab with the property id on the URL; the wizard
 // itself doesn't read it yet (no prefill/update flow exists), this is
 // navigation-only scaffolding for a follow-up task.
@@ -42,8 +43,8 @@ const STATUS_FILTER_OPTIONS = [
   ...Object.values(PropertyStatus).map((value) => ({ value, label: propertyStatusPillMap[value].label })),
 ];
 
-function handleBoost() {
-  toast.info("Boost Listing — coming soon!");
+function handleBoostFromHeader() {
+  toast.info("Pick a listing below to boost it.");
 }
 
 export function BrokerListingsTable() {
@@ -160,8 +161,10 @@ export function BrokerListingsTable() {
               <Pencil className="size-4" />
             </Link>
           </Button>
-          <Button variant="outline" size="icon" className="size-8" aria-label="Boost listing" onClick={handleBoost}>
-            <TrendingUp className="size-4" />
+          <Button variant="outline" size="icon" className="size-8" aria-label="Boost listing" asChild>
+            <Link href={`/broker/listings/${property.id}/boost`}>
+              <TrendingUp className="size-4" />
+            </Link>
           </Button>
         </div>
       ),
@@ -180,7 +183,7 @@ export function BrokerListingsTable() {
           <p className="font-body text-[15px] text-muted-foreground">Manage all your property listings</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button className="bg-brand-primary-400 text-white hover:opacity-90" onClick={handleBoost}>
+          <Button className="bg-brand-primary-400 text-white hover:opacity-90" onClick={handleBoostFromHeader}>
             <TrendingUp className="size-4" />
             Boost Listing
           </Button>

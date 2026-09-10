@@ -9,10 +9,9 @@
 // anywhere in the schema, so the "Views - Last 30 Days" chart renders an
 // honest "Coming soon" placeholder instead of fabricated trend data — same
 // call already made for Total Views on the broker Home dashboard
-// (BrokerHomeDashboard.tsx). Boost Listing always toasts "coming soon",
-// same as BrokerListingsTable's Boost action — BoostPlan is a catalog table
-// only, there's no purchase/assignment flow to call. Closing (Mark as
-// Sold/Rented) is reversible: a sold/rented listing shows a Reopen
+// (BrokerHomeDashboard.tsx). Boost Listing navigates to the real Boost
+// Listing checkout (features/broker/boost/BoostListingPage.tsx). Closing
+// (Mark as Sold/Rented) is reversible: a sold/rented listing shows a Reopen
 // Listing action instead, recovering from an accidental click.
 
 "use client";
@@ -33,10 +32,6 @@ import { closeProperty, getMyProperty, reopenProperty, type BrokerPropertyLeadSu
 import { FURNISHING_LABELS, ListingType, PropertyStatus } from "@/lib/enums";
 import { cn, formatListingPrice, formatRelativeTime } from "@/lib/utils";
 import { toast } from "@/lib/toast";
-
-function handleBoost() {
-  toast.info("Boost Listing — coming soon!");
-}
 
 function BrokerPropertyDetailSkeleton() {
   return (
@@ -208,9 +203,11 @@ export function BrokerPropertyDetail({ propertyId }: { propertyId: string }) {
               Reopen Listing
             </Button>
           )}
-          <Button variant="outline" onClick={handleBoost}>
-            <TrendingUp className="size-4" />
-            Boost Listing
+          <Button variant="outline" asChild>
+            <Link href={`/broker/listings/${propertyId}/boost`}>
+              <TrendingUp className="size-4" />
+              Boost Listing
+            </Link>
           </Button>
         </div>
       </div>
@@ -294,8 +291,8 @@ export function BrokerPropertyDetail({ propertyId }: { propertyId: string }) {
               <h3 className="font-heading text-[16px] font-medium text-white">Boost Your Listing</h3>
               <p className="font-body text-[13px] text-white/90">Get 3x more visibility and reach potential buyers faster</p>
             </div>
-            <Button className="bg-white text-brand-green-700 hover:bg-white/90" onClick={handleBoost}>
-              Upgrade Now
+            <Button className="bg-white text-brand-green-700 hover:bg-white/90" asChild>
+              <Link href={`/broker/listings/${propertyId}/boost`}>Upgrade Now</Link>
             </Button>
           </div>
         </div>
