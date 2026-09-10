@@ -1634,4 +1634,72 @@ separate from the general `<phase>_frontend_client` branch)
   (see backend CLAUDE.md) — `/broker/leads` and this page's own Leads
   Closed stat both 404'd against a fresh `dev`-based server until that
   was resolved with a separate PR.
+- **Boost Listing checkout shipped 2026-09-10** — real `/broker/
+  listings/[id]/boost` page (Figma "Real Estate Broker Portal >
+  BoostListing", node `178:5300`), replacing both stub `toast.info(
+  "Boost Listing — coming soon!")` call sites (`BrokerListingsTable.tsx`'s
+  header button + per-row action, `BrokerPropertyDetail.tsx`'s Boost
+  Listing/Upgrade Now buttons — all four now `Link`s to the real page).
+  This pulls the plan/duration/order-creation half of Phase 6's Boost
+  Payments system forward now, explicitly **without** the Razorpay
+  payment gateway (your call, confirmed via 3 scope questions before
+  writing any code — see backend CLAUDE.md for the full reasoning and
+  the schema conflict this surfaced). New
+  `features/broker/boost/BoostListingPage.tsx`: property summary card
+  (real `getMyProperty`, "Change" links back to the Listings table),
+  Step 1 plan cards (real `GET /boost-plans`, tier→icon/ribbon/
+  multiplier-label maps are frontend-only presentation, not modeled —
+  `2x/5x/10x more visibility` and the Most Popular/Max Visibility
+  ribbons aren't in `BoostPlan.features`), Step 2 duration cards (7/15/
+  30 days, client-side pricing preview mirroring `boost_service.
+  compute_pricing()`'s exact discount/GST math — the server recomputes
+  and freezes the authoritative amount, this is preview-only), Step 3
+  Optional Add-ons (static 4-item list, rendered disabled/opacity-60,
+  section heading literally reads "(Coming soon)" — no backend model
+  exists, per your explicit call in the scope questions), and a sidebar
+  (Expected Reach from the plan's `reach_estimate`, Order Summary with
+  real base/discount/subtotal/GST/total, Payment Method — two inert
+  radio buttons with a plain-language note that payment integration is
+  coming soon, no fabricated saved card/UPI details like the Figma mock
+  shows, since no payment method has ever actually been added). New
+  `lib/api/endpoints/boost.ts` (`listBoostPlans`/`createBoostOrder`).
+  **Two things visible in the Figma mock deliberately not reproduced,
+  decided while implementing, not asked about separately:** the "3 free
+  boosts remaining · Pro plan" footer widget implies a subscription/
+  quota system with no backing model at all — fabricating a plan name
+  and reset date next to a real signed-in user's name felt worse than
+  omitting the panel entirely, so it's just not rendered; and the Order
+  Summary's first line shows the plan's pre-discount base amount (not
+  the Figma mock's literal number, which — cross-checked against its
+  own GST/Total figures — reads as a copy-paste slip that duplicated
+  the post-discount subtotal into that field instead of the base).
+  Icons throughout use `lucide-react` (`Zap`/`Star`/`Crown`/`Clock`/
+  `Camera`/`Share2`/`BarChart3`/`Globe`/etc.) rather than the Figma
+  export's own SVG assets — same established convention as
+  `PropertyCard.tsx`/`BrokerListingsTable.tsx`, and those temp Figma
+  asset URLs expire in ~7 days anyway. `tsc`/`eslint`/`next build` all
+  clean (one pre-existing-pattern `<img>` warning, matching
+  `BrokerListingsTable.tsx`'s own convention). **Hit the same stale-
+  orphaned-server bug documented repeatedly in backend CLAUDE.md, this
+  time from the *other* direction:** the backend process holding port
+  8000 turned out to be running from the *main* `homigrow/backend`
+  checkout (this session's own primary directory, currently on
+  `feature/phase_3_frontend_broker`) rather than the
+  `homigrow-backend-wt` worktree — `GET /openapi.json` showed zero
+  `boost` paths even though the code was correct, confirmed via
+  `Get-CimInstance Win32_Process`'s `CommandLine` column before killing
+  it and starting a fresh `python -m uvicorn` from the worktree. Live-
+  verified end-to-end with Playwright against the real backend
+  worktree + Supabase dev DB, logged in as the demo-data broker
+  (`vikram.broker.test@homigrow.local`): clicked Boost from a real
+  active listing row, confirmed Featured/15-days loaded as the default
+  selection with correct live numbers (`₹3,362` subtotal, `₹605` GST,
+  `₹3,967` total), switched to Basic Boost + recomputed Expected Reach/
+  Order Summary correctly, switched duration to 30 days and back,
+  clicked Launch Boost, confirmed the success toast and redirect to the
+  Property Detail page, then confirmed via direct SQL that the real
+  order row landed with the exact frozen breakdown
+  (`base_amount=1485.00, discount_amount=148.50, gst_amount=240.57,
+  total_amount=1577.07, status=created`) — left in place, a
+  `created`-status order has no visible effect anywhere yet.
 
