@@ -646,6 +646,69 @@ commits to `dev` before starting)
   opened for them, even though the frontend Leads table already ships
   against it. Opened as its own separate PR rather than folded into
   this branch.
+- **Boost Listing checkout (no payment yet) shipped 2026-09-10** — the
+  boost/payments system was originally scoped whole to Phase 6
+  (`20_Phase_6.md`: coupons, `boost_orders` with required Razorpay
+  fields, webhook idempotency, admin plan CRUD), but the Figma "Boost
+  Listing" checkout page (node `178:5300`) was ready and you asked to
+  pull the plan/duration selection + order creation forward now,
+  explicitly deferring the actual payment gateway — same "design ready,
+  pull it forward" precedent as the P1 homepage. Confirmed the pull-
+  forward's exact shape with you first (three scope questions): real
+  order persistence (not just a UI stub), `boost_plans.price`
+  repurposed as a ₹/day rate with duration chosen per-order instead of
+  fixed per plan (the existing M1 schema's `duration_days` on the plan
+  conflicted with the Figma design's independent 7/15/30-day selector +
+  volume discount), and the Figma "Optional Add-ons" section (no
+  backend model exists for it) shipped as a static, disabled "coming
+  soon" section rather than modeled. Migration M12
+  (`cde17bb27e5c`): drops `boost_plans.duration_days`, adds
+  `boost_plans.reach_estimate` (jsonb — the checkout page's "Expected
+  Reach" views/leads/calls ranges, admin-editable marketing copy, not
+  measured analytics), and creates `boost_orders` (broker_id/
+  property_id/plan_id, duration_days, frozen `base_amount`/
+  `discount_amount`/`gst_amount`/`total_amount`, `status` defaulting
+  `created`, nullable `starts_at`/`ends_at`) — deliberately **without**
+  `razorpay_order_id`/`razorpay_payment_id`/`coupon_id`/
+  `activation_failed`, since nothing here ever moves an order past
+  `created` yet; those columns land with real Razorpay integration
+  later. Verified up/down/up clean against the real dev DB (only
+  pre-existing `spatial_ref_sys` autogenerate noise, unrelated).
+  New `app/services/boost_service.py`: `DURATION_DISCOUNT_PERCENT`
+  (`{7: 0, 15: 10, 30: 20}`, not admin-editable yet — that's the
+  coupon/plan-admin work P6 already scopes) × flat 18% GST, plain
+  Decimal rupee math (not the real billing service's integer-paise
+  math — no money is actually moving yet, so the P6 precision
+  requirement doesn't apply here); `create_order()` enforces own +
+  `PropertyStatus.active` (409 `PROPERTY_NOT_ACTIVE` otherwise, 403 if
+  not owned) before freezing the price breakdown onto the order — a
+  later admin price edit to the plan must never alter an already-placed
+  order's amount. New `GET /boost-plans` (public, active only, per
+  `05_API_Design.md`'s original spec) and `POST /boost-orders`
+  (broker-only). New `scripts/seed_boost_plans.py` (idempotent per
+  tier) seeded the 3 real plans/copy from the Figma design (Basic/
+  Featured/Premium Spotlight) into the real dev DB. 315/315 tests pass
+  (17 new: pricing math incl. exact rounding at each duration tier,
+  ownership/active/plan-not-found guards, route-level auth/role/status
+  codes). Live-verified end-to-end against the real dev DB (see
+  frontend CLAUDE.md for the Playwright detail): a real order round-
+  tripped through the actual checkout UI, confirmed via direct SQL —
+  `base_amount=1485.00, discount_amount=148.50, gst_amount=240.57,
+  total_amount=1577.07, status=created` for a Basic/15-day selection
+  on the demo broker's real "Bandra Garden Villa" listing (left in
+  place — a `created`-status order has no visible effect anywhere,
+  same as other harmless verification artifacts documented elsewhere
+  in this file). **Hit the exact same stale-orphaned-server class of
+  bug documented twice above, a third time**: the process bound to
+  port 8000 was `python -m uvicorn` running from the *main*
+  `homigrow/backend` checkout (currently on `feature/phase_3_frontend_broker`,
+  not this worktree) — confirmed via `Get-CimInstance Win32_Process`'s
+  `CommandLine` column before killing it and starting a genuinely fresh
+  server from this worktree.
+  **Deliberately not built here, per the phase-6 scope it was pulled
+  from:** the actual Razorpay order/webhook, coupons, admin plan CRUD,
+  and boost-tier search/ranking surfacing — this task only unblocks the
+  frontend checkout UI + a real `created`-status order row.
 
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
