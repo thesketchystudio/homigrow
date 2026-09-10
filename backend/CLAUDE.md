@@ -436,6 +436,19 @@ commits to `dev` before starting)
   changes (Property Type dropdown, conditional Plot/Land sub-forms)
   not started — separate task, backend-first per your explicit
   ordering.**
+- **`BrokerPropertyListItem.created_at` added, 2026-09-05** — small,
+  targeted addition for the frontend broker Listings table (Figma node
+  `176:789`), which needs a "Listed Xd ago" column that's always present
+  regardless of status; `published_at` (the only timestamp
+  `PropertyListItem` already had) is null for draft/pending listings,
+  which is most of what a broker actually sees day-to-day. `Property.
+  created_at` already existed as a column — just wasn't exposed on this
+  schema. `list_my_properties()` now passes it through alongside
+  `status`. No migration, no other endpoint touched (the public
+  `PropertyListItem` base class is unchanged). 242/242 tests pass
+  (pre-existing `test_broker_properties.py` assertions check specific
+  keys, not full-object equality, so none needed updating); `ruff`
+  clean.
 - **Broker lead pipeline shipped 2026-09-07** — on `feature/phase_3_backend_client`,
   alongside the `POST /properties/{id}/enquire` endpoint from the same
   branch: new broker-authenticated `GET /leads` (list, newest first),

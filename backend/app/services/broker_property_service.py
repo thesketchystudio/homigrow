@@ -67,7 +67,11 @@ def list_my_properties(db: Session, broker: User) -> list[BrokerPropertyListItem
         .all()
     )
     return [
-        BrokerPropertyListItem(**build_property_list_item(property_, cover_image_url), status=property_.status)
+        BrokerPropertyListItem(
+            **build_property_list_item(property_, cover_image_url),
+            status=property_.status,
+            created_at=property_.created_at,
+        )
         for property_, cover_image_url in rows
     ]
 
