@@ -4,7 +4,7 @@ app/schemas/properties.py
 Pydantic read shapes for the public property listing resources.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal, Optional
 from uuid import UUID
 
@@ -15,6 +15,7 @@ from app.models.enums import (
     LeadStatus,
     ListingType,
     MediaType,
+    OwnershipType,
     PaymentStructure,
     PriceFlexibility,
     PropertyStatus,
@@ -181,6 +182,8 @@ class PropertyRead(BaseModel):
     is_jv_property: bool
     jv_details: Optional[JVDetails] = None
     virtual_tour_url: Optional[str] = None
+    ownership_type: Optional[OwnershipType] = None
+    available_from: Optional[date] = None
     address_line: str
     locality: str
     city: str
@@ -325,4 +328,55 @@ class PropertyCreateRequest(BaseModel):
     stamp_duty_percent: Optional[float] = Field(default=None, ge=0)
     registration_fee_percent: Optional[float] = Field(default=None, ge=0)
     brokerage_included: bool = True
+    brokerage_percent: Optional[float] = Field(default=None, ge=0)
+
+
+class PropertyUpdateRequest(BaseModel):
+    """
+    The Edit Listing form's submission (Figma node 177:4065). Every field is
+    optional and only the ones present in the request body are applied
+    (service layer reads this via `model_dump(exclude_unset=True)`) — a
+    genuine partial PATCH, not a full replace. Deliberately excludes
+    listing_type and property_type: both determine which type-specific
+    sub-form (plot/land/pg/jv) applies to a listing, and changing either
+    post-creation is not supported by this endpoint.
+    """
+
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    description: Optional[str] = None
+    bhk: Optional[int] = None
+    bathrooms: Optional[int] = None
+    area_sqft: Optional[float] = Field(default=None, gt=0)
+    floor: Optional[int] = None
+    total_floors: Optional[int] = None
+    facing: Optional[str] = Field(default=None, max_length=20)
+    furnishing: Optional[Furnishing] = None
+    built_year: Optional[int] = None
+    parking_slots: Optional[int] = None
+    amenities: Optional[list[str]] = None
+    plot_details: Optional[PlotDetails] = None
+    land_details: Optional[LandDetails] = None
+    pg_details: Optional[PGDetails] = None
+    is_jv_property: Optional[bool] = None
+    jv_details: Optional[JVDetails] = None
+    virtual_tour_url: Optional[str] = Field(default=None, max_length=500)
+    ownership_type: Optional[OwnershipType] = None
+    available_from: Optional[date] = None
+    address_line: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    locality: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    city: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    state: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    pincode: Optional[str] = Field(default=None, min_length=1, max_length=6)
+    landmark: Optional[str] = None
+    price: Optional[float] = Field(default=None, gt=0)
+    price_per_sqft: Optional[float] = Field(default=None, gt=0)
+    token_amount: Optional[float] = Field(default=None, gt=0)
+    maintenance_monthly: Optional[float] = Field(default=None, gt=0)
+    deposit: Optional[float] = Field(default=None, gt=0)
+    is_negotiable: Optional[bool] = None
+    price_flexibility: Optional[PriceFlexibility] = None
+    payment_structure: Optional[PaymentStructure] = None
+    stamp_duty_percent: Optional[float] = Field(default=None, ge=0)
+    registration_fee_percent: Optional[float] = Field(default=None, ge=0)
+    brokerage_included: Optional[bool] = None
     brokerage_percent: Optional[float] = Field(default=None, ge=0)
