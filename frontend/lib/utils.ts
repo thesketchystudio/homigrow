@@ -22,6 +22,19 @@ export function toOptionalNumber(value: string): number | undefined {
   return value === "" ? undefined : Number(value);
 }
 
+// Two-letter initials from a full name, for avatar circles that have no
+// photo (the broker sidebar footer and the Broker Profile page header).
+export function initials(name?: string): string {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
 // Formats a rupee amount using Indian lakh/crore short-scale notation
 // (e.g. 7500000 -> "₹75L", 130000000 -> "₹13Cr"), matching the buyer
 // preference wizard's price-range display.
