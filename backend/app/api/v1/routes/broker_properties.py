@@ -11,12 +11,19 @@ register under one prefix.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import RequireBroker
 from app.db.session import get_db
-from app.schemas.properties import BrokerPropertyDetailRead, BrokerPropertyListItem, PropertyCreateRequest, PropertyMediaRead, PropertyRead
+from app.schemas.properties import (
+    BrokerPropertyDetailRead,
+    BrokerPropertyListItem,
+    PropertyCreateRequest,
+    PropertyMediaRead,
+    PropertyRead,
+    PropertyUpdateRequest,
+)
 from app.services import broker_property_service
 
 router = APIRouter(prefix="/properties", tags=["properties", "broker"])
@@ -79,6 +86,29 @@ def create_property(
     """Creates a new draft listing — the Post Property wizard's final submit action."""
     property_ = broker_property_service.create_property(db, user, data)
     return PropertyRead.model_validate(property_)
+
+
+@router.patch("/{property_id}", response_model=PropertyRead)
+def update_property(
+    property_id: UUID,
+    data: PropertyUpdateRequest,
+    user: RequireBroker,
+    db: Session = Depends(get_db),
+) -> PropertyRead:
+    """Applies a partial edit to a broker-owned listing — the Edit Listing form's submit action."""
+    property_ = broker_property_service.update_property(db, user, property_id, data)
+    return PropertyRead.model_validate(property_)
+
+
+@router.delete("/{property_id}/media/{media_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_property_media(
+    property_id: UUID,
+    media_id: UUID,
+    user: RequireBroker,
+    db: Session = Depends(get_db),
+) -> None:
+    """Removes one photo/video from a listing's gallery; 403 if the property isn't owned by the caller."""
+    broker_property_service.delete_media(db, user, property_id, media_id)
 
 
 @router.post("/{property_id}/media", response_model=list[PropertyMediaRead])

@@ -520,6 +520,47 @@ commits to `dev` before starting)
   which also shows each one's full command line) and kill anything
   stale before starting fresh.
 
+- **Edit Listing PATCH + delete-media endpoints shipped 2026-09-09**
+  (backs the Figma "Edit Listing" screen, node `177:4065`, frontend
+  CLAUDE.md same day). New `PATCH /properties/{id}`
+  (`update_property`) — a genuine partial update: `PropertyUpdateRequest`
+  (`app/schemas/properties.py`) has every field optional, and the
+  service reads it via `model_dump(exclude_unset=True)`, so an omitted
+  field is left untouched rather than nulled. Deliberately excludes
+  `listing_type`/`property_type` — both gate which type-specific
+  sub-form (plot/land/pg/jv) applies, and changing either post-creation
+  isn't supported here. Editing a currently-`active` listing now
+  transitions it to `pending` for re-moderation, closing the gap
+  `property_lifecycle.py` already documented (`active -> pending`) but
+  nothing implemented — your explicit call when this was scoped;
+  draft/pending/rejected listings keep their status since they haven't
+  been published yet. New `DELETE /properties/{id}/media/{media_id}`
+  (`delete_media`) removes one photo/video; if it was the cover image,
+  the next-lowest-position remaining item is promoted so a listing is
+  never left without one. Doesn't touch the underlying storage
+  object — `PropertyMedia` rows are this codebase's existing source of
+  truth for what's shown, and nothing else cleans up orphaned storage
+  objects either.
+  **Migration M10** (`b7e2f1a9c3d4`) adds two columns Figma's Edit
+  Listing screen needs that neither the `Property` model nor the Post
+  Property wizard ever collected: `ownership_type` (new
+  `OwnershipType` enum — freehold/leasehold/co_operative_society/
+  power_of_attorney) and `available_from` (`Date`), both nullable so
+  existing rows need no backfill. Upgrade → downgrade → upgrade
+  verified clean against the real dev DB (the only `alembic check`
+  drift is the pre-existing, unrelated `spatial_ref_sys` PostGIS
+  system table, not from this migration). 272/272 tests pass (12 new
+  in `test_broker_properties.py`: partial-field PATCH, active->pending
+  transition, draft-stays-draft, plot_details replaced whole, 404 on
+  an unknown media id, ownership 403/401 on both new endpoints, cover
+  promotion on delete). `ruff` clean. Live-verified end-to-end via the
+  real frontend against this worktree's own `uvicorn` + the real
+  Supabase dev DB (see frontend CLAUDE.md for the Playwright detail):
+  a real `PATCH` against the demo broker's active listing correctly
+  flipped it to `pending`; the edited title/amenities/status were
+  reverted afterward via a direct DB fix to keep this shared broker's
+  demo data clean.
+
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
   docs/architecture/15_Decision_Log.md); integrate via
