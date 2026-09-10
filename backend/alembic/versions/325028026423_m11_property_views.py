@@ -1,7 +1,7 @@
 """m11_property_views
 
 Revision ID: 325028026423
-Revises: b7e2f1a9c3d4
+Revises: 4afa53dc5ab7
 Create Date: 2026-09-10 15:03:23.037245
 
 """
@@ -14,7 +14,13 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = '325028026423'
-down_revision: Union[str, None] = 'b7e2f1a9c3d4'
+# Chains onto M9 (4afa53dc5ab7), the actual current head in dev's git
+# history — not M10 (ownership_and_available_from), which was applied to
+# the live dev DB but never committed (separate, still-in-progress Edit
+# Listing work). Whichever of M10/M11 merges second will need a merge
+# revision to reconcile the two heads; property_views doesn't touch or
+# depend on M10's columns, so there's no ordering requirement between them.
+down_revision: Union[str, None] = '4afa53dc5ab7'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
