@@ -4,11 +4,10 @@
 // visitor is redirected home. Nav matches the Figma "Blank screen" sidebar
 // (node 643:355) — logo mark, 5-item nav (Home/Listings/Leads/Analytics/
 // Profile, no Messages — that Figma screen doesn't show one) with a dark
-// active pill, broker name/avatar footer, and the floating "+" post-
-// property button. The dark active-pill/16px Space Grotesk nav labels are
-// applied via a local CSS var override (see below) rather than changing
-// the shared sidebar's global tokens, since components/shared/Sidebar.tsx
-// is also used by the Admin portal.
+// active pill and a broker name/avatar footer. The dark active-pill/16px
+// Space Grotesk nav labels are applied via a local CSS var override (see
+// below) rather than changing the shared sidebar's global tokens, since
+// components/shared/Sidebar.tsx is also used by the Admin portal.
 //
 // Dashboard, Listings, Leads, and Profile always navigate — all four render
 // real content either way (each shows its own empty state or the actual
@@ -19,25 +18,15 @@
 // the old "coming soon" toast instead of a page that would otherwise
 // misleadingly repeat the same empty-state pitch.
 //
-// The floating "+" opens the Post Property wizard in a new tab rather than
-// navigating this one away — the wizard is a standalone flow (its own
-// route group/layout, no sidebar; see app/(broker-post)/broker/listings/
-// new/layout.tsx) that a broker may want to fill out alongside the portal
-// they were already looking at. Hidden on the Listings and Dashboard pages,
-// which each have their own "Add Listing" button in their header
-// (BrokerListingsTable.tsx, BrokerHomeDashboard.tsx) — showing both there
-// was redundant.
-//
 // No top header bar (sidebar-toggle icon, page label) above the content —
 // the Figma "Real Estate Broker Portal" screens (e.g. node 176:789) don't
 // have one; the sidebar is always visible with no collapse control.
 
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, FileText, Home, Plus, UserRound, Users2 } from "lucide-react";
+import { BarChart3, FileText, Home, UserRound, Users2 } from "lucide-react";
 
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar, { type SidebarNavGroup } from "@/components/shared/Sidebar";
@@ -114,21 +103,7 @@ export default function BrokerLayout({ children }: { children: React.ReactNode }
             }
           />
           <SidebarInset>
-            <main className="relative flex-1 p-6">
-              {children}
-              {pathname !== "/broker/listings" && pathname !== "/broker/dashboard" && (
-                <Link
-                  href="/broker/listings/new"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Post a new property"
-                  title="Post a new property"
-                  className="fixed bottom-8 right-8 flex size-14 items-center justify-center rounded-full bg-brand-green-500 text-brand-primary-700 shadow-lg"
-                >
-                  <Plus size={24} />
-                </Link>
-              )}
-            </main>
+            <main className="relative flex-1 p-6">{children}</main>
           </SidebarInset>
         </SidebarProvider>
       </div>
