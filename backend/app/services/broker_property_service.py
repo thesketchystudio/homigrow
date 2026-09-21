@@ -39,6 +39,21 @@ from app.services.property_lifecycle import transition_property_status
 RECENT_LEADS_LIMIT = 4
 
 
+def _auto_approve(property_: Property) -> None:
+    """
+    TODO: temporary stand-in for P4-T12 (admin approve/reject). No admin
+    moderation queue exists yet, so a listing left in "pending" would be
+    stuck there forever with no way to reach the client-facing site —
+    decided to auto-approve every submission/re-submission to active
+    instead of leaving real brokers unable to publish anything. The
+    pending state and its transition checks are left in place; deleting
+    this call (and this function) once P4-T12 ships is the entire
+    migration back to real moderation.
+    """
+    if transition_property_status(property_.status, PropertyStatus.active):
+        property_.status = PropertyStatus.active
+
+
 def _get_owned_property(db: Session, broker: User, property_id: UUID) -> Property:
     """Loads a property with its media eager-loaded, 404s if missing, 403s if not owned by broker."""
     property_ = (
@@ -202,8 +217,9 @@ def update_property(db: Session, broker: User, property_id: UUID, data: Property
     as create_property, since nothing partially merges them elsewhere
     either. Editing a currently-active listing sends it back to pending
     for admin re-moderation, per the transition property_lifecycle.py
-    already documents; a draft/pending/rejected listing hasn't been
-    published yet, so its status is left untouched.
+    already documents, then auto-approves back to active (see
+    _auto_approve — interim until P4-T12); a draft/pending/rejected
+    listing hasn't been published yet, so its status is left untouched.
     """
     property_ = _get_owned_property(db, broker, property_id)
     updates = data.model_dump(exclude_unset=True)
@@ -218,6 +234,7 @@ def update_property(db: Session, broker: User, property_id: UUID, data: Property
 
     if property_.status == PropertyStatus.active and transition_property_status(property_.status, PropertyStatus.pending):
         property_.status = PropertyStatus.pending
+        _auto_approve(property_)
 
     db.commit()
     db.refresh(property_)
@@ -327,8 +344,9 @@ def upload_jv_agreement(db: Session, broker: User, property_id: UUID, content: b
 def submit_property(db: Session, broker: User, property_id: UUID) -> Property:
     """
     Final step of the Post Property wizard: moves a draft to pending
-    (broker moderation queue). Requires at least one cover photo — a
-    listing with no photos isn't a meaningful submission.
+    (broker moderation queue), then auto-approves to active (see
+    _auto_approve — interim until P4-T12). Requires at least one cover
+    photo — a listing with no photos isn't a meaningful submission.
     """
     property_ = _get_owned_property(db, broker, property_id)
     if not any(media.is_cover for media in property_.media):
@@ -343,6 +361,7 @@ def submit_property(db: Session, broker: User, property_id: UUID) -> Property:
             f"Cannot submit a listing in '{property_.status.value}' status.",
         )
     property_.status = PropertyStatus.pending
+    _auto_approve(property_)
     db.commit()
     db.refresh(property_)
     return property_
