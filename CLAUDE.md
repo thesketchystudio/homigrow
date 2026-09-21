@@ -113,6 +113,19 @@ that directory, keeping this root file lean. What follows here is the
 shared Phase 1 bootstrap history (predates the backend/frontend branch
 split existing at all).
 
+**Phase labels in branch/commit names are not a strict scope
+guarantee.** When a later phase's Figma design is ready early, its
+scope gets pulled forward into whatever phase is currently in flight
+rather than waiting — established with the Phase 1 homepage, repeated
+for Phase 4's broker verification-details signup (built during Phase 2)
+and, as of 2026-09-10, most of Phase 4's broker dashboard/leads-CRM/
+analytics/my-listings/profile-edit backlog (built on `feature/phase_3_*`
+broker branches). Each pull-forward is logged in `backend/CLAUDE.md`/
+`frontend/CLAUDE.md` against the real phase-doc task id (e.g. "P4-T50")
+it actually satisfies, regardless of which phase number the branch name
+carries — check those files' task-id references, not the branch prefix,
+to know what's really been built.
+
 ### ✅ Done
 - Repo scaffolded, branching + protection rules set up (`main`, `dev`)
 - Frontend: Next.js + Tailwind v4 scaffolded, route groups created

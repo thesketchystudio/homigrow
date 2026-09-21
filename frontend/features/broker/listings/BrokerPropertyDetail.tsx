@@ -3,13 +3,14 @@
 // Detail", node 177:3345 — both frames on that node are the same page, just
 // clipped to different heights) — reached by clicking a listing row in
 // BrokerListingsTable. Performance numbers (Total Views, Leads Generated,
-// Shortlisted) are real, computed backend-side from Property.views_count,
-// the Lead table, and the SavedProperty watchlist join table
-// (GET /properties/mine/{id}). There is no per-day view time series
-// anywhere in the schema, so the "Views - Last 30 Days" chart renders an
-// honest "Coming soon" placeholder instead of fabricated trend data — same
-// call already made for Total Views on the broker Home dashboard
-// (BrokerHomeDashboard.tsx). Boost Listing navigates to the real Boost
+// Shortlisted) are real, computed backend-side from the real property_views
+// log, the Lead table, and the SavedProperty watchlist join table
+// (GET /properties/mine/{id}) — Total Views used to read the dead
+// Property.views_count column (fixed 2026-09-11, once property_views
+// existed to back it for real). There is still no per-day view time series
+// scoped to a single property, so the "Views - Last 30 Days" chart renders
+// an honest "Coming soon" placeholder instead of fabricated trend data.
+// Boost Listing navigates to the real Boost
 // Listing checkout (features/broker/boost/BoostListingPage.tsx). Closing
 // (Mark as Sold/Rented) is reversible: a sold/rented listing shows a Reopen
 // Listing action instead, recovering from an accidental click.

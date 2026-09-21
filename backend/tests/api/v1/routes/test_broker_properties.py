@@ -18,6 +18,7 @@ from app.models.broker_profile import BrokerProfile
 from app.models.enums import LeadStatus, PropertyStatus, UserRole
 from app.models.lead import Lead
 from app.models.property import Property
+from app.models.property_view import PropertyView
 from app.models.saved_property import SavedProperty
 from tests.conftest import make_user
 
@@ -502,6 +503,8 @@ class TestGetMyProperty:
         db_session.add(Lead(property_id=UUID(property_id), broker_id=broker.id, client_id=client1.id, contact_name="Amit Sharma", status=LeadStatus.new, created_at=older))
         db_session.add(Lead(property_id=UUID(property_id), broker_id=broker.id, client_id=client2.id, contact_name="Priya Patel", status=LeadStatus.contacted, created_at=newer))
         db_session.add(SavedProperty(user_id=client1.id, property_id=UUID(property_id)))
+        db_session.add(PropertyView(property_id=UUID(property_id), viewer_id=client1.id))
+        db_session.add(PropertyView(property_id=UUID(property_id), viewer_id=None))
         db_session.flush()
 
         response = client.get(f"/api/v1/properties/mine/{property_id}", headers=_auth_headers(broker))
@@ -509,7 +512,9 @@ class TestGetMyProperty:
         assert response.status_code == 200
         body = response.json()
         assert body["title"] == "2 BHK Luxury Flat"
-        assert body["views_count"] == 0
+        # Real count from property_views, not the dead Property.views_count
+        # column — one logged-in view + one anonymous view seeded above.
+        assert body["views_count"] == 2
         assert body["leads_count"] == 2
         assert body["shortlisted_count"] == 1
         assert [lead["contact_name"] for lead in body["recent_leads"]] == ["Priya Patel", "Amit Sharma"]

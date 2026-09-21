@@ -253,11 +253,12 @@ class BrokerPropertyDetailRead(PropertyRead):
     """
     GET /properties/mine/{id}'s shape — PropertyRead plus the broker
     Property Detail page's Performance card. leads_count/recent_leads and
-    shortlisted_count are computed from the real Lead/SavedProperty tables.
-    There is no per-day view time series anywhere in the schema (no events
-    table exists to build one), so the page renders an honest "coming soon"
-    placeholder for that chart instead of fabricating trend data — same
-    call already made for Total Views on the broker Home dashboard.
+    shortlisted_count are computed from the real Lead/SavedProperty tables;
+    views_count is a real count from the property_views log (added for the
+    broker Analytics page), not the dead Property.views_count column. There
+    is still no per-day view time series scoped to a single property, so
+    the page renders an honest "coming soon" placeholder for that chart
+    instead of fabricating trend data.
     """
 
     views_count: int

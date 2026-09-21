@@ -5,6 +5,8 @@ Integration tests for GET /api/v1/boost-plans (public) and
 POST /api/v1/boost-orders (broker-only checkout, no payment yet).
 """
 
+import uuid
+
 from app.core.security import create_access_token
 from app.models.boost import BoostPlan
 from app.models.enums import BoostTier, ListingType, PropertyStatus, PropertyType, UserRole
@@ -21,8 +23,21 @@ def _make_broker(db_session, **kwargs) -> User:
     return make_user(db_session, role=UserRole.broker, **kwargs)
 
 
-def _make_plan(db_session, *, price=249, tier=BoostTier.featured, is_active=True) -> BoostPlan:
-    plan = BoostPlan(tier=tier, name="Featured", price=price, features=["Top 5 search placement"], reach_estimate={
+def _unique_name(prefix: str = "Test Plan") -> str:
+    """
+    A per-test throwaway plan name. Tests run against the real dev DB
+    (tests/conftest.py's db_session wraps in a rolled-back transaction, but
+    pre-existing committed rows — e.g. scripts/seed_boost_plans.py's real
+    Basic/Featured/Premium Spotlight catalog — are still visible). Scoping
+    assertions to a name no real plan uses keeps them exact regardless of
+    how many real plans exist, same convention as test_properties.py's
+    _unique_city().
+    """
+    return f"{prefix}-{uuid.uuid4().hex[:8]}"
+
+
+def _make_plan(db_session, *, name=None, price=249, tier=BoostTier.featured, is_active=True) -> BoostPlan:
+    plan = BoostPlan(tier=tier, name=name or _unique_name(), price=price, features=["Top 5 search placement"], reach_estimate={
         "views_min": 3000, "views_max": 5000, "leads_min": 28, "leads_max": 45, "calls_min": 14, "calls_max": 22,
     }, is_active=is_active)
     db_session.add(plan)
@@ -54,16 +69,19 @@ def _make_property(db_session, broker, **overrides) -> Property:
 
 class TestListBoostPlans:
     def test_returns_active_plans_only(self, client, db_session):
-        _make_plan(db_session, tier=BoostTier.featured)
-        _make_plan(db_session, tier=BoostTier.basic, is_active=False)
+        active_name = _unique_name("Active Plan")
+        inactive_name = _unique_name("Inactive Plan")
+        _make_plan(db_session, name=active_name, tier=BoostTier.featured)
+        _make_plan(db_session, name=inactive_name, tier=BoostTier.basic, is_active=False)
 
         response = client.get("/api/v1/boost-plans")
 
         assert response.status_code == 200
         body = response.json()
-        assert len(body) == 1
-        assert body[0]["tier"] == "featured"
-        assert body[0]["reach_estimate"]["views_min"] == 3000
+        by_name = {plan["name"]: plan for plan in body}
+        assert active_name in by_name
+        assert by_name[active_name]["reach_estimate"]["views_min"] == 3000
+        assert inactive_name not in by_name
 
     def test_no_auth_required(self, client):
         response = client.get("/api/v1/boost-plans")

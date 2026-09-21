@@ -18,6 +18,7 @@ from app.core.exceptions import ForbiddenError, NotFoundError, ValidationFailed
 from app.models.enums import ListingType, MediaType, PropertyStatus
 from app.models.lead import Lead
 from app.models.property import Property, PropertyMedia
+from app.models.property_view import PropertyView
 from app.models.saved_property import SavedProperty
 from app.models.user import User
 from app.schemas.properties import (
@@ -83,15 +84,19 @@ def get_property_detail(db: Session, broker: User, property_id: UUID) -> BrokerP
     only) — backs the Property Detail page reached by clicking a listing
     row. Adds the Performance card's real, computed numbers: leads_count
     and recent_leads from the Lead table, shortlisted_count from the
-    SavedProperty watchlist join table. There is no per-day view time
-    series anywhere in the schema, so that chart isn't backed here at all.
+    SavedProperty watchlist join table, and views_count from the real
+    property_views log (added for the broker Analytics page) — not the
+    Property.views_count column, which is dead and never incremented.
+    There is no per-day view time series anywhere in the schema, so that
+    chart isn't backed here at all.
     """
     property_ = _get_owned_property(db, broker, property_id)
     leads = db.query(Lead).filter(Lead.property_id == property_id).order_by(Lead.created_at.desc()).all()
     shortlisted_count = db.query(func.count(SavedProperty.property_id)).filter(SavedProperty.property_id == property_id).scalar()
+    views_count = db.query(func.count(PropertyView.id)).filter(PropertyView.property_id == property_id).scalar()
     return BrokerPropertyDetailRead(
         **PropertyRead.model_validate(property_).model_dump(),
-        views_count=property_.views_count,
+        views_count=views_count,
         leads_count=len(leads),
         shortlisted_count=shortlisted_count,
         recent_leads=[BrokerPropertyLeadSummary.model_validate(lead) for lead in leads[:RECENT_LEADS_LIMIT]],
