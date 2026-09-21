@@ -558,6 +558,92 @@ commits to `dev` before starting)
   which also shows each one's full command line) and kill anything
   stale before starting fresh.
 
+- **Property view tracking + broker Analytics API shipped 2026-09-10**
+  — pulled forward from `11_Phase_4.md` (P4-T01 event tracking /
+  P4-T50 aggregate queries), same "design ready, pull it forward"
+  pattern as P4-T11's broker verification-details signup and the P1
+  homepage. New **`property_views`** table (migration M11,
+  `325028026423`): `record_view()` in `property_service.py` issues a
+  Postgres `INSERT ... ON CONFLICT DO NOTHING` against a partial
+  unique index on `(property_id, viewer_id) WHERE viewer_id IS NOT
+  NULL` — a logged-in viewer is deduped to one row per property no
+  matter how many times they revisit, while an anonymous viewer (no
+  stable identity to dedupe against) gets a fresh row every view.
+  `GET /properties/{id}` now calls this after serving the response.
+  The pre-existing `Property.views_count` column (present since Phase
+  1, never incremented anywhere) is superseded by this real event log
+  rather than backfilled — nothing reads that column anymore.
+  New **`GET /analytics/broker?range=7d|30d|6m`**
+  (`app/services/analytics_service.py`, `app/api/v1/routes/
+  analytics.py`, `app/schemas/analytics.py`), `RequireBroker`-gated,
+  scoped to the caller's own properties/leads: 4 KPIs (Total Views,
+  Total Leads, Enquiry Calls — leads whose `source == "number_request"`,
+  the closest real signal to a phone enquiry since no call-log table
+  exists — and Est. Revenue, a sum of listing price across the
+  period's `closed_won` leads, explicitly not a real commission figure
+  since no deal-value field exists), each with a period-over-period %
+  change that's `None` rather than a fabricated "0%"/"∞%" when the
+  prior period has no baseline to compare against; a Views/Leads trend
+  bucketed daily (7d/30d) or monthly (6m); a property-type lead
+  breakdown; a top-6 leads-by-city list; and a top-5 listings table
+  ranked by view→lead conversion rate. Every number is a live
+  aggregate over real `Lead`/`PropertyView` rows — nothing seeded or
+  mocked.
+  **Real migration-chaining bug hit shipping this:** M11 was
+  originally chained onto M10 (`b7e2f1a9c3d4`, the `ownership_type`/
+  `available_from` columns from the Edit Listing PATCH work below) —
+  but M10 was only applied locally against the dev DB at the time, not
+  yet committed to git. CI builds its database from git history alone,
+  so it failed with "Revision b7e2f1a9c3d4 ... is not present" the
+  moment this branch built. Fixed by rechaining M11 onto M9
+  (`4afa53dc5ab7`, the actual head of dev's committed migration
+  history at that point) — `property_views` has no dependency on M10's
+  columns either way. Upgrade/downgrade verified clean once rechained.
+  238→254 tests pass (16 new: 13 in new `tests/api/v1/routes/
+  test_analytics.py`, 3 in `test_properties.py` covering anonymous
+  multi-logging vs. logged-in-viewer dedup); `ruff` clean.
+  **Backfilled entry, 2026-09-11:** this task shipped with no
+  corresponding write-up in this file — caught during a Phase 3/4
+  progress audit the day after. Written directly from the committed
+  code/migration/tests, not from session notes, so unlike this file's
+  other entries it carries no live-verification narrative (Playwright/
+  curl steps, cleanup confirmation) — that step may not have happened,
+  or simply wasn't logged; worth a real live check next time this area
+  is touched. Separately, a full suite run during this same audit found
+  `test_boost.py::TestListBoostPlans::test_returns_active_plans_only`
+  failing (expected exactly 1 active plan, the real dev DB legitimately
+  has 4 once `scripts/seed_boost_plans.py`'s 3 real plans exist) —
+  **fixed same day (2026-09-11):** the test's own root cause was
+  assuming a pristine `boost_plans` table, the same class of bug
+  `test_properties.py`'s `_unique_city()` was written to prevent for
+  property listings — this suite predates that convention. Added a
+  matching `_unique_name()` helper and gave `_make_plan()` a `name`
+  override; the test now asserts its own uniquely-named active plan is
+  present and its own uniquely-named inactive plan is absent, rather
+  than asserting an exact `len(body) == 1` against a catalog real seed
+  data also lives in. 315/315 tests pass (no new tests — this fixed an
+  existing one).
+- **`BrokerPropertyDetail`'s Total Views fixed to a real number,
+  2026-09-11** — `get_property_detail()` in `broker_property_service.py`
+  was still returning `property_.views_count`, the dead `Property`
+  column the Analytics entry above already documents as "never
+  incremented anywhere." Since `property_views` exists now, swapped to
+  `db.query(func.count(PropertyView.id)).filter(PropertyView.property_id
+  == property_id).scalar()` — an honest, real per-property lifetime view
+  count (all-time, unlike the Analytics page's own range-scoped
+  aggregate). `BrokerPropertyDetailRead`'s docstring in
+  `schemas/properties.py` updated to match (it still said "no per-day
+  view time series... exists"/pointed at the dashboard's now-stale
+  precedent). No API shape change — `views_count: int` stays the same
+  field name/type, so the frontend needed no code change, just its own
+  stale header comment fixed (frontend CLAUDE.md, same day). Strengthened
+  the existing `TestGetMyProperty::test_returns_full_detail_with_real_
+  performance_numbers` test (previously asserted `views_count == 0`
+  without ever seeding a view, which never actually exercised the real
+  aggregation) to seed one logged-in + one anonymous `PropertyView` row
+  and assert `views_count == 2`. 315/315 tests pass (no new tests —
+  strengthened an existing one); `ruff` clean.
+
 - **Edit Listing PATCH + delete-media endpoints shipped 2026-09-09**
   (backs the Figma "Edit Listing" screen, node `177:4065`, frontend
   CLAUDE.md same day). New `PATCH /properties/{id}`

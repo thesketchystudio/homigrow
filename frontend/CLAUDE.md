@@ -1579,6 +1579,63 @@ separate from the general `<phase>_frontend_client` branch)
   (no redirect to `/login`) the whole time, proving an ordinary
   timeout only fails that request rather than logging the user out;
   removing the interception and reloading recovered the page cleanly.
+- **Broker Analytics page shipped 2026-09-10** — new `/broker/analytics`
+  route wired for real (Figma "Real Estate Broker Portal > Analytics",
+  node `177:1857`), against the new `GET /analytics/broker` endpoint
+  (backend CLAUDE.md, same day — pulled forward from Phase 4's own
+  P4-T50/T51/T52/T53). New `features/broker/analytics/
+  BrokerAnalytics.tsx` + `lib/api/endpoints/analytics.ts`: 4 KPI cards
+  (Views/Leads/Enquiry Calls/Est. Revenue, each showing a real vs-
+  previous-period %, or an honest "No prior period to compare" instead
+  of a fabricated 0%/∞% when there's no baseline), a Views & Leads
+  line-chart trend, a property-type pie chart, a leads-by-city bar
+  chart, and a Top Performing Listings table ranked by conversion — all
+  via `recharts` (through the existing shadcn `chart.tsx` wrapper,
+  first real page to use it outside `/dev/components`). A working
+  7d/30d/6m range toggle re-queries the endpoint. Groups "By Property
+  Type" by the real `property_type` enum rather than the Figma mock's
+  BHK buckets, since BHK doesn't apply to non-residential types.
+  Property-type pie slices use a 4-color palette validated at ΔE ≥ 16.6
+  (`dataviz/scripts/validate_palette.js`) instead of one color ramp,
+  and every slice still carries a direct text label — never
+  color-only identification.
+  **Stale gap surfaced while writing this entry, fixed same day
+  (2026-09-11):** `BrokerHomeDashboard.tsx`'s Total Views stat — and
+  its own header comment — still said "Total Views has no backing
+  analytics on the backend at all" and rendered a hardcoded
+  "—"/"Coming soon" card. True when the Dashboard shipped (2026-09-07),
+  false once `GET /analytics/broker` landed above. Wired for real: a
+  `useQuery(["broker-analytics", "30d"])` call (same key the Analytics
+  page itself uses, so the two share a cache) feeds the card a real
+  `total_views` count and a "+X% vs last 30 days" caption, or "No prior
+  period to compare" when the backend returns `null` (no baseline) —
+  same no-fabricated-percentage rule the Analytics page's own KPI cards
+  follow. `StatCardProps.captionTone` gained a third `"negative"` value
+  (red, via `text-destructive`) alongside the existing positive/neutral,
+  since views can legitimately trend down between periods and the
+  other three stat cards never had a reason to need that case.
+  `BrokerPropertyDetail.tsx`'s own "Views - Last 30 Days" per-listing
+  chart placeholder is unaffected by this fix — `GET /analytics/broker`
+  is a broker-wide aggregate, not a per-property time series, so that
+  one's still genuinely open. **Separately found while fixing this,
+  then fixed the same day (2026-09-11):** `BrokerPropertyDetail.tsx`'s
+  "Total Views" *number* (not the chart) was reading `Property.
+  views_count` on the backend — the same dead column the Analytics
+  entry says "was never incremented anywhere." That page had been
+  silently showing a stale/always-zero view count since it shipped
+  (2026-09-08), predating the real `property_views` log existing at
+  all. Fixed backend-side (see backend CLAUDE.md, same day) to a real
+  per-property lifetime count from `property_views`; the API's
+  `views_count: int` field name/shape didn't change, so this component
+  needed no code change — only its own header comment, which still
+  described the old dead-column source, was corrected.
+  **Backfilled entry, 2026-09-11:** shipped the same session as the
+  backend task above but never logged in this file at the time —
+  caught during a Phase 3/4 progress audit the day after. Written
+  directly from the committed component/route code, not from session
+  notes, so unlike this file's other entries it carries no
+  live-verification narrative — worth a real Playwright pass next time
+  this page is touched.
 - **Broker Profile page shipped 2026-09-10** — new `/broker/profile`
   page (Figma "Real Estate Broker Portal > Profile", node `177:2805`).
   The Figma export's own sidebar/app-shell chrome is unused — the

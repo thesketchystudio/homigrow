@@ -11,11 +11,10 @@
 // fetched elsewhere in the portal (BrokerLayout, BrokerListingsTable,
 // BrokerLeadsTable all query the same two endpoints), so this reuses the
 // same query keys rather than adding a new aggregate backend endpoint.
-// Total Views has no backing analytics on the backend at all — rendered as
-// an honest "Coming soon" card rather than a fabricated number, matching
-// this codebase's existing precedent (Vaastu compliance, Market Context,
-// the Compare screen's Investment section, BrokerListingsTable's
-// hardcoded-0 Performance column).
+// Total Views comes from the real GET /analytics/broker endpoint (30d
+// range, same query key as the Analytics page so the two share a cache)
+// — real as of 2026-09-10, once property_views/broker Analytics shipped;
+// this card used to hardcode "Coming soon" before that existed.
 
 "use client";
 
@@ -31,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { BrokerEmptyState } from "@/features/broker/BrokerEmptyState";
 import { AddLeadNoteDialog } from "@/features/broker/leads/LeadActionDialogs";
 import { LEADS_QUERY_KEY } from "@/features/broker/leads/queryKey";
+import { getBrokerAnalytics } from "@/lib/api/endpoints/analytics";
 import { listLeads, type LeadListItem } from "@/lib/api/endpoints/leads";
 import { listMyProperties } from "@/lib/api/endpoints/properties";
 import { useAuthStore } from "@/lib/stores/auth";
@@ -55,7 +55,7 @@ type StatCardProps = {
   label: string;
   value: string;
   caption: string;
-  captionTone: "positive" | "neutral";
+  captionTone: "positive" | "neutral" | "negative";
 };
 
 function StatCard({ label, value, caption, captionTone }: StatCardProps) {
@@ -63,7 +63,12 @@ function StatCard({ label, value, caption, captionTone }: StatCardProps) {
     <div className="flex flex-col gap-2 rounded-lg border border-brand-secondary-500 bg-brand-secondary-100 p-5">
       <span className="font-body text-[14px] text-brand-primary-300">{label}</span>
       <span className="font-heading text-[28px] font-bold text-brand-primary-400">{value}</span>
-      <span className={cn("font-body text-[12px] font-medium", captionTone === "positive" ? "text-brand-green-800" : "text-muted-foreground")}>
+      <span
+        className={cn(
+          "font-body text-[12px] font-medium",
+          captionTone === "positive" ? "text-brand-green-800" : captionTone === "negative" ? "text-destructive" : "text-muted-foreground",
+        )}
+      >
         {caption}
       </span>
     </div>
@@ -77,6 +82,10 @@ export function BrokerHomeDashboard() {
     queryFn: listMyProperties,
   });
   const { data: leadsData, isLoading: leadsLoading } = useQuery({ queryKey: LEADS_QUERY_KEY, queryFn: listLeads });
+  const { data: analyticsData } = useQuery({
+    queryKey: ["broker-analytics", "30d"],
+    queryFn: () => getBrokerAnalytics("30d"),
+  });
   const [noteLeadId, setNoteLeadId] = useState<string | null>(null);
 
   const properties = useMemo(() => propertiesData ?? [], [propertiesData]);
@@ -213,7 +222,24 @@ export function BrokerHomeDashboard() {
           caption={`+${stats.newLeadsLast24h} in the last 24 hours`}
           captionTone={stats.newLeadsLast24h > 0 ? "positive" : "neutral"}
         />
-        <StatCard label="Total Views" value="—" caption="Coming soon" captionTone="neutral" />
+        <StatCard
+          label="Total Views"
+          value={analyticsData ? analyticsData.kpis.total_views.toLocaleString("en-IN") : "—"}
+          caption={
+            !analyticsData || analyticsData.kpis.total_views_change_pct === null
+              ? "No prior period to compare"
+              : `${analyticsData.kpis.total_views_change_pct > 0 ? "+" : ""}${analyticsData.kpis.total_views_change_pct}% vs last 30 days`
+          }
+          captionTone={
+            !analyticsData || analyticsData.kpis.total_views_change_pct === null
+              ? "neutral"
+              : analyticsData.kpis.total_views_change_pct > 0
+                ? "positive"
+                : analyticsData.kpis.total_views_change_pct < 0
+                  ? "negative"
+                  : "neutral"
+          }
+        />
         <StatCard
           label="Conversion Rate"
           value={stats.conversionRate === null ? "—" : `${stats.conversionRate.toFixed(1)}%`}
