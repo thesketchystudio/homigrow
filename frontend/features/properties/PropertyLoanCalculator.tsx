@@ -14,6 +14,7 @@
 import { useMemo, useState } from "react";
 
 import { Slider } from "@/components/ui/slider";
+import { calculateEmi } from "@/lib/finance";
 import { toast } from "@/lib/toast";
 
 const TENURE_OPTIONS = [5, 10, 15, 20, 25, 30] as const;
@@ -62,13 +63,9 @@ export function PropertyLoanCalculator({ propertyPrice }: { propertyPrice: numbe
   const calc = useMemo(() => {
     const downPayment = price * (downPaymentPct / 100);
     const loanAmount = price - downPayment;
-    const r = rate / 12 / 100;
-    const n = tenure * 12;
-    const emi = r === 0 ? loanAmount / n : (loanAmount * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
-    const total = emi * n;
-    const interest = total - loanAmount;
+    const { emi, totalPayment, totalInterest } = calculateEmi(loanAmount, rate, tenure);
     const monthlyIncomeNeeded = emi / 0.4;
-    return { downPayment, loanAmount, emi, total, interest, monthlyIncomeNeeded };
+    return { downPayment, loanAmount, emi, total: totalPayment, interest: totalInterest, monthlyIncomeNeeded };
   }, [price, downPaymentPct, rate, tenure]);
 
   const principalPct = calc.loanAmount / calc.total;
