@@ -83,6 +83,57 @@ export function principalForEmi(maxEmi: number, annualRatePct: number, tenureYea
   return (maxEmi * (f - 1)) / (r * f);
 }
 
+// Flat stamp-duty + registration assumption for the Rent vs Buy
+// calculator's buy-scenario outflow — a common India-wide ballpark
+// (actual rates are state-specific, typically 5-7%); not user-adjustable
+// since the reference design has no control for it.
+const STAMP_DUTY_REGISTRATION_PCT = 7;
+
+export interface RentVsBuyResult {
+  downPayment: number;
+  loanAmount: number;
+  emi: number;
+  stampDutyAndRegistration: number;
+  totalOutflow: number;
+  finalPropertyValue: number;
+  /** totalOutflow - finalPropertyValue. Negative means buying nets a gain. */
+  netCostBuy: number;
+  totalRentPaid: number;
+  /** totalRentPaid - netCostBuy. Positive means buying is the cheaper option. */
+  saving: number;
+}
+
+/**
+ * Compares the long-term cost of buying (loan repayment + down payment +
+ * stamp duty/registration, net of the property's appreciated value) against
+ * renting (monthly rent compounding at an annual growth rate) over the
+ * loan's tenure.
+ */
+export function calculateRentVsBuy(params: {
+  propertyValue: number;
+  downPaymentPct: number;
+  loanRatePct: number;
+  loanTenureYears: number;
+  appreciationPct: number;
+  monthlyRent: number;
+  rentGrowthPct: number;
+}): RentVsBuyResult {
+  const { propertyValue, downPaymentPct, loanRatePct, loanTenureYears, appreciationPct, monthlyRent, rentGrowthPct } = params;
+
+  const downPayment = propertyValue * (downPaymentPct / 100);
+  const loanAmount = propertyValue - downPayment;
+  const { emi, totalPayment } = calculateEmi(loanAmount, loanRatePct, loanTenureYears);
+  const stampDutyAndRegistration = propertyValue * (STAMP_DUTY_REGISTRATION_PCT / 100);
+  const totalOutflow = totalPayment + downPayment + stampDutyAndRegistration;
+  const finalPropertyValue = propertyValue * Math.pow(1 + appreciationPct / 100, loanTenureYears);
+  const netCostBuy = totalOutflow - finalPropertyValue;
+
+  const g = rentGrowthPct / 100;
+  const totalRentPaid = g === 0 ? 12 * monthlyRent * loanTenureYears : 12 * monthlyRent * ((Math.pow(1 + g, loanTenureYears) - 1) / g);
+
+  return { downPayment, loanAmount, emi, stampDutyAndRegistration, totalOutflow, finalPropertyValue, netCostBuy, totalRentPaid, saving: totalRentPaid - netCostBuy };
+}
+
 // Full Indian digit-grouped rupee amount (e.g. 3500000 -> "₹35,00,000"),
 // matching the AI Tools calculators' result displays — unlike
 // lib/utils.ts's formatINR, this never switches to L/Cr short-scale, since
