@@ -1760,3 +1760,92 @@ separate from the general `<phase>_frontend_client` branch)
   total_amount=1577.07, status=created`) — left in place, a
   `created`-status order has no visible effect anywhere yet.
 
+### Frontend Phase 4 (on `feature/phase_4_frontend`, cut from `dev`)
+- **AI Tools section shipped 2026-09-28** — not a scoped Phase 4 task
+  (`docs/architecture/11_Phase_4.md`'s backlog is entirely broker-side:
+  events, verification, Leads CRM, My Listings, dashboard/analytics —
+  no client-facing tools work at all); pulled forward the same way the
+  homepage EMI section and buyer-preference wizard were, off a fresh
+  Figma design (`node-id=252:337`, section `tools`, hub frame `734:1237`
+  "ToolsHub") the user supplied directly, plus a working reference
+  build at `toolshomigrow.figma.site` ("Vaastu Checker Tools") used as
+  the source of truth for exact calculation behavior while Figma stayed
+  the source of truth for visuals. Full hub page
+  (`features/ai-tools/ToolsHub.tsx` + `app/(client)/ai-tools/page.tsx`)
+  plus all 7 calculators, each its own route under
+  `app/(client)/ai-tools/<slug>/`. Wires `TopNavBar`'s previously-dead
+  "AI Tools" link (`NAV_LINK_HREFS`).
+  - **Shared math extracted first**: `lib/finance.ts`'s
+    `calculateEmi`/`buildAmortizationSchedule` (docs/architecture/
+    18_Decision_Framework_And_Hard_Logic.md §2.4) is now the single
+    source of truth — both pre-existing EMI surfaces
+    (`features/homepage/EmiCalculator.tsx`,
+    `features/properties/PropertyLoanCalculator.tsx`) were refactored
+    onto it instead of keeping their own inline copies of the formula,
+    verified to render identical numbers before/after.
+  - **EMI Calculator** (`EmiCalculatorTool.tsx`, node `735:1816`) —
+    straight `calculateEmi`, 12-month amortisation table.
+  - **Loan Calculator** (`LoanCalculatorTool.tsx`, node `735:1495`) —
+    same math, principal/interest "Breakup" bar instead of a schedule.
+  - **Home Loan Eligibility** (`HomeLoanEligibilityTool.tsx`, node
+    `735:1719`) — 50% FOIR rule, reverse-solved via `lib/finance.ts`'s
+    new `principalForEmi` (algebraic inverse of the EMI formula).
+  - **Area Unit Converter** (`AreaUnitConverterTool.tsx`, node
+    `737:2470`) — new `lib/areaUnits.ts`, 12 units incl. regional ones
+    (Guntha, Bigha, Marla, Kanal, Ground, Ankanam), each the standard
+    published conversion factor, not reverse-engineered from the
+    reference build (its own sq-m figure was off by <0.0001%, a
+    rounding artifact in its chain — every other unit matched exactly,
+    confirming the standard factors are right and its own float drifted).
+  - **Rent vs Buy Calculator** (`RentVsBuyCalculatorTool.tsx`, node
+    `737:2787`) — new `calculateRentVsBuy` in `lib/finance.ts`. Formula
+    had no existing spec anywhere, so it was reverse-derived from the
+    reference build by solving its displayed intermediate figures: buy
+    outflow = loan repayment + down payment + a flat 7% stamp-duty/
+    registration assumption (not user-adjustable, no slider for it);
+    rent total = monthly rent compounded via the geometric-series growth
+    formula. Verified exact on every line (EMI, outflow, appreciated
+    property value, net cost, total rent, final saving).
+  - **Home Interior Cost Estimator** (`InteriorCostEstimatorTool.tsx`,
+    node `737:3534`) — new `lib/interiorCost.ts`. Most rooms are
+    `area (sqft) x grade rate/sqft`; Modular Kitchen is the one
+    exception — confirmed by checking all 4 finish-grade tiers against
+    the reference build that its cost isn't area-based at all (the
+    cost-to-rate ratio isn't constant: Rs.1.2L/Rs.2.5L/Rs.6L/Rs.15L at
+    Rs.750/Rs.1,500/Rs.3,000/Rs.6,500 per sqft), so it's hardcoded as a
+    flat per-grade lookup instead. Verified exact at both the default
+    6-room set and with all 10 rooms checked.
+  - **Property Tax Calculator** (`PropertyTaxCalculatorTool.tsx`, node
+    `736:2245`) — new `lib/propertyTax.ts`, the one tool whose formula
+    isn't fully pinned down. Every single-variable relationship was
+    isolated against the reference build and matches it exactly: flat
+    ARV of Rs.240/sqft/year regardless of city or type; city rate
+    multipliers (Bengaluru/Chennai 1.0x, Hyderabad 0.75x, Mumbai 1.25x,
+    Delhi 1.5x); type multipliers for Bengaluru (Commercial 2.5x,
+    Industrial 2.0x); occupancy (Rented 1.1x); age depreciation (1%/yr,
+    capped at 25% off). **Known, documented gap**: combining a
+    non-Bengaluru city with a non-Residential type doesn't reproduce the
+    reference build's number — e.g. Delhi+Commercial comes out to 3.5x
+    base there, and Delhi+Industrial to 2.5x base, which aren't
+    consistent with any single city multiplier applied to both type
+    multipliers (1.5x2.5=3.75, 1.5x2.0=3.0 — neither matches). Read as
+    an inconsistency in the AI-generated reference tool itself rather
+    than a real formula worth reverse-engineering further; implemented
+    as the straightforward multiplicative combination instead, which is
+    exact in every case except that specific interaction. Full reasoning
+    in the `lib/propertyTax.ts` file header.
+  - No vitest/RTL setup exists anywhere in this repo yet despite
+    `docs/architecture/12_Testing.md` calling out the EMI calculator as
+    worth unit-testing — introducing a test framework from scratch was
+    out of scope for this task, so verification was tsc + eslint (both
+    clean, zero new warnings) plus live Playwright checks against the
+    reference build's actual numbers for every tool, which is arguably
+    the more authoritative check here anyway. Revisit test infra as its
+    own task.
+  - `tsc --noEmit` and `eslint .` both clean across the whole frontend
+    (25 pre-existing warnings elsewhere, none touching these files).
+    Live-verified via Playwright against the real dev server for all 7
+    tools + the hub, screenshotted against the Figma design for visual
+    fidelity, every result checked against the reference build's actual
+    computed numbers rather than just "looks right."
+

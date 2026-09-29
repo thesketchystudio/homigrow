@@ -6,6 +6,8 @@
 
 import { useMemo, useState } from "react";
 
+import { buildAmortizationSchedule, calculateEmi } from "@/lib/finance";
+
 function crore(v: number) {
   return v >= 10000000
     ? `₹${(v / 10000000).toFixed(2)} Cr`
@@ -176,26 +178,19 @@ export function EmiCalculatorSection() {
   const [view, setView] = useState<"summary" | "schedule">("summary");
 
   const calc = useMemo(() => {
-    const r = rate / 12 / 100;
-    const n = tenure * 12;
-    const emi = r === 0 ? principal / n : (principal * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
-    const total = emi * n;
-    const interest = total - principal;
+    const { emi, totalPayment, totalInterest } = calculateEmi(principal, rate, tenure);
+    const months = buildAmortizationSchedule(principal, rate, tenure, Math.min(tenure, 5) * 12);
     const schedule: { year: number; principal: number; interest: number; balance: number }[] = [];
-    let balance = principal;
     for (let y = 1; y <= Math.min(tenure, 5); y++) {
-      let yPrincipal = 0;
-      let yInterest = 0;
-      for (let m = 0; m < 12; m++) {
-        const iP = balance * r;
-        const pP = emi - iP;
-        yInterest += iP;
-        yPrincipal += pP;
-        balance -= pP;
-      }
-      schedule.push({ year: y, principal: yPrincipal, interest: yInterest, balance: Math.max(0, balance) });
+      const yearMonths = months.slice((y - 1) * 12, y * 12);
+      schedule.push({
+        year: y,
+        principal: yearMonths.reduce((sum, m) => sum + m.principal, 0),
+        interest: yearMonths.reduce((sum, m) => sum + m.interest, 0),
+        balance: yearMonths[yearMonths.length - 1]?.balance ?? 0,
+      });
     }
-    return { emi: Math.round(emi), total: Math.round(total), interest: Math.round(interest), schedule };
+    return { emi: Math.round(emi), total: Math.round(totalPayment), interest: Math.round(totalInterest), schedule };
   }, [principal, rate, tenure]);
 
   const principalPct = Math.round((principal / calc.total) * 100);

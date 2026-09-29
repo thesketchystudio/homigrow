@@ -29,9 +29,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { SearchOverlay } from "@/features/search/SearchOverlay";
 import { FONT_HEADING as sg } from "@/lib/fonts";
 
-// "Saved", "Compare", and "Discover" (the Listings/search page) have real
-// destinations — AI Tools stays a dead "#" link until that feature exists.
-const NAV_LINK_HREFS: Record<string, string> = { Discover: "/properties", Saved: "/saved", Compare: "/compare" };
+const NAV_LINK_HREFS: Record<string, string> = {
+  Discover: "/properties",
+  "AI Tools": "/ai-tools",
+  Saved: "/saved",
+  Compare: "/compare",
+};
 
 function initials(name?: string) {
   if (!name) return "?";
