@@ -68,8 +68,11 @@ class TestListMyProperties:
         first_id = client.post("/api/v1/properties", headers=_auth_headers(broker), json=_VALID_PAYLOAD).json()["id"]
         second_payload = {**_VALID_PAYLOAD, "title": "3 BHK Villa"}
         second_id = client.post("/api/v1/properties", headers=_auth_headers(broker), json=second_payload).json()["id"]
-        client.post(f"/api/v1/properties/{second_id}/media", headers=_auth_headers(broker), files=_IMAGE_FILES)
-        client.post(f"/api/v1/properties/{second_id}/submit", headers=_auth_headers(broker))
+        # Forced directly rather than via /submit — submit now auto-approves
+        # straight through to active (see broker_property_service._auto_approve),
+        # so pending is reached in practice only as a transient in-request
+        # state. "mine" still needs to surface it if a row is ever left there.
+        db_session.query(Property).filter(Property.id == UUID(second_id)).update({"status": PropertyStatus.pending})
 
         # The test transaction's now() is frozen at transaction start, so
         # both creates share one created_at — force a deterministic order
@@ -90,6 +93,27 @@ class TestListMyProperties:
         assert [item["id"] for item in body] == [second_id, first_id]
         assert body[0]["status"] == "pending"
         assert body[1]["status"] == "draft"
+
+    def test_includes_real_views_and_leads_counts_per_listing(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546036")
+        with_activity_id = client.post("/api/v1/properties", headers=_auth_headers(broker), json=_VALID_PAYLOAD).json()["id"]
+        no_activity_payload = {**_VALID_PAYLOAD, "title": "Quiet Listing"}
+        no_activity_id = client.post("/api/v1/properties", headers=_auth_headers(broker), json=no_activity_payload).json()["id"]
+
+        viewer = make_user(db_session, role=UserRole.client, phone="+919876546037")
+        db_session.add(Lead(property_id=UUID(with_activity_id), broker_id=broker.id, client_id=viewer.id, contact_name="Rahul Gupta", status=LeadStatus.new))
+        db_session.add(PropertyView(property_id=UUID(with_activity_id), viewer_id=viewer.id))
+        db_session.add(PropertyView(property_id=UUID(with_activity_id), viewer_id=None))
+        db_session.flush()
+
+        response = client.get("/api/v1/properties/mine", headers=_auth_headers(broker))
+
+        assert response.status_code == 200
+        body = {item["id"]: item for item in response.json()}
+        assert body[with_activity_id]["views_count"] == 2
+        assert body[with_activity_id]["leads_count"] == 1
+        assert body[no_activity_id]["views_count"] == 0
+        assert body[no_activity_id]["leads_count"] == 0
 
     def test_does_not_return_another_brokers_listings(self, client, db_session):
         owner = _make_broker(db_session, phone="+919876546029")
@@ -461,7 +485,10 @@ class TestSubmitProperty:
         assert response.status_code == 422
         assert response.json()["error"]["code"] == "MEDIA_REQUIRED"
 
-    def test_submit_with_cover_photo_moves_to_pending(self, client, db_session):
+    def test_submit_with_cover_photo_auto_approves_to_active(self, client, db_session):
+        # Interim behavior (see broker_property_service._auto_approve): with
+        # no admin moderation queue built yet, submit goes straight to
+        # active instead of leaving the listing stuck in pending forever.
         broker = _make_broker(db_session, phone="+919876546009")
         property_id = client.post(
             "/api/v1/properties", headers=_auth_headers(broker), json=_VALID_PAYLOAD
@@ -471,7 +498,7 @@ class TestSubmitProperty:
         response = client.post(f"/api/v1/properties/{property_id}/submit", headers=_auth_headers(broker))
 
         assert response.status_code == 200
-        assert response.json()["status"] == "pending"
+        assert response.json()["status"] == "active"
 
     def test_non_owner_broker_is_forbidden(self, client, db_session):
         owner = _make_broker(db_session, phone="+919876546010")
@@ -620,7 +647,12 @@ class TestUpdateProperty:
         assert body["bhk"] == 2
         assert body["city"] == "Bengaluru"
 
-    def test_editing_an_active_listing_reverts_it_to_pending(self, client, db_session):
+    def test_editing_an_active_listing_stays_active_after_auto_reapproval(self, client, db_session):
+        # The edit still routes through pending for re-moderation (per
+        # property_lifecycle.py), but auto-approves straight back to active
+        # (see broker_property_service._auto_approve) rather than leaving a
+        # broker's already-live listing stuck invisible with no admin queue
+        # to release it.
         broker = _make_broker(db_session, phone="+919876546049")
         property_id = client.post(
             "/api/v1/properties", headers=_auth_headers(broker), json=_VALID_PAYLOAD
@@ -635,7 +667,7 @@ class TestUpdateProperty:
         )
 
         assert response.status_code == 200
-        assert response.json()["status"] == "pending"
+        assert response.json()["status"] == "active"
 
     def test_editing_a_draft_listing_leaves_status_unchanged(self, client, db_session):
         broker = _make_broker(db_session, phone="+919876546050")
