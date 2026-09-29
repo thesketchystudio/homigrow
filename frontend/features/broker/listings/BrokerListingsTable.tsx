@@ -2,10 +2,11 @@
 // Real Listings table for the Broker Portal (Figma "Real Estate Broker
 // Portal > MyListings", node 176:789): search + Type/Status filters, a
 // property/location/price/details/performance/status/actions table, and
-// pagination. Performance (views/leads) is hardcoded to 0/0 for now — no
-// per-property view/lead-count aggregate exists on this table yet (the
-// Property Detail page linked from the Property column has the real
-// numbers, computed server-side). Each row's Boost action navigates to the
+// pagination. Performance (views/leads) is real per-property data from
+// GET /properties/mine (views_count/leads_count, correlated subqueries
+// server-side) — the same numbers the Property Detail page shows, just
+// aggregated across every row in one query instead of one at a time.
+// Each row's Boost action navigates to the
 // real Boost Listing checkout (features/broker/boost/BoostListingPage.tsx);
 // the header's Boost Listing button has no specific property in context, so
 // it just points the broker at the table below. Edit opens the Post
@@ -134,13 +135,15 @@ export function BrokerListingsTable() {
     {
       key: "performance",
       header: "Performance",
-      render: () => (
+      render: (property) => (
         <div className="flex items-center gap-3 font-body text-[13px] text-muted-foreground">
           <span className="flex items-center gap-1">
-            <Eye className="size-3.5" />0
+            <Eye className="size-3.5" />
+            {property.views_count}
           </span>
           <span className="flex items-center gap-1">
-            <Users2 className="size-3.5" />0
+            <Users2 className="size-3.5" />
+            {property.leads_count}
           </span>
         </div>
       ),
