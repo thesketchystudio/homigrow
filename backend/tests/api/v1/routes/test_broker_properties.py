@@ -94,6 +94,27 @@ class TestListMyProperties:
         assert body[0]["status"] == "pending"
         assert body[1]["status"] == "draft"
 
+    def test_includes_real_views_and_leads_counts_per_listing(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546036")
+        with_activity_id = client.post("/api/v1/properties", headers=_auth_headers(broker), json=_VALID_PAYLOAD).json()["id"]
+        no_activity_payload = {**_VALID_PAYLOAD, "title": "Quiet Listing"}
+        no_activity_id = client.post("/api/v1/properties", headers=_auth_headers(broker), json=no_activity_payload).json()["id"]
+
+        viewer = make_user(db_session, role=UserRole.client, phone="+919876546037")
+        db_session.add(Lead(property_id=UUID(with_activity_id), broker_id=broker.id, client_id=viewer.id, contact_name="Rahul Gupta", status=LeadStatus.new))
+        db_session.add(PropertyView(property_id=UUID(with_activity_id), viewer_id=viewer.id))
+        db_session.add(PropertyView(property_id=UUID(with_activity_id), viewer_id=None))
+        db_session.flush()
+
+        response = client.get("/api/v1/properties/mine", headers=_auth_headers(broker))
+
+        assert response.status_code == 200
+        body = {item["id"]: item for item in response.json()}
+        assert body[with_activity_id]["views_count"] == 2
+        assert body[with_activity_id]["leads_count"] == 1
+        assert body[no_activity_id]["views_count"] == 0
+        assert body[no_activity_id]["leads_count"] == 0
+
     def test_does_not_return_another_brokers_listings(self, client, db_session):
         owner = _make_broker(db_session, phone="+919876546029")
         other = _make_broker(db_session, phone="+919876546030")

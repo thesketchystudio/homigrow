@@ -231,11 +231,16 @@ class BrokerPropertyListItem(PropertyListItem):
     created_at, since a broker (unlike the public search grid) needs to see
     draft/pending listings too (which have no published_at yet) and the
     Listings table's "Listed Xd ago" column needs a timestamp that's always
-    present regardless of status.
+    present regardless of status. views_count/leads_count back the Listings
+    table's Performance column — real per-property aggregates from
+    PropertyView/Lead, computed via a correlated subquery per row rather
+    than the Property Detail page's N+1-safe-for-one-row query pattern.
     """
 
     status: PropertyStatus
     created_at: datetime
+    views_count: int
+    leads_count: int
 
 
 class BrokerPropertyLeadSummary(BaseModel):

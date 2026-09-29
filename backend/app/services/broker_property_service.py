@@ -11,7 +11,7 @@ would break its existing "no owner-preview path" contract.
 
 from uuid import UUID
 
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationFailed
@@ -72,12 +72,24 @@ def _get_owned_property(db: Session, broker: User, property_id: UUID) -> Propert
 def list_my_properties(db: Session, broker: User) -> list[BrokerPropertyListItem]:
     """
     Every property owned by broker, across every status (draft included),
-    newest first — backs the broker Dashboard's empty-state check and its
-    listing list once there's at least one.
+    newest first — backs the broker Dashboard's empty-state check and the
+    Listings table. views_count/leads_count are correlated scalar
+    subqueries (same pattern as cover_image_subquery()) rather than a
+    separate query per row, so the Performance column stays one round trip
+    regardless of how many listings a broker has.
     """
     cover_image_subq = cover_image_subquery()
+    views_count_subq = (
+        select(func.count(PropertyView.id)).where(PropertyView.property_id == Property.id).correlate(Property).scalar_subquery()
+    )
+    leads_count_subq = select(func.count(Lead.id)).where(Lead.property_id == Property.id).correlate(Property).scalar_subquery()
     rows = (
-        db.query(Property, cover_image_subq.label("cover_image_url"))
+        db.query(
+            Property,
+            cover_image_subq.label("cover_image_url"),
+            views_count_subq.label("views_count"),
+            leads_count_subq.label("leads_count"),
+        )
         .filter(Property.broker_id == broker.id)
         .order_by(Property.created_at.desc())
         .all()
@@ -87,8 +99,10 @@ def list_my_properties(db: Session, broker: User) -> list[BrokerPropertyListItem
             **build_property_list_item(property_, cover_image_url),
             status=property_.status,
             created_at=property_.created_at,
+            views_count=views_count,
+            leads_count=leads_count,
         )
-        for property_, cover_image_url in rows
+        for property_, cover_image_url, views_count, leads_count in rows
     ]
 
 
