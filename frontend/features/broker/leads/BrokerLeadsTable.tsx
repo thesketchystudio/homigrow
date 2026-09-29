@@ -20,14 +20,16 @@
 // reading or writing it until now. The Status pill is a real Select
 // (PATCH .../status) rather than a static badge, since Figma's table shows
 // no separate detail screen this frame's status field could otherwise live
-// on.
+// on. A fourth action (eye icon, opens LeadDetailDialog) is a later,
+// non-Figma addition — GET /leads/{id} existed with no frontend caller at
+// all, so this just gives it one rather than leaving it orphaned.
 
 "use client";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calendar, MessageSquare, Phone } from "lucide-react";
+import { Calendar, Eye, MessageSquare, Phone } from "lucide-react";
 
 import SharedTable, { type TableColumn } from "@/components/shared/Table";
 import StatusPill, { leadStatusPillMap } from "@/components/shared/StatusPill";
@@ -35,7 +37,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { BrokerEmptyState } from "@/features/broker/BrokerEmptyState";
 import { LeadStatusTabs, type LeadStatusFilter } from "@/features/broker/leads/LeadStatusTabs";
-import { AddLeadNoteDialog, SetFollowUpDialog } from "@/features/broker/leads/LeadActionDialogs";
+import { AddLeadNoteDialog, LeadDetailDialog, SetFollowUpDialog } from "@/features/broker/leads/LeadActionDialogs";
 import { LEADS_QUERY_KEY } from "@/features/broker/leads/queryKey";
 import { listLeads, updateLead, type LeadListItem } from "@/lib/api/endpoints/leads";
 import { listMyProperties } from "@/lib/api/endpoints/properties";
@@ -66,6 +68,7 @@ export function BrokerLeadsTable() {
   const [page, setPage] = useState(1);
   const [noteLeadId, setNoteLeadId] = useState<string | null>(null);
   const [followUpLeadId, setFollowUpLeadId] = useState<string | null>(null);
+  const [viewLeadId, setViewLeadId] = useState<string | null>(null);
 
   const leads = useMemo(() => data ?? [], [data]);
 
@@ -221,6 +224,9 @@ export function BrokerLeadsTable() {
           <Button variant="outline" size="icon" className="size-8" aria-label="Schedule follow-up" onClick={() => setFollowUpLeadId(lead.id)}>
             <Calendar className="size-4" />
           </Button>
+          <Button variant="outline" size="icon" className="size-8" aria-label="View lead details" onClick={() => setViewLeadId(lead.id)}>
+            <Eye className="size-4" />
+          </Button>
         </div>
       ),
     },
@@ -258,6 +264,7 @@ export function BrokerLeadsTable() {
 
       <AddLeadNoteDialog leadId={noteLeadId} onClose={() => setNoteLeadId(null)} />
       <SetFollowUpDialog leadId={followUpLeadId} onClose={() => setFollowUpLeadId(null)} />
+      <LeadDetailDialog leadId={viewLeadId} onClose={() => setViewLeadId(null)} />
     </div>
   );
 }

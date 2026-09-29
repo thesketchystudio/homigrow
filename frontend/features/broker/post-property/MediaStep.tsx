@@ -1,25 +1,30 @@
 // features/broker/post-property/MediaStep.tsx
 // Step 2 of the Post Property wizard (Figma "Curate Your Listing" > Media).
 // Hero/Interior/Floor Plans reuse the generalized PropertyMediaDropzone,
-// uploaded to Supabase Storage on submit. Video/Drone footage and the 360°
-// virtual tour link render as a "Coming soon" placeholder — real uploads
-// for those are on hold until Cloudflare (Stream for video) is wired up,
-// rather than shipping them through Supabase Storage like the photos.
-// Floor plans are uploaded as regular gallery images (JPG/PNG/WEBP) rather
-// than the PDF/SVG Figma shows — the backend's image upload only validates
-// those three image types, and adding a parallel PDF pathway just for this
-// one box isn't worth it yet.
+// uploaded to Supabase Storage on submit. Video/Drone footage now uploads
+// the same way, through PropertyVideoDropzone + POST /properties/{id}/
+// media/video — that endpoint already went through Supabase Storage (not
+// Cloudflare Stream, which was never actually wired up), so there was
+// nothing left blocking it once someone built the upload UI; it's plain
+// storage, not adaptive streaming, same as the photos. The 360° virtual
+// tour link still isn't collected anywhere in this wizard — unrelated to
+// video upload, a separate gap. Floor plans are uploaded as regular
+// gallery images (JPG/PNG/WEBP) rather than the PDF/SVG Figma shows — the
+// backend's image upload only validates those three image types, and
+// adding a parallel PDF pathway just for this one box isn't worth it yet.
 // Hero caps at 5 photos (PropertyMediaDropzone's maxFiles); Interior has no
 // cap yet but requires at least 3 — the only gate on Continue, since Hero's
 // cap alone doesn't guarantee a usable gallery. Floor Plans has neither.
+// Video is optional — nothing gates Continue on it.
 
 "use client";
 
 import { useState } from "react";
-import { Circle, CircleCheck, Video } from "lucide-react";
+import { Circle, CircleCheck } from "lucide-react";
 import { PostPropertyStepper, type StepKey } from "@/features/broker/post-property/PostPropertyStepper";
 import { FreePlanUsageBar } from "@/features/broker/post-property/FreePlanUsageBar";
 import { PropertyMediaDropzone } from "@/features/broker/post-property/PropertyMediaDropzone";
+import { PropertyVideoDropzone } from "@/features/broker/post-property/PropertyVideoDropzone";
 
 type MediaStepProps = {
   heroImages: File[];
@@ -28,6 +33,8 @@ type MediaStepProps = {
   onInteriorImagesChange: (images: File[]) => void;
   floorPlanImages: File[];
   onFloorPlanImagesChange: (images: File[]) => void;
+  videoFile: File | null;
+  onVideoFileChange: (file: File | null) => void;
   onBack: () => void;
   onContinue: () => void;
   onStepSelect?: (step: StepKey) => void;
@@ -49,6 +56,8 @@ export function MediaStep({
   onInteriorImagesChange,
   floorPlanImages,
   onFloorPlanImagesChange,
+  videoFile,
+  onVideoFileChange,
   onBack,
   onContinue,
   onStepSelect,
@@ -104,15 +113,9 @@ export function MediaStep({
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="font-heading text-[16px] font-bold text-foreground">Video & Virtual Tour</h2>
-              <span className="font-body text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">Coming soon</span>
+              <span className="font-body text-[12px] text-muted-foreground">Optional</span>
             </div>
-            <div className="flex flex-col items-center gap-3 rounded-lg bg-brand-secondary-400 py-10 text-center">
-              <Video className="size-6 text-brand-primary-300" />
-              <p className="font-heading text-[14px] font-bold text-brand-primary-600">Coming soon</p>
-              <p className="max-w-sm font-body text-[12px] text-brand-primary-300">
-                Property video, drone footage, and 360° virtual tour uploads launch once our Cloudflare-powered video hosting is ready.
-              </p>
-            </div>
+            <PropertyVideoDropzone file={videoFile} onChange={onVideoFileChange} />
           </div>
         </div>
 

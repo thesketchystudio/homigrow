@@ -247,7 +247,12 @@ export type PropertyCreateInput = {
 // Dashboard's empty-state check and the Listings table. created_at is
 // always present (unlike published_at, which is null until a listing goes
 // active) so the table's "Listed Xd ago" column always has a value.
-export type BrokerPropertyListItem = PropertyListItem & { status: PropertyStatus; created_at: string };
+export type BrokerPropertyListItem = PropertyListItem & {
+  status: PropertyStatus;
+  created_at: string;
+  views_count: number;
+  leads_count: number;
+};
 
 export function listMyProperties(): Promise<BrokerPropertyListItem[]> {
   return apiRequest<BrokerPropertyListItem[]>("/properties/mine");
