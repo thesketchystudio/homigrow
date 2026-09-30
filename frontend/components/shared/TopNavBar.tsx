@@ -25,6 +25,7 @@ import { ensureAuthResolved } from "@/lib/auth/session";
 import svgPaths from "@/lib/homepage-svg-paths";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useSearchHistoryStore } from "@/lib/stores/searchHistory";
+import { toast } from "@/lib/toast";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { SearchOverlay } from "@/features/search/SearchOverlay";
 import { FONT_HEADING as sg } from "@/lib/fonts";
@@ -192,17 +193,26 @@ export default function TopNavBar() {
 
         <div style={{ display: "flex", gap: "clamp(8px, 2vw, 16px)", alignItems: "center", flexShrink: 0 }}>
           {status === "authenticated" ? (
-            <button
-              onClick={() => router.push("/profile/account")}
-              style={{ display: "flex", alignItems: "center", gap: 16, background: "none", border: "none", cursor: "pointer" }}
-            >
-              <Bell size={24} color={scrolled ? "#090909" : "#fefeff"} />
-              <Avatar className="size-8">
-                <AvatarFallback className="bg-[#dfe0e1] text-[11px] font-bold text-[#575e70]">
-                  {initials(user?.full_name)}
-                </AvatarFallback>
-              </Avatar>
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <button
+                aria-label="Notifications"
+                onClick={() => toast.info("Notifications are coming soon.")}
+                style={{ display: "flex", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+              >
+                <Bell size={24} color={scrolled ? "#090909" : "#fefeff"} />
+              </button>
+              <button
+                aria-label="Account"
+                onClick={() => router.push("/profile/account")}
+                style={{ display: "flex", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+              >
+                <Avatar className="size-8">
+                  <AvatarFallback className="bg-[#dfe0e1] text-[11px] font-bold text-[#575e70]">
+                    {initials(user?.full_name)}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+            </div>
           ) : (
             <button
               onClick={() => router.push("/welcome")}
