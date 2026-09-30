@@ -7,14 +7,24 @@
 "use client";
 
 import { useState } from "react";
-import { Bath, BedDouble, CalendarDays, Car, MapPin, Ruler, Share2, TrainFront } from "lucide-react";
+import { BedDouble, Building, CalendarDays, Car, Check, Droplet, House, MapPin, Maximize2, Share2, TrainFront } from "lucide-react";
 
 import type { PropertyRead } from "@/lib/api/endpoints/properties";
-import { ListingType, LISTING_TYPE_LABELS as LISTING_TAG } from "@/lib/enums";
+import { ListingType, LISTING_TYPE_LABELS as LISTING_TAG, PropertyType, PROPERTY_TYPE_LABELS } from "@/lib/enums";
 import { toast } from "@/lib/toast";
 
 function formatPriceINR(amount: number): string {
   return `₹${Math.round(amount).toLocaleString("en-IN")}`;
+}
+
+const RESIDENTIAL_TYPES: PropertyType[] = [PropertyType.apartment, PropertyType.villa, PropertyType.independent_house, PropertyType.pg_colive];
+const LAND_TYPES: PropertyType[] = [PropertyType.plot, PropertyType.land];
+
+// The backend has no "purpose" column; it follows from the property type.
+function purposeLabel(type: PropertyType): string {
+  if (RESIDENTIAL_TYPES.includes(type)) return "Residential";
+  if (LAND_TYPES.includes(type)) return "Land";
+  return "Commercial";
 }
 
 export function PropertyHeader({ property }: { property: PropertyRead }) {
@@ -32,18 +42,30 @@ export function PropertyHeader({ property }: { property: PropertyRead }) {
     }
   };
 
-  const stats: { icon: React.ReactNode; label: string; value: string }[] = [];
+  const stats: { icon: React.ReactNode; label: string; value: string; sub?: string }[] = [
+    { icon: <Building className="size-5" />, label: "Type", value: PROPERTY_TYPE_LABELS[property.property_type] },
+    { icon: <House className="size-5" />, label: "Purpose", value: purposeLabel(property.property_type) },
+  ];
   if (property.area_sqft) {
-    stats.push({ icon: <Ruler className="size-5" />, label: "Area", value: `${property.area_sqft.toLocaleString("en-IN")} SQFT` });
+    stats.push({ icon: <Maximize2 className="size-5" />, label: "Area", value: `${property.area_sqft.toLocaleString("en-IN")} SQFT` });
   }
   if (property.bhk) {
     stats.push({ icon: <BedDouble className="size-5" />, label: "Bedrooms", value: `${String(property.bhk).padStart(2, "0")} Units` });
   }
   if (property.bathrooms) {
-    stats.push({ icon: <Bath className="size-5" />, label: "Bathrooms", value: `${String(property.bathrooms).padStart(2, "0")} Baths` });
+    stats.push({ icon: <Droplet className="size-5" />, label: "Bathrooms", value: `${String(property.bathrooms).padStart(2, "0")} Baths` });
   }
   if (property.parking_slots) {
     stats.push({ icon: <Car className="size-5" />, label: "Parking", value: `${String(property.parking_slots).padStart(2, "0")} Slots` });
+  }
+  if (property.metro_distance_km != null) {
+    stats.push({ icon: <TrainFront className="size-5" />, label: "Metro", value: property.locality, sub: `${property.metro_distance_km} kms` });
+  }
+  if (property.built_year) {
+    stats.push({ icon: <CalendarDays className="size-5" />, label: "Year Built", value: String(property.built_year) });
+  }
+  if (isRecurring) {
+    stats.push({ icon: <Check className="size-5" />, label: "Lease", value: "Available" });
   }
 
   return (
@@ -86,49 +108,28 @@ export function PropertyHeader({ property }: { property: PropertyRead }) {
             </span>
             {isRecurring && <span className="font-heading text-[16px] font-medium text-brand-primary-600/80">/mo</span>}
           </div>
-          {property.maintenance_monthly !== undefined && (
+          {property.maintenance_monthly != null && (
             <p className="font-body text-[12px] uppercase tracking-[1.2px] text-brand-primary-300">Inclusive of Maintenance</p>
           )}
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-8 border-y border-[rgba(198,198,205,0.2)] py-8">
+      <div className="grid grid-cols-2 gap-x-10 gap-y-8 border-y border-[rgba(198,198,205,0.2)] py-[33px] sm:grid-cols-4">
         {stats.map((stat) => (
           <div key={stat.label} className="flex items-center gap-3">
-            <div className="text-brand-primary-600">{stat.icon}</div>
+            <div className="shrink-0 text-brand-primary-600">{stat.icon}</div>
             <div className="flex flex-col">
-              <span className="font-body text-[12px] uppercase tracking-[1.2px] text-brand-primary-600/80">{stat.label}</span>
-              <span className="font-heading text-[16px] font-bold text-brand-primary-600">{stat.value}</span>
+              <span className="font-heading text-[12px] uppercase leading-4 tracking-[1.2px] text-brand-primary-600/80">{stat.label}</span>
+              <span className="font-heading text-[16px] font-bold leading-6 text-brand-primary-600">{stat.value}</span>
+              {stat.sub && (
+                <div className="flex items-center gap-1">
+                  <MapPin className="size-3 text-brand-green-700" />
+                  <span className="font-heading text-[16px] font-bold leading-6 text-brand-green-700">{stat.sub}</span>
+                </div>
+              )}
             </div>
           </div>
         ))}
-
-        {(property.metro_distance_km !== undefined || property.built_year) && (
-          <div className="flex gap-8">
-            {property.metro_distance_km !== undefined && (
-              <div className="flex items-center gap-3">
-                <TrainFront className="size-5 text-brand-primary-600" />
-                <div className="flex flex-col">
-                  <span className="font-body text-[12px] uppercase tracking-[1.2px] text-brand-primary-600/80">Metro</span>
-                  <span className="font-heading text-[16px] font-bold text-brand-primary-600">{property.locality}</span>
-                  <div className="flex items-center gap-1">
-                    <MapPin className="size-3 text-brand-green-700" />
-                    <span className="font-heading text-[16px] font-bold text-brand-green-700">{property.metro_distance_km} kms</span>
-                  </div>
-                </div>
-              </div>
-            )}
-            {property.built_year && (
-              <div className="flex items-center gap-3">
-                <CalendarDays className="size-5 text-brand-primary-600" />
-                <div className="flex flex-col">
-                  <span className="font-body text-[12px] uppercase tracking-[1.2px] text-brand-primary-600/80">Year Built</span>
-                  <span className="font-heading text-[16px] font-bold text-brand-primary-600">{property.built_year}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

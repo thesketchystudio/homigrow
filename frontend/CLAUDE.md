@@ -1849,3 +1849,22 @@ separate from the general `<phase>_frontend_client` branch)
     fidelity, every result checked against the reference build's actual
     computed numbers rather than just "looks right."
 
+
+### Frontend Phase 3 — Property Details Figma pass (on `feature/phase_3_frontend_client`)
+- **Property Details spacing, loan-calculator panel and icons matched to
+  Figma, 2026-10-01** (node `31:1845`). The loan calculator card now uses
+  Figma's translucent grey fill (`rgba(223,224,225,0.24)`) instead of
+  `#f8f9fa`, which was indistinguishable from the page background.
+  Page container widened to 1148px (1100px content, as in Figma), 48px
+  gaps between left-column sections, a 378px sidebar, and 32px vertical
+  padding around the content row; the calculator's slider rows, chips,
+  summary strip, EMI card and button row were re-spaced to the frame's
+  measurements. Quick stats are now a 4-column grid with Figma's icons
+  (Type, Purpose, Area, Bedrooms, Bathrooms, Parking, Metro, Year Built,
+  Lease) — all `lucide-react`, which is where Figma's icons come from, so
+  no favicon/icon-font needed. Amenities render as icon + label rows; the
+  icon is picked by keyword in `lib/amenity-icons.ts` with a check-mark
+  fallback, since amenities are free-form strings. Fixed a `null kms` /
+  stray "Inclusive of Maintenance" bug: the backend sends `null` for
+  missing optionals, but the checks only tested `undefined`.
+  `tsc`/`eslint` clean; verified live against the real backend.
