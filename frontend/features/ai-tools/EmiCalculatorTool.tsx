@@ -24,7 +24,7 @@ export function EmiCalculatorTool() {
   const schedule = useMemo(() => buildAmortizationSchedule(amount, rate, tenure, 12), [amount, rate, tenure]);
 
   return (
-    <ToolPageShell category="Finance & Yield" title="EMI Calculator">
+    <ToolPageShell slug="emi-calculator" title="EMI Calculator">
       <div className="flex flex-col gap-8 rounded-2xl border border-brand-secondary-500 bg-brand-secondary-100 p-6 shadow-sm sm:p-10">
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
           <div className="flex flex-col gap-6">

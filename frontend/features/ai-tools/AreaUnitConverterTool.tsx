@@ -23,11 +23,12 @@ export function AreaUnitConverterTool() {
   const [toId, setToId] = useState("sqm");
 
   const fromUnit = AREA_UNITS.find((u) => u.id === fromId)!;
+  const toUnit = AREA_UNITS.find((u) => u.id === toId)!;
   const toValue = useMemo(() => convertArea(value, fromId, toId), [value, fromId, toId]);
   const others = AREA_UNITS.filter((u) => u.id !== fromId);
 
   return (
-    <ToolPageShell category="Discovery AI" title="Area Unit Converter">
+    <ToolPageShell slug="area-unit-converter" title="Area Unit Converter">
       <div className="flex flex-col gap-8 rounded-2xl border border-brand-secondary-500 bg-brand-secondary-100 p-6 shadow-sm sm:p-10">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
@@ -68,7 +69,7 @@ export function AreaUnitConverterTool() {
             </Select>
             <div className="mt-1 flex items-center justify-between rounded-lg bg-brand-primary-800 px-4 py-3">
               <span className="font-heading text-[18px] font-bold text-brand-secondary-100">{formatValue(toValue)}</span>
-              <span className="font-body text-[12px] text-brand-secondary-100/50">Square</span>
+              <span className="font-body text-[12px] text-brand-secondary-100/50">{toUnit.label}</span>
             </div>
           </div>
         </div>

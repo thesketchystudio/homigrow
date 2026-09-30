@@ -35,7 +35,7 @@ export function PropertyTaxCalculatorTool() {
   );
 
   return (
-    <ToolPageShell category="Due Diligence" title="Property Tax Calculator">
+    <ToolPageShell slug="property-tax-calculator" title="Property Tax Calculator">
       <div className="grid grid-cols-1 gap-8 rounded-2xl border border-brand-secondary-500 bg-brand-secondary-100 p-6 shadow-sm sm:grid-cols-2 sm:p-10">
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-1.5">
@@ -111,14 +111,6 @@ export function PropertyTaxCalculatorTool() {
           <ResultCard label="Annual Tax Payable" value={formatRupees(result.annualTax)} accent />
           <ResultCard label="Half-yearly Instalment" value={formatRupees(result.halfYearlyInstalment)} />
           <ResultCard label="Estimated Annual Rental Value" value={formatRupees(result.estimatedAnnualRentalValue)} />
-
-          <div className="flex flex-col gap-1 rounded-xl border border-brand-secondary-500 bg-brand-green-200 p-5">
-            <span className="font-heading text-[14px] font-bold text-brand-primary-500">Disclaimer</span>
-            <p className="font-body text-[12px] text-brand-primary-600/80">
-              This estimate is indicative and based on prevailing ARV-based models. Actual tax liability is determined by your municipal corporation using
-              property-specific surveys. Visit your city&apos;s municipal portal for exact computation.
-            </p>
-          </div>
         </div>
       </div>
     </ToolPageShell>
