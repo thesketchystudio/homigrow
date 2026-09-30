@@ -54,7 +54,7 @@ export const TOOLS: ToolCard[] = [
   {
     slug: "area-unit-converter",
     title: "Area Unit Converter",
-    category: "Discovery AI",
+    category: "Measurement",
     description: "Convert between sq ft, sq m, sq yard, acres, cents, guntas, and more. Handles all regional Indian land measurement units accurately.",
     icon: LayoutGrid,
     related: ["property-tax-calculator", "interior-cost-estimator", "rent-vs-buy-calculator"],
@@ -71,7 +71,7 @@ export const TOOLS: ToolCard[] = [
   {
     slug: "interior-cost-estimator",
     title: "Home Interior Cost Estimator",
-    category: "3D Curation",
+    category: "Home Improvement",
     description: "Estimate interior fit-out budgets by room, material grade, and finish level. Get itemised breakdowns for modular kitchens, flooring, and more.",
     icon: ShieldCheck,
     related: ["area-unit-converter", "rent-vs-buy-calculator", "loan-calculator"],
