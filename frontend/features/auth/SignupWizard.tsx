@@ -16,6 +16,7 @@ import { useMutation } from "@tanstack/react-query";
 import { UserRole } from "@/lib/enums";
 import { toast } from "@/lib/toast";
 import { useAuthStore } from "@/lib/stores/auth";
+import { getRoleHomePath } from "@/lib/auth/roleHome";
 import type { TokenResponse } from "@/lib/api/endpoints/auth";
 import { getMe, updateMe } from "@/lib/api/endpoints/users";
 import { RoleSelectStep } from "@/features/auth/RoleSelectStep";
@@ -124,7 +125,7 @@ export function SignupWizard() {
 
   if (step === "documents") {
     return (
-      <BrokerDocumentUploadStep onSubmitted={() => setStep("pending")} onExit={() => router.push("/")} />
+      <BrokerDocumentUploadStep onSubmitted={() => setStep("pending")} onExit={() => router.push(getRoleHomePath(UserRole.broker))} />
     );
   }
 

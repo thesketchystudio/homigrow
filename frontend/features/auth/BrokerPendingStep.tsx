@@ -2,12 +2,14 @@
 // Terminal screen after successful document submission (Figma:
 // BrokerPendingScreen, node 431:1623). Figma's frame has no visible
 // CTA button, but this route sits inside the auth layout shell (no
-// TopNavBar), so a "Go to homepage" link is added — a deliberate small
-// addition, not a literal Figma pull, since leaving a genuine dead end
-// is worse than one small deviation.
+// TopNavBar), so a "Go to dashboard" link to the broker's own home is
+// added — a deliberate small addition, not a literal Figma pull, since
+// leaving a genuine dead end is worse than one small deviation.
 
 import Link from "next/link";
 import { Check } from "lucide-react";
+import { getRoleHomePath } from "@/lib/auth/roleHome";
+import { UserRole } from "@/lib/enums";
 import { cn } from "@/lib/utils";
 
 type ChecklistState = "done" | "in_progress" | "pending";
@@ -62,8 +64,8 @@ export function BrokerPendingStep() {
         </div>
       </div>
 
-      <Link href="/" className="font-heading text-[14px] font-semibold text-foreground underline">
-        Go to homepage
+      <Link href={getRoleHomePath(UserRole.broker)} className="font-heading text-[14px] font-semibold text-foreground underline">
+        Go to dashboard
       </Link>
     </div>
   );
