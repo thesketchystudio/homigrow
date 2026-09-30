@@ -183,6 +183,7 @@ def create_property(db: Session, broker: User, data: PropertyCreateRequest) -> P
         broker_id=broker.id,
         status=PropertyStatus.draft,
         title=data.title,
+        description=data.description,
         listing_type=data.listing_type,
         property_type=data.property_type,
         price=data.price,

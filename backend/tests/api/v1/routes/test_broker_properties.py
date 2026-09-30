@@ -138,6 +138,25 @@ class TestListMyProperties:
 
 
 class TestCreateProperty:
+    def test_description_is_stored_trimmed(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546901")
+        payload = {**_VALID_PAYLOAD, "description": "  Bright corner flat near the metro.  "}
+        response = client.post("/api/v1/properties", headers=_auth_headers(broker), json=payload)
+        assert response.status_code == 200
+        assert db_session.get(Property, UUID(response.json()["id"])).description == "Bright corner flat near the metro."
+
+    def test_blank_description_is_stored_as_null(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546902")
+        response = client.post("/api/v1/properties", headers=_auth_headers(broker), json={**_VALID_PAYLOAD, "description": "   "})
+        assert response.status_code == 200
+        assert db_session.get(Property, UUID(response.json()["id"])).description is None
+
+    def test_description_over_250_words_is_rejected(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546903")
+        payload = {**_VALID_PAYLOAD, "description": " ".join(["word"] * 251)}
+        response = client.post("/api/v1/properties", headers=_auth_headers(broker), json=payload)
+        assert response.status_code == 422
+
     def test_broker_can_create_a_draft_listing(self, client, db_session):
         broker = _make_broker(db_session, phone="+919876546001")
 

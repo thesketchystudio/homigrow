@@ -1,0 +1,133 @@
+INFO:     Started server process [13592]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:62594 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50876 - "OPTIONS /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57342 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50876 - "OPTIONS /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51079 - "OPTIONS /api/v1/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62252 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57342 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57342 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57342 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57342 - "GET /api/v1/properties/mine HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:51079 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57342 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57342 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57274 - "GET /api/v1/properties/mine HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:60031 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60031 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59641 - "OPTIONS /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60031 - "GET /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63883 - "OPTIONS /api/v1/properties/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50457 - "PATCH /api/v1/properties/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50457 - "GET /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52980 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50457 - "GET /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52911 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52913 - "GET /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52915 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52905 - "OPTIONS /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53929 - "OPTIONS /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52826 - "GET /api/v1/properties/mine HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:64414 - "GET /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:53929 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64414 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54679 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59899 - "GET /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62475 - "OPTIONS /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57287 - "GET /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:62475 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57287 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57287 - "GET /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53975 - "OPTIONS /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54267 - "OPTIONS /api/v1/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59102 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52600 - "GET /api/v1/properties/mine HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:54267 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52600 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59102 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52600 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52600 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52600 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56577 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60498 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49176 - "OPTIONS /api/v1/properties/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54137 - "GET /api/v1/properties/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63428 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49944 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49944 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49944 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49944 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49944 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51222 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52760 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52760 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52760 - "GET /api/v1/properties/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65247 - "OPTIONS /api/v1/properties/3e255843-4d83-4346-ab41-91ff8d79432e/enquire HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65373 - "POST /api/v1/properties/3e255843-4d83-4346-ab41-91ff8d79432e/enquire HTTP/1.1" 201 Created
+INFO:     127.0.0.1:65327 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65327 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65327 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65327 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65327 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65327 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53808 - "OPTIONS /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58209 - "GET /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55722 - "GET /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51330 - "GET /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64969 - "OPTIONS /api/v1/properties/3e255843-4d83-4346-ab41-91ff8d79432e/close HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58641 - "POST /api/v1/properties/3e255843-4d83-4346-ab41-91ff8d79432e/close HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58641 - "GET /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50918 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50918 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50918 - "GET /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59238 - "OPTIONS /api/v1/properties/3e255843-4d83-4346-ab41-91ff8d79432e/reopen HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50918 - "POST /api/v1/properties/3e255843-4d83-4346-ab41-91ff8d79432e/reopen HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50918 - "GET /api/v1/properties/mine/3e255843-4d83-4346-ab41-91ff8d79432e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63541 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63541 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52183 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55425 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55425 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55425 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55425 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65387 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65387 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65387 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65387 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65387 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65387 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55867 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65387 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65387 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65387 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65387 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55066 - "OPTIONS /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62476 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55066 - "OPTIONS /api/v1/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52284 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62476 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62476 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62476 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62476 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55760 - "OPTIONS /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61776 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55182 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61776 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61776 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61776 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61776 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61209 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55685 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55685 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55685 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55685 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55685 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62701 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55685 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55685 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55685 - "GET /api/v1/leads HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55685 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55685 - "GET /api/v1/leads HTTP/1.1" 404 Not Found

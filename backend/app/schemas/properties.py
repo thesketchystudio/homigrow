@@ -8,7 +8,7 @@ from datetime import date, datetime
 from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from app.models.enums import (
     Furnishing,
@@ -23,6 +23,26 @@ from app.models.enums import (
     VerificationStatus,
 )
 from app.schemas._pagination import PaginatedResponse
+
+
+DESCRIPTION_MAX_WORDS = 250
+
+
+def _validate_description_length(value: Optional[str]) -> Optional[str]:
+    """
+    Caps a listing description at DESCRIPTION_MAX_WORDS words. The limit is
+    word-based (not character-based) to match the counter the Post Property
+    and Edit Listing forms show, so the two can't disagree. Blank input is
+    normalised to None so an empty textarea doesn't store an empty string.
+    """
+    if value is None:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    if len(value.split()) > DESCRIPTION_MAX_WORDS:
+        raise ValueError(f"Description must be {DESCRIPTION_MAX_WORDS} words or fewer")
+    return value
 
 
 class PropertyMediaRead(BaseModel):
@@ -305,6 +325,7 @@ class PropertyCreateRequest(BaseModel):
     """
 
     title: str = Field(min_length=1, max_length=200)
+    description: Optional[str] = None
     listing_type: ListingType
     property_type: PropertyType
     bhk: Optional[int] = None
@@ -338,6 +359,11 @@ class PropertyCreateRequest(BaseModel):
     registration_fee_percent: Optional[float] = Field(default=None, ge=0)
     brokerage_included: bool = True
     brokerage_percent: Optional[float] = Field(default=None, ge=0)
+
+    @field_validator("description")
+    @classmethod
+    def _check_description(cls, value: Optional[str]) -> Optional[str]:
+        return _validate_description_length(value)
 
 
 class PropertyUpdateRequest(BaseModel):
@@ -389,3 +415,8 @@ class PropertyUpdateRequest(BaseModel):
     registration_fee_percent: Optional[float] = Field(default=None, ge=0)
     brokerage_included: Optional[bool] = None
     brokerage_percent: Optional[float] = Field(default=None, ge=0)
+
+    @field_validator("description")
+    @classmethod
+    def _check_description(cls, value: Optional[str]) -> Optional[str]:
+        return _validate_description_length(value)
