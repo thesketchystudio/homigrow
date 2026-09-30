@@ -208,6 +208,7 @@ export function getNeighborhoods(limit = 4): Promise<NeighborhoodSummary[]> {
 // app/schemas/properties.py for the full reasoning.
 export type PropertyCreateInput = {
   title: string;
+  description?: string;
   listing_type: ListingType;
   property_type: PropertyType;
   bhk?: number;

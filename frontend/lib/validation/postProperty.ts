@@ -136,9 +136,22 @@ export const pgDetailsSchema = z.object({
 });
 export type PGDetailsValues = z.infer<typeof pgDetailsSchema>;
 
+export const DESCRIPTION_MAX_WORDS = 250;
+
+// Whitespace-delimited word count; shared by the description counter and
+// the schema so the UI and validation can never disagree.
+export function countWords(text: string | undefined): number {
+  const trimmed = (text ?? "").trim();
+  return trimmed ? trimmed.split(/\s+/).length : 0;
+}
+
 export const propertyInfoSchema = z.object({
   listing_type: z.enum([ListingType.sale, ListingType.rent]),
   title: z.string().trim().min(1, "Listing title is required").max(200),
+  description: z
+    .string()
+    .optional()
+    .refine((value) => countWords(value) <= DESCRIPTION_MAX_WORDS, `Description must be ${DESCRIPTION_MAX_WORDS} words or fewer`),
   property_type: z.enum(POSTABLE_PROPERTY_TYPES, { error: "Select a property type" }),
   built_year: z.number().int().min(1900).max(new Date().getFullYear()).optional(),
   bhk: z.number().int().min(1).max(20).optional(),
