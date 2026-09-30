@@ -31,7 +31,7 @@ import { FONT_HEADING as sg } from "@/lib/fonts";
 
 const NAV_LINK_HREFS: Record<string, string> = {
   Discover: "/properties",
-  "AI Tools": "/ai-tools",
+  "Tools": "/ai-tools",
   Saved: "/saved",
   Compare: "/compare",
 };
@@ -132,7 +132,7 @@ export default function TopNavBar() {
         </Link>
 
         <div style={{ display: "flex", gap: 32, alignItems: "center" }} className="desktop-only">
-          {["Discover", "AI Tools", "Compare", "Saved"].map((link) => (
+          {["Discover", "Tools", "Compare", "Saved"].map((link) => (
             <Link
               key={link}
               href={NAV_LINK_HREFS[link] ?? "#"}
@@ -249,7 +249,7 @@ export default function TopNavBar() {
           className="mobile-only"
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {["Discover", "AI Tools", "Compare", "Saved"].map((link) => (
+            {["Discover", "Tools", "Compare", "Saved"].map((link) => (
               <Link
                 key={link}
                 href={NAV_LINK_HREFS[link] ?? "#"}
