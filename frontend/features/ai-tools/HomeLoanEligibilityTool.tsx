@@ -29,7 +29,7 @@ export function HomeLoanEligibilityTool() {
   }, [income, existingEmis, rate, tenure]);
 
   return (
-    <ToolPageShell category="Finance & Yield" title="Home Loan Eligibility">
+    <ToolPageShell slug="home-loan-eligibility" title="Home Loan Eligibility">
       <div className="grid grid-cols-1 gap-8 rounded-2xl border border-brand-secondary-500 bg-brand-secondary-100 p-6 shadow-sm sm:grid-cols-2 sm:p-10">
         <div className="flex flex-col gap-6">
           <ToolSlider

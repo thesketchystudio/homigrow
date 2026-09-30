@@ -6,73 +6,8 @@
 // signup flow) so it's static markup only, matching the "coming soon"
 // treatment other unbuilt CTAs use elsewhere in the app.
 
-import Link from "next/link";
-import { LayoutGrid, MapPin, Scale, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
-
-interface ToolCard {
-  slug: string;
-  title: string;
-  category: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
-const TOOLS: ToolCard[] = [
-  {
-    slug: "loan-calculator",
-    title: "Loan Calculator",
-    category: "Finance & Yield",
-    description:
-      "Calculate total loan costs including principal, interest, and fees. Compare loan scenarios side-by-side to choose the best financing option for your property.",
-    icon: TrendingUp,
-  },
-  {
-    slug: "home-loan-eligibility",
-    title: "Home Loan Eligibility",
-    category: "Finance & Yield",
-    description:
-      "Estimate the maximum home loan amount you qualify for based on income, existing obligations, and lender norms across major Indian banks.",
-    icon: ShieldCheck,
-  },
-  {
-    slug: "emi-calculator",
-    title: "EMI Calculator",
-    category: "Finance & Yield",
-    description:
-      "Break down your monthly EMI into principal and interest components with an amortisation schedule across the full loan tenure.",
-    icon: Sparkles,
-  },
-  {
-    slug: "property-tax-calculator",
-    title: "Property Tax Calculator",
-    category: "Due Diligence",
-    description:
-      "Compute annual municipal property tax liability for residential and commercial properties across Bengaluru, Mumbai, and Delhi NCR.",
-    icon: Scale,
-  },
-  {
-    slug: "area-unit-converter",
-    title: "Area Unit Converter",
-    category: "Discovery AI",
-    description: "Convert between sq ft, sq m, sq yard, acres, cents, guntas, and more. Handles all regional Indian land measurement units accurately.",
-    icon: LayoutGrid,
-  },
-  {
-    slug: "rent-vs-buy-calculator",
-    title: "Rent vs Buy Calculator",
-    category: "Finance & Yield",
-    description:
-      "Model the long-term financial outcome of renting versus buying, accounting for appreciation, tax benefits, opportunity cost, and maintenance.",
-    icon: MapPin,
-  },
-  {
-    slug: "interior-cost-estimator",
-    title: "Home Interior Cost Estimator",
-    category: "3D Curation",
-    description: "Estimate interior fit-out budgets by room, material grade, and finish level. Get itemised breakdowns for modular kitchens, flooring, and more.",
-    icon: ShieldCheck,
-  },
-];
+import { TOOLS } from "./toolsCatalog";
+import { ToolCardLink } from "./ToolCardLink";
 
 export function ToolsHub() {
   return (
@@ -96,28 +31,9 @@ export function ToolsHub() {
         </div>
 
         <div className="grid w-full max-w-350 grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {TOOLS.map((tool) => {
-            const Icon = tool.icon;
-            return (
-              <Link
-                key={tool.slug}
-                href={`/ai-tools/${tool.slug}`}
-                className="flex flex-col gap-6 rounded-2xl border border-brand-secondary-500 bg-brand-secondary-100 p-8 transition-shadow hover:shadow-md"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="flex shrink-0 items-center justify-center rounded-lg bg-brand-green-200 p-3">
-                    <Icon className="size-6 text-brand-green-900" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="font-heading text-[18px] font-bold text-brand-primary-500">{tool.title}</span>
-                    <span className="font-body text-[12px] text-brand-primary-100">{tool.category}</span>
-                  </div>
-                </div>
-                <p className="font-body flex-1 text-[14px] leading-[22px] text-brand-primary-600/80">{tool.description}</p>
-                <span className="font-heading text-[14px] font-bold text-brand-primary-600">Open tool →</span>
-              </Link>
-            );
-          })}
+          {TOOLS.map((tool) => (
+            <ToolCardLink key={tool.slug} tool={tool} />
+          ))}
         </div>
       </section>
 

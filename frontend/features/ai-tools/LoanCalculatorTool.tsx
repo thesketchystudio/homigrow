@@ -2,16 +2,13 @@
 // Loan Calculator tool screen (Figma node 735:1495/1496) — near-duplicate
 // of EmiCalculatorTool.tsx's math (both use lib/finance.ts's calculateEmi)
 // but with a principal/interest "Breakup" bar instead of an amortisation
-// schedule, per the design. "Download report" has no backing PDF
-// generation, so it surfaces a toast, matching PropertyLoanCalculator's
-// "coming soon" treatment for its own unbuilt actions.
+// schedule, per the design.
 
 "use client";
 
 import { useMemo, useState } from "react";
 
 import { calculateEmi, formatRupees } from "@/lib/finance";
-import { toast } from "@/lib/toast";
 
 import { ResultCard } from "./ResultCard";
 import { ToolPageShell } from "./ToolPageShell";
@@ -26,16 +23,8 @@ export function LoanCalculatorTool() {
   const principalPct = totalPayment > 0 ? (amount / totalPayment) * 100 : 0;
 
   return (
-    <ToolPageShell category="Finance & Yield" title="Loan Calculator">
-      <div className="flex flex-col items-end gap-4">
-        <button
-          type="button"
-          onClick={() => toast.info("Report download isn't available yet — check back soon.")}
-          className="rounded bg-brand-primary-800 px-8 py-3.5 font-heading text-[16px] font-bold text-brand-secondary-100"
-        >
-          Download report
-        </button>
-
+    <ToolPageShell slug="loan-calculator" title="Loan Calculator">
+      <div className="flex flex-col gap-4">
         <div className="flex w-full flex-col gap-8 rounded-2xl border border-brand-secondary-500 bg-brand-secondary-100 p-6 shadow-sm sm:p-10">
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
             <div className="flex flex-col gap-6">

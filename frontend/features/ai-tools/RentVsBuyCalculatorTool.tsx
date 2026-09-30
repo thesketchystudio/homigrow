@@ -30,7 +30,7 @@ export function RentVsBuyCalculatorTool() {
   const buyingIsCheaper = result.saving > 0;
 
   return (
-    <ToolPageShell category="Finance & Yield" title="Rent vs Buy Calculator">
+    <ToolPageShell slug="rent-vs-buy-calculator" title="Rent vs Buy Calculator">
       <div className="grid grid-cols-1 gap-8 rounded-2xl border border-brand-secondary-500 bg-brand-secondary-100 p-6 shadow-sm sm:grid-cols-2 sm:p-10">
         <div className="flex flex-col gap-5">
           <p className="font-heading text-[12px] font-bold tracking-[1.2px] text-brand-primary-200 uppercase">Buying</p>

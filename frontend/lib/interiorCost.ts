@@ -1,9 +1,9 @@
 // lib/interiorCost.ts
 // Cost model for the Home Interior Cost Estimator tool. Most rooms cost
 // `area (sqft) × the selected grade's rate/sqft`; Modular Kitchen is the
-// one exception — its cost is a flat per-grade package price rather than
-// area-based (verified against the reference build across all 4 grades:
-// the ratio to rate isn't constant, so it isn't an area×rate formula).
+// one exception — it is priced as a per-grade package for a standard
+// 80 sqft kitchen (the ratio to the grade rate isn't constant, so it isn't
+// an area×rate formula) and scales proportionally when the area differs.
 // Professional fees (12%) and miscellaneous (8%) are added on top of the
 // sum of included rooms.
 
@@ -16,6 +16,8 @@ export const FINISH_GRADES: { id: FinishGrade; label: string; ratePerSqft: numbe
   { id: "ultra", label: "Ultra-luxury", ratePerSqft: 6500 },
 ];
 
+const MODULAR_KITCHEN_BASE_AREA_SQFT = 80;
+
 const MODULAR_KITCHEN_COST: Record<FinishGrade, number> = {
   economy: 120000,
   midrange: 250000,
@@ -26,7 +28,7 @@ const MODULAR_KITCHEN_COST: Record<FinishGrade, number> = {
 export interface RoomDef {
   id: string;
   label: string;
-  /** Default sqft if area-based; undefined for the flat-fee kitchen. */
+  /** Default sqft the room is priced at. */
   defaultArea?: number;
   defaultChecked: boolean;
 }
@@ -36,7 +38,7 @@ export const INTERIOR_ROOMS: RoomDef[] = [
   { id: "master_bedroom", label: "Master Bedroom", defaultArea: 200, defaultChecked: true },
   { id: "bedroom_2", label: "Bedroom 2", defaultArea: 150, defaultChecked: true },
   { id: "bedroom_3", label: "Bedroom 3", defaultArea: 130, defaultChecked: true },
-  { id: "modular_kitchen", label: "Modular Kitchen", defaultChecked: true },
+  { id: "modular_kitchen", label: "Modular Kitchen", defaultArea: 80, defaultChecked: true },
   { id: "bathrooms", label: "Bathrooms", defaultArea: 80, defaultChecked: true },
   { id: "dining_area", label: "Dining Area", defaultArea: 150, defaultChecked: false },
   { id: "foyer", label: "Foyer / Entrance", defaultArea: 80, defaultChecked: false },
@@ -64,11 +66,14 @@ export interface InteriorCostResult {
 export function calculateInteriorCost(grade: FinishGrade, areas: Record<string, number>, checked: Record<string, boolean>): InteriorCostResult {
   const rate = FINISH_GRADES.find((g) => g.id === grade)!.ratePerSqft;
 
-  const lines: InteriorCostLine[] = INTERIOR_ROOMS.filter((room) => checked[room.id]).map((room) => ({
-    id: room.id,
-    label: room.label,
-    cost: room.id === "modular_kitchen" ? MODULAR_KITCHEN_COST[grade] : (areas[room.id] ?? room.defaultArea ?? 0) * rate,
-  }));
+  const lines: InteriorCostLine[] = INTERIOR_ROOMS.filter((room) => checked[room.id]).map((room) => {
+    const area = areas[room.id] ?? room.defaultArea ?? 0;
+    return {
+      id: room.id,
+      label: room.label,
+      cost: room.id === "modular_kitchen" ? (MODULAR_KITCHEN_COST[grade] * area) / MODULAR_KITCHEN_BASE_AREA_SQFT : area * rate,
+    };
+  });
 
   const base = lines.reduce((sum, line) => sum + line.cost, 0);
   const professionalFees = base * (PROFESSIONAL_FEES_PCT / 100);

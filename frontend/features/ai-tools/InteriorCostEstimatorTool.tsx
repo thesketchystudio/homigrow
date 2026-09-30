@@ -26,7 +26,7 @@ export function InteriorCostEstimatorTool() {
   const toggleRoom = (id: string) => setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
 
   return (
-    <ToolPageShell category="3D Curation" title="Home Interior Cost Estimator">
+    <ToolPageShell slug="interior-cost-estimator" title="Home Interior Cost Estimator">
       <div className="flex flex-col gap-8 rounded-2xl border border-brand-secondary-500 bg-brand-secondary-100 p-6 shadow-sm sm:p-10">
         <div className="flex flex-col gap-3">
           <span className="font-heading text-[14px] font-bold text-brand-primary-500">Finish Grade</span>
