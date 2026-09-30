@@ -1,10 +1,9 @@
 // features/broker/BrokerEmptyState.tsx
 // Figma "Blank screen" (node 643:22) — shown across the Broker Portal's
 // still-empty pages (Dashboard, Listings, Leads, Analytics) until each has
-// real data to show. The illustration is the flattened PNG export of that
-// Figma node (public/broker/empty-state.png) rather than hand-redrawn SVG
-// layers, per the design-to-code guidance to render every asset faithfully
-// rather than approximate it. "Add Listing" opens the wizard in a new tab,
+// real data to show. The illustration is the SVG export of that
+// Figma node's artwork group (public/broker/empty-state.svg), rendered as
+// exported rather than hand-redrawn. "Add Listing" opens the wizard in a new tab,
 // same as the sidebar's floating "+" button (see (broker)/broker/layout.tsx).
 
 import Image from "next/image";
@@ -24,7 +23,7 @@ export function BrokerEmptyState({
 
   return (
     <div className="flex flex-col items-center gap-8 py-20 text-center">
-      <Image src="/broker/empty-state.png" alt="" width={455} height={243} priority className="h-auto w-70 sm:w-91" />
+      <Image src="/broker/empty-state.svg" alt="" width={255} height={240} priority className="h-auto w-56 sm:w-64" />
       <div className="flex flex-col gap-3">
         <h1 className="font-heading text-[28px] font-bold text-foreground">Welcome {firstName}!</h1>
         <p className="font-body text-[16px] text-muted-foreground">{body}</p>
