@@ -36,27 +36,30 @@ export function BrokerPendingStep() {
         </div>
       </div>
 
-      <div className="flex w-full flex-col gap-2 rounded-lg border border-brand-green-300 bg-brand-green-100 px-5 py-2">
-        {CHECKLIST.map(({ label, state }) => (
-          <div key={label} className="flex items-center justify-center gap-3 py-2">
-            <div
-              className={cn(
-                "flex size-5 items-center justify-center rounded-full",
-                state === "done" ? "bg-brand-green-600" : state === "in_progress" ? "bg-brand-green-600/35" : "bg-brand-secondary-700",
-              )}
-            >
-              {state === "done" && <Check size={14} className="text-background" />}
+      <div className="flex w-full justify-center rounded-lg border border-brand-green-300 bg-brand-green-100 px-5 py-2">
+        {/* Rows are left-aligned inside one centered block so every icon sits in the same column, regardless of label width. */}
+        <div className="flex flex-col gap-2">
+          {CHECKLIST.map(({ label, state }) => (
+            <div key={label} className="flex items-center gap-3 py-2">
+              <div
+                className={cn(
+                  "flex size-5 shrink-0 items-center justify-center rounded-full",
+                  state === "done" ? "bg-brand-green-600" : state === "in_progress" ? "bg-brand-green-600/35" : "bg-brand-secondary-700",
+                )}
+              >
+                {state === "done" && <Check size={14} className="text-background" />}
+              </div>
+              <span
+                className={cn(
+                  "font-heading text-[16px]",
+                  state === "pending" ? "text-brand-secondary-700" : "text-foreground",
+                )}
+              >
+                {label}
+              </span>
             </div>
-            <span
-              className={cn(
-                "font-heading text-[16px]",
-                state === "pending" ? "text-brand-secondary-700" : "text-foreground",
-              )}
-            >
-              {label}
-            </span>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       <Link href="/" className="font-heading text-[14px] font-semibold text-foreground underline">

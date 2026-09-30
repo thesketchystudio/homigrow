@@ -12,6 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { AuthTextField } from "@/components/forms/AuthTextField";
 import { AuthSelectField } from "@/components/forms/AuthSelectField";
+import { Textarea } from "@/components/ui/textarea";
 import { PostPropertyStepper, type StepKey } from "@/features/broker/post-property/PostPropertyStepper";
 import { FreePlanUsageBar } from "@/features/broker/post-property/FreePlanUsageBar";
 import { PropertySpecificationsSidebar } from "@/features/broker/post-property/PropertySpecificationsSidebar";
@@ -31,6 +32,8 @@ import {
   RESIDENTIAL_PROPERTY_TYPES,
   SELL_PROPERTY_TYPE_GROUPS,
   type PropertyInfoValues,
+  DESCRIPTION_MAX_WORDS,
+  countWords,
 } from "@/lib/validation/postProperty";
 
 const AMENITY_OPTIONS = [
@@ -81,6 +84,7 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
   });
 
   const listingType = watch("listing_type");
+  const descriptionWords = countWords(watch("description"));
   const propertyType = watch("property_type");
   const amenities = watch("amenities") ?? [];
   const landApprovals = watch("land_details.approvals") ?? [];
@@ -170,6 +174,24 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
             error={errors.title?.message}
             labelClassName={labelClassName}
           />
+
+          <div className="flex flex-col gap-4">
+            <label htmlFor="listing-description" className={labelClassName}>
+              Description
+            </label>
+            <Textarea
+              id="listing-description"
+              {...register("description")}
+              placeholder="Describe your property, highlight unique features, nearby landmarks, etc."
+              className="min-h-[214px] resize-none rounded-lg border-border"
+            />
+            <div className="flex items-start justify-between gap-4">
+              <p className="text-[12px] text-destructive">{errors.description?.message}</p>
+              <span className={cn("shrink-0 font-heading text-[14px]", descriptionWords > DESCRIPTION_MAX_WORDS ? "text-destructive" : "text-muted-foreground")}>
+                {descriptionWords}/{DESCRIPTION_MAX_WORDS} words
+              </span>
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
             <AuthSelectField

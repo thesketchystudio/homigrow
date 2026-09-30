@@ -26,6 +26,7 @@ import { PostPropertyStepper, type StepKey } from "@/features/broker/post-proper
 import { FreePlanUsageBar } from "@/features/broker/post-property/FreePlanUsageBar";
 import { ListingType, PAYMENT_STRUCTURE_LABELS, PaymentStructure, PRICE_FLEXIBILITY_LABELS, PriceFlexibility } from "@/lib/enums";
 import { cn } from "@/lib/utils";
+import { computePriceSummary } from "@/lib/priceSummary";
 import { propertyPricingSchema, type PropertyPricingValues } from "@/lib/validation/postProperty";
 
 type PricingStepProps = {
@@ -59,6 +60,18 @@ function formatInr(value: number): string {
 }
 
 const fieldLabelClassName = "font-heading text-[10px] font-bold uppercase tracking-[1px] text-brand-primary-600/80";
+
+// One label/value line of the Price Summary card. `muted` marks reference
+// figures (per-sq-ft rate, token, recurring maintenance) that are shown but
+// deliberately not part of the total.
+function SummaryRow({ label, value, muted = false }: { label: string; value: string; muted?: boolean }) {
+  return (
+    <div className="flex items-center justify-between font-body text-[13px]">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={cn("font-bold", muted ? "text-muted-foreground" : "text-foreground")}>{value}</span>
+    </div>
+  );
+}
 
 function PriceField({
   label,
@@ -160,7 +173,17 @@ export function PricingStep({ listingType, defaultValues, onBack, onContinue, on
   const stampDutyPercent = watch("stamp_duty_percent");
   const registrationFeePercent = watch("registration_fee_percent");
   const brokeragePercent = watch("brokerage_percent");
-  const totalCost = price + (pricePerSqft ?? 0) + (tokenAmount ?? 0);
+  const summary = computePriceSummary({
+    isRent,
+    price,
+    tokenAmount,
+    deposit,
+    maintenanceMonthly,
+    stampDutyPercent,
+    registrationFeePercent,
+    brokerageIncluded,
+    brokeragePercent,
+  });
 
   const onFormSubmit = handleSubmit(onContinue);
 
@@ -332,32 +355,25 @@ export function PricingStep({ listingType, defaultValues, onBack, onContinue, on
           <div className="flex flex-col gap-5 rounded-lg bg-muted p-7 shadow-sm">
             <h2 className="font-heading text-[14px] font-medium uppercase tracking-[1.4px] text-foreground">Price Summary</h2>
             <div className="flex flex-col gap-2.5">
-              <div className="flex items-center justify-between font-body text-[13px]">
-                <span className="text-muted-foreground">Base Price</span>
-                <span className="font-bold text-foreground">{formatInr(price)}</span>
-              </div>
-              {pricePerSqft !== undefined && (
-                <div className="flex items-center justify-between font-body text-[13px]">
-                  <span className="text-muted-foreground">Price / Sq. Ft.</span>
-                  <span className="font-bold text-foreground">{formatInr(pricePerSqft)}</span>
-                </div>
+              <SummaryRow label={isRent ? "Monthly Rent" : "Base Price"} value={formatInr(summary.basePrice)} />
+              {summary.stampDuty > 0 && <SummaryRow label={`Stamp Duty (${stampDutyPercent}%)`} value={formatInr(summary.stampDuty)} />}
+              {summary.registrationFee > 0 && (
+                <SummaryRow label={`Registration Fee (${registrationFeePercent}%)`} value={formatInr(summary.registrationFee)} />
               )}
-              {tokenAmount !== undefined && (
-                <div className="flex items-center justify-between font-body text-[13px]">
-                  <span className="text-muted-foreground">Token Amount</span>
-                  <span className="font-bold text-foreground">{formatInr(tokenAmount)}</span>
-                </div>
-              )}
-              {maintenanceMonthly !== undefined && (
-                <div className="flex items-center justify-between font-body text-[13px]">
-                  <span className="text-muted-foreground">Maintenance</span>
-                  <span className="font-bold text-foreground">{formatInr(maintenanceMonthly)}/mo</span>
-                </div>
+              {summary.deposit > 0 && <SummaryRow label="Security Deposit" value={formatInr(summary.deposit)} />}
+              {summary.brokerage > 0 && (
+                <SummaryRow
+                  label={`Brokerage (${brokeragePercent}%)`}
+                  value={summary.brokerageAddedToTotal ? formatInr(summary.brokerage) : "Included"}
+                />
               )}
               <div className="flex items-center justify-between border-t border-border pt-3 font-body text-[13px]">
                 <span className="text-muted-foreground">{isRent ? "Total Cost to Tenant" : "Total Cost to Buyer"}</span>
-                <span className="font-bold text-foreground">{formatInr(totalCost)}</span>
+                <span className="font-bold text-foreground">{formatInr(summary.total)}</span>
               </div>
+              {pricePerSqft !== undefined && <SummaryRow label="Price / Sq. Ft." value={formatInr(pricePerSqft)} muted />}
+              {tokenAmount !== undefined && <SummaryRow label="Token Amount (part of price)" value={formatInr(tokenAmount)} muted />}
+              {maintenanceMonthly !== undefined && <SummaryRow label="Maintenance (recurring)" value={`${formatInr(maintenanceMonthly)}/mo`} muted />}
             </div>
           </div>
 
