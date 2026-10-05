@@ -13,6 +13,7 @@ import ErrorState from "@/components/shared/ErrorState";
 import { PropertyHeroGallery } from "@/features/properties/PropertyHeroGallery";
 import { PropertyHeader } from "@/features/properties/PropertyHeader";
 import { PropertyDescription } from "@/features/properties/PropertyDescription";
+import { PropertyPricePredictor } from "@/features/properties/PropertyPricePredictor";
 import { PropertyVaastuChecker } from "@/features/properties/PropertyVaastuChecker";
 import { PropertyAmenities } from "@/features/properties/PropertyAmenities";
 import { PropertyContactCard } from "@/features/properties/PropertyContactCard";
@@ -56,6 +57,7 @@ export default function PropertyDetailsPage() {
           <PropertyVaastuChecker />
           <PropertyDescription description={property.description} />
           <PropertyAmenities amenities={property.amenities} />
+          <PropertyPricePredictor />
         </div>
         <div className="w-full shrink-0 lg:w-[378px]">
           <PropertyContactCard property={property} />
