@@ -2,8 +2,7 @@
 // "Where would you like to build your future?" — a dropdown (same
 // CITY_NAMES list and underline-select styling as the signup form's City
 // field) that adds a city to the selection on pick. Selected cities render
-// below as black-fill tags with a remove "X", matching PillGroup's
-// "compact" variant (bedroom-count pills in PropertyTypeStep). Nothing
+// below as green-fill tags with a remove "X". Nothing
 // renders below the dropdown until at least one city is selected.
 
 import { X } from "lucide-react";
@@ -50,7 +49,7 @@ export function CityMultiSelectChips({ value, onChange }: CityMultiSelectChipsPr
               key={city}
               type="button"
               onClick={() => removeCity(city)}
-              className="flex items-center gap-1.5 rounded bg-brand-primary-600 px-6 py-2 font-heading text-[16px] font-medium text-brand-secondary-400"
+              className="flex items-center gap-1.5 rounded bg-brand-green-500 px-6 py-2 font-heading text-[16px] font-medium text-brand-primary-400"
             >
               {city}
               <X size={12} strokeWidth={3} />
