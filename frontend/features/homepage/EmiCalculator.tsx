@@ -5,6 +5,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 
 import { buildAmortizationSchedule, calculateEmi } from "@/lib/finance";
 
@@ -226,20 +228,23 @@ export function EmiCalculatorSection() {
               EMI Calculator
             </h2>
           </div>
-          <p
+          <Link
+            href="/ai-tools"
             style={{
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              fontWeight: 400,
-              fontSize: 15,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 9,
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 700,
+              fontSize: 16,
               lineHeight: "24px",
-              color: "rgba(254,254,255,0.45)",
-              maxWidth: 400,
-              textAlign: "right",
-              margin: 0,
+              color: "#fefeff",
+              textDecoration: "none",
             }}
           >
-            Plan your home purchase with clarity before you commit.
-          </p>
+            More tools
+            <ArrowRight size={17} />
+          </Link>
         </div>
 
         <div className="grid-2" style={{ gap: "clamp(24px, 4vw, 48px)" }}>
@@ -254,6 +259,18 @@ export function EmiCalculatorSection() {
               gap: 36,
             }}
           >
+            <p
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 400,
+                fontSize: 16,
+                lineHeight: "24px",
+                color: "#fefeff",
+                margin: 0,
+              }}
+            >
+              Plan your home purchase with clarity before you commit.
+            </p>
             <SliderField
               label="Loan Amount"
               value={principal}
