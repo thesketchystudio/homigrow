@@ -4,6 +4,8 @@
 
 import "@/features/homepage/homepage.css";
 
+import { Suspense } from "react";
+
 import { CompareDrawer } from "@/components/shared/CompareDrawer";
 import Footer from "@/components/shared/Footer";
 import TopNavBar from "@/components/shared/TopNavBar";
@@ -14,7 +16,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       <TopNavBar />
       {children}
       <Footer />
-      <CompareDrawer />
+      <Suspense fallback={null}>
+        <CompareDrawer />
+      </Suspense>
     </div>
   );
 }
