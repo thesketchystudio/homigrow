@@ -150,7 +150,15 @@ function PropertiesListingsContent() {
 
   return (
     <div className="mx-auto flex max-w-350 flex-col gap-8 px-6 pt-28 pb-20 lg:flex-row lg:gap-0">
-      <FilterSidebar filters={filters} onChange={updateFilters} className="hidden lg:flex" />
+      {/* The grey column spans the full results height; the filters inside it stay pinned
+          below the nav and scroll on their own when taller than the viewport. */}
+      <div className="hidden w-[320px] shrink-0 bg-brand-secondary-400 lg:block">
+        <FilterSidebar
+          filters={filters}
+          onChange={updateFilters}
+          className="sticky top-24 flex max-h-[calc(100vh-6rem)] overflow-y-auto overflow-x-hidden bg-transparent scrollbar-none"
+        />
+      </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-8 lg:px-12 lg:py-8">
         <ListingsToolbar
