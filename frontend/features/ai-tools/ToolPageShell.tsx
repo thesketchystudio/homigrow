@@ -18,7 +18,7 @@ export function ToolPageShell({ slug, title, children }: { slug: string; title: 
   return (
     <div className="flex flex-col items-center bg-brand-secondary-400 px-6 pt-32 pb-16 sm:px-16 lg:px-[150px]">
       <div className="flex w-full max-w-[1100px] flex-col gap-[72px]">
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-8">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div className="flex flex-col gap-4">
@@ -38,14 +38,14 @@ export function ToolPageShell({ slug, title, children }: { slug: string; title: 
             {children}
           </div>
 
-          <div className="flex flex-col gap-4 rounded-2xl border border-brand-secondary-500 bg-brand-green-200 p-6 shadow-sm">
+          <div className="flex flex-col gap-4 rounded-2xl border border-brand-secondary-500 bg-brand-green-200 p-6 shadow-[0px_4px_8px_0px_rgba(0,0,0,0.06)]">
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-center rounded-lg bg-brand-green-200 p-2">
                 <Info className="size-5 text-brand-primary-500" />
               </div>
               <p className="font-heading text-[16px] font-bold text-brand-primary-500">Important Disclaimer</p>
             </div>
-            <p className="font-body text-[14px] leading-[22px] text-brand-primary-600/80">
+            <p className="max-w-[760px] font-body text-[14px] leading-[22px] text-brand-primary-600/80">
               Results are estimates only and may vary based on property details, location, market conditions, lender requirements, taxes, fees, and other
               factors. This information is for general guidance and is not financial, legal, tax, or real estate advice. Please contact a qualified real
               estate professional for an accurate assessment.
