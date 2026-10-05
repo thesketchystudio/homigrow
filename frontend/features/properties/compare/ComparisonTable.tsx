@@ -12,12 +12,26 @@
 // placeholder rather than fabricated numbers — same pattern as the
 // Details page's Vaastu/Market Context sections.
 
-import { Bath, BedDouble, Building2, Car, Check, Compass, IndianRupee, Layers, MapPin, Ruler } from "lucide-react";
+import { Bath, BedDouble, Building2, Car, Check, Compass, IndianRupee, Layers, MapPin, Ruler, TrendingUp } from "lucide-react";
 
 import { ComparisonAccordionSection, type ComparisonRow } from "./ComparisonAccordionSection";
 import type { PropertyRead } from "@/lib/api/endpoints/properties";
 import { PROPERTY_TYPE_LABELS } from "@/lib/enums";
 import { formatINR } from "@/lib/utils";
+
+// Scoring for the Property Health Score is not defined yet, so every property
+// shows this fixed value. The summary block is layout-only until the scoring
+// rules exist.
+// TODO: replace with a real per-property score once the formula is decided.
+const PLACEHOLDER_HEALTH_SCORE = 96;
+
+function HealthScoreBadge({ score }: { score: number }) {
+  return (
+    <span className="bg-brand-green-500 text-brand-primary-400 my-[3.75px] flex size-10 items-center justify-center rounded-full font-body text-[12px] font-medium">
+      {score}
+    </span>
+  );
+}
 
 function pricePerSqft(property: PropertyRead): string {
   if (!property.area_sqft || property.area_sqft === 0) return "—";
@@ -25,6 +39,15 @@ function pricePerSqft(property: PropertyRead): string {
 }
 
 export function ComparisonTable({ properties }: { properties: PropertyRead[] }) {
+  const summaryRows: ComparisonRow[] = [
+    {
+      key: "health_score",
+      label: "Property Health Score",
+      icon: <TrendingUp className="size-3" />,
+      values: properties.map((p) => <HealthScoreBadge key={p.id} score={PLACEHOLDER_HEALTH_SCORE} />),
+    },
+  ];
+
   const overviewRows: ComparisonRow[] = [
     {
       key: "price",
@@ -81,6 +104,7 @@ export function ComparisonTable({ properties }: { properties: PropertyRead[] }) 
 
   return (
     <div className="flex flex-col gap-6">
+      <ComparisonAccordionSection title="Summary" rows={summaryRows} />
       <ComparisonAccordionSection title="Overview" rows={overviewRows} />
       <ComparisonAccordionSection title="Amenities" rows={amenityRows} />
       <ComparisonAccordionSection title="Location" rows={locationRows} />
