@@ -95,7 +95,7 @@ export function PropertyAlertsSection() {
   const summaryTags = [...(budget ? [budget] : []), ...types, ...localities];
 
   return (
-    <section style={{ background: "#f8f9fa", fontFamily: "'Space Grotesk', sans-serif" }}>
+    <section style={{ background: "#232323", fontFamily: "'Space Grotesk', sans-serif" }}>
       <div className="section-inner">
         <div className="grid-2-wide" style={{ alignItems: "start" }}>
           <div>
@@ -106,7 +106,7 @@ export function PropertyAlertsSection() {
                 fontSize: 12,
                 letterSpacing: "1.2px",
                 textTransform: "uppercase",
-                color: "#575e70",
+                color: "#9c9c9c",
                 marginBottom: 10,
               }}
             >
@@ -118,11 +118,11 @@ export function PropertyAlertsSection() {
                 fontWeight: 500,
                 fontSize: 36,
                 lineHeight: "44px",
-                color: "#232323",
+                color: "#fefeff",
                 margin: "0 0 16px 0",
               }}
             >
-              The best homes don&apos;t wait. Neither should you.
+              Set your preferences and receive an alert the moment a matching home goes live.
             </h2>
             <p
               style={{
@@ -130,11 +130,11 @@ export function PropertyAlertsSection() {
                 fontWeight: 400,
                 fontSize: 16,
                 lineHeight: "26px",
-                color: "rgba(26,26,26,0.6)",
+                color: "#dfe0e1",
                 margin: "0 0 48px 0",
               }}
             >
-              Premium properties in Bengaluru list and sell within 4–7 days. Set your preferences and receive an alert the moment a matching home goes live.
+              Premium properties in Bengaluru list and sell within 4–7 days.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
@@ -160,7 +160,7 @@ export function PropertyAlertsSection() {
                       fontFamily: "'Space Grotesk', sans-serif",
                       fontWeight: 700,
                       fontSize: 18,
-                      color: "#1a1a1a",
+                      color: "#fefeff",
                       width: 80,
                       flexShrink: 0,
                     }}
@@ -172,7 +172,7 @@ export function PropertyAlertsSection() {
                       fontFamily: "'Plus Jakarta Sans', sans-serif",
                       fontWeight: 400,
                       fontSize: 15,
-                      color: "rgba(26,26,26,0.6)",
+                      color: "#dfe0e1",
                       lineHeight: "22px",
                     }}
                   >
