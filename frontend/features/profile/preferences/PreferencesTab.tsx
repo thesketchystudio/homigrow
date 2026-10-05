@@ -2,7 +2,7 @@
 // Preferences tab (Figma node 569:671): view mode first — every
 // BuyerPreferences field the signup wizard collected, rendered as
 // read-only OverflowChipsSection groups — with an "Edit preferences"
-// button (Figma node 569:679, bg #1a1a1a/brand-primary-600) that swaps
+// button (Figma node 569:679, outlined #707070/brand-primary-300) that swaps
 // in PreferencesEditForm. Figma's own mock only shows 3 categories
 // (Cities/Type of Home/Bedrooms) and a separate flat "Buyer Profile"
 // summary grid (Budget/Location/Property Type/Buyer Intent) — the
@@ -137,7 +137,7 @@ function PreferencesForm({ user }: { user: UserRead }) {
       <button
         type="button"
         onClick={enterEdit}
-        className="bg-brand-primary-600 text-background font-heading shrink-0 rounded px-4 py-2 text-[16px] font-bold whitespace-nowrap"
+        className="font-heading shrink-0 rounded border border-brand-primary-300 px-4 py-2 text-[16px] leading-6 font-bold whitespace-nowrap text-brand-primary-300"
       >
         Edit preferences
       </button>
