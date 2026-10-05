@@ -31,7 +31,7 @@ export function AuthTextField({ label, placeholder, type = "text", error, regist
         placeholder={placeholder}
         aria-invalid={Boolean(error)}
         className={cn(
-          "w-full border-b bg-transparent pb-[5px] pt-1 font-heading text-[20px] leading-[28px] text-foreground outline-none placeholder:text-brand-secondary-700",
+          "w-full border-b bg-transparent pb-[5px] pt-1 font-heading text-[16px] leading-[24px] text-foreground outline-none placeholder:text-brand-secondary-700",
           error ? "border-destructive" : "border-foreground focus:border-brand-green-600",
         )}
         {...register}
