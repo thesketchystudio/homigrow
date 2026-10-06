@@ -60,17 +60,19 @@ type StatCardProps = {
 
 function StatCard({ label, value, caption, captionTone }: StatCardProps) {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-brand-secondary-500 bg-brand-secondary-100 p-5">
-      <span className="font-body text-[14px] text-brand-primary-300">{label}</span>
-      <span className="font-heading text-[28px] font-bold text-brand-primary-400">{value}</span>
-      <span
-        className={cn(
-          "font-body text-[12px] font-medium",
-          captionTone === "positive" ? "text-brand-green-800" : captionTone === "negative" ? "text-destructive" : "text-muted-foreground",
-        )}
-      >
-        {caption}
-      </span>
+    <div className="flex flex-col gap-2 rounded-lg border border-brand-secondary-500 bg-brand-secondary-100 p-[21px]">
+      <span className="font-body text-[14px] leading-[22px] text-brand-primary-300">{label}</span>
+      <div className="flex flex-col gap-1">
+        <span className="font-heading text-[28px] font-bold leading-9 text-brand-primary-400">{value}</span>
+        <span
+          className={cn(
+            "font-body text-[12px] font-medium leading-[18px]",
+            captionTone === "positive" ? "text-brand-green-800" : captionTone === "negative" ? "text-destructive" : "text-muted-foreground",
+          )}
+        >
+          {caption}
+        </span>
+      </div>
     </div>
   );
 }
@@ -165,9 +167,8 @@ export function BrokerHomeDashboard() {
     {
       key: "actions",
       header: "Actions",
-      className: "text-right",
       render: (lead) => (
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-start gap-2">
           {lead.contact_phone ? (
             <Button variant="outline" size="icon" className="size-8" aria-label="Call lead" asChild>
               <a href={`tel:${lead.contact_phone}`}>
@@ -209,18 +210,18 @@ export function BrokerHomeDashboard() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Active Listings"
           value={String(stats.activeListings.length)}
           caption={`+${stats.activeThisWeek} this week`}
-          captionTone={stats.activeThisWeek > 0 ? "positive" : "neutral"}
+          captionTone="positive"
         />
         <StatCard
           label="New Leads"
           value={String(stats.newLeads)}
           caption={`+${stats.newLeadsLast24h} in the last 24 hours`}
-          captionTone={stats.newLeadsLast24h > 0 ? "positive" : "neutral"}
+          captionTone="positive"
         />
         <StatCard
           label="Total Views"
@@ -230,21 +231,14 @@ export function BrokerHomeDashboard() {
               ? "No prior period to compare"
               : `${analyticsData.kpis.total_views_change_pct > 0 ? "+" : ""}${analyticsData.kpis.total_views_change_pct}% vs last 30 days`
           }
-          captionTone={
-            !analyticsData || analyticsData.kpis.total_views_change_pct === null
-              ? "neutral"
-              : analyticsData.kpis.total_views_change_pct > 0
-                ? "positive"
-                : analyticsData.kpis.total_views_change_pct < 0
-                  ? "negative"
-                  : "neutral"
-          }
+          // Green like every other stat caption (Figma); only a real decline turns red.
+          captionTone={analyticsData && (analyticsData.kpis.total_views_change_pct ?? 0) < 0 ? "negative" : "positive"}
         />
         <StatCard
           label="Conversion Rate"
           value={stats.conversionRate === null ? "—" : `${stats.conversionRate.toFixed(1)}%`}
           caption={stats.conversionRate === null ? "No leads yet" : "Closed won ÷ total leads"}
-          captionTone={stats.conversionRate !== null && stats.conversionRate > 0 ? "positive" : "neutral"}
+          captionTone="positive"
         />
       </div>
 
@@ -256,6 +250,7 @@ export function BrokerHomeDashboard() {
           </Link>
         </div>
         <SharedTable
+          darkHeader
           columns={leadColumns}
           data={recentLeads}
           rowKey={(lead) => lead.id}

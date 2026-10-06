@@ -53,6 +53,9 @@ export type SharedTableProps<T> = {
   sort?: TableSort;
   onSortChange?: (key: string) => void;
   pagination?: TablePagination;
+  // Solid dark header row with light text (Figma Recent Leads table); the
+  // default keeps the plain header the other tables use.
+  darkHeader?: boolean;
 };
 
 const SKELETON_ROWS = 5;
@@ -71,6 +74,7 @@ export default function SharedTable<T>({
   sort,
   onSortChange,
   pagination,
+  darkHeader = false,
 }: SharedTableProps<T>) {
   const showToolbar = onSearchChange !== undefined || filtersSlot !== undefined;
 
@@ -93,12 +97,15 @@ export default function SharedTable<T>({
         </div>
       )}
 
-      <div className="rounded-lg border">
+      <div className={cn("rounded-lg border", darkHeader && "overflow-hidden")}>
         <TablePrimitive>
           <TableHeader>
-            <TableRow>
+            <TableRow className={cn(darkHeader && "bg-brand-primary-400 hover:bg-brand-primary-400")}>
               {columns.map((column) => (
-                <TableHead key={column.key} className={column.className}>
+                <TableHead
+                  key={column.key}
+                  className={cn(darkHeader && "font-body text-[12px] text-brand-secondary-100", column.className)}
+                >
                   {column.sortable && onSortChange ? (
                     <button
                       type="button"

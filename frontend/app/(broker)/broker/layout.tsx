@@ -23,7 +23,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { BarChart3, FileText, Home, UserRound, Users2 } from "lucide-react";
 
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import AppSidebar, { type SidebarNavGroup } from "@/components/shared/Sidebar";
+import AppSidebar, { type AppSidebarClassNames, type SidebarNavGroup } from "@/components/shared/Sidebar";
 import { AuthGuard } from "@/components/shared/AuthGuard";
 import { useAuthStore } from "@/lib/stores/auth";
 import { UserRole } from "@/lib/enums";
@@ -44,7 +44,19 @@ const NAV_GROUPS: SidebarNavGroup[] = [
 
 // Pages that render real content (or their own empty state) regardless of
 // listing count; any other nav href falls back to the "coming soon" toast.
-const BUILT_ROUTES = new Set(["/broker/dashboard", "/broker/listings", "/broker/leads", "/broker/analytics", "/broker/profile"]);
+// Spacing and type from the Figma broker sidebar: a 76px logo header, nav items
+// flush beneath it (37px tall, 2px apart, 6px radius, 16px muted text), and a
+// 70px footer separated by a hairline.
+const BROKER_SIDEBAR_CLASSNAMES: AppSidebarClassNames = {
+  header: "p-6",
+  content: "gap-0",
+  group: "px-3 py-0",
+  menu: "gap-0.5",
+  item: "h-[37px] gap-3 rounded-[6px] px-3 py-2 text-brand-primary-300 [&>svg]:size-[18px]",
+  footer: "h-[70px] gap-0 border-t border-[#f3f4f6] px-4 pt-[17px]",
+};
+
+const BUILT_ROUTES =new Set(["/broker/dashboard", "/broker/listings", "/broker/leads", "/broker/analytics", "/broker/profile"]);
 
 export default function BrokerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -55,12 +67,22 @@ export default function BrokerLayout({ children }: { children: React.ReactNode }
     <AuthGuard allowedRoles={[UserRole.broker]}>
       <div
         className="contents"
-        style={{ "--sidebar-accent": "var(--brand-primary-400)", "--sidebar-accent-foreground": "var(--brand-secondary-400)" } as React.CSSProperties}
+        // Selected item is the dark brand fill (Figma); hover is a light grey so
+        // the two states stay distinguishable.
+        style={
+          {
+            "--sidebar-accent": "var(--brand-secondary-500)",
+            "--sidebar-accent-foreground": "var(--brand-primary-400)",
+            "--sidebar-active": "var(--brand-primary-400)",
+            "--sidebar-active-foreground": "var(--brand-secondary-400)",
+          } as React.CSSProperties
+        }
       >
         <SidebarProvider>
           <AppSidebar
             groups={NAV_GROUPS}
             activeRoute={pathname}
+            classNames={BROKER_SIDEBAR_CLASSNAMES}
             onNavigate={(href) => {
               if (BUILT_ROUTES.has(href)) {
                 router.push(href);
@@ -69,7 +91,7 @@ export default function BrokerLayout({ children }: { children: React.ReactNode }
               }
             }}
             header={
-              <div className="flex items-center gap-2 px-2 py-1">
+              <div className="flex items-center gap-2">
                 <div className="flex size-7 items-center justify-center rounded-[4px] bg-brand-primary-400">
                   <span className="font-heading text-[13px] font-bold text-brand-secondary-400">H</span>
                 </div>
@@ -77,7 +99,7 @@ export default function BrokerLayout({ children }: { children: React.ReactNode }
               </div>
             }
             footer={
-              <div className="flex items-center gap-3 border-t border-sidebar-border px-2 py-3">
+              <div className="flex items-center gap-3">
                 <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-secondary-400">
                   <span className="font-heading text-[16px] font-medium text-brand-primary-400">{initials(user?.full_name)}</span>
                 </div>
@@ -90,7 +112,7 @@ export default function BrokerLayout({ children }: { children: React.ReactNode }
               </div>
             }
           />
-          <SidebarInset>
+          <SidebarInset className="bg-secondary">
             <main className="relative flex-1 p-6">{children}</main>
           </SidebarInset>
         </SidebarProvider>

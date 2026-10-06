@@ -15,6 +15,7 @@ import { AuthSelectField } from "@/components/forms/AuthSelectField";
 import { Textarea } from "@/components/ui/textarea";
 import { PostPropertyStepper, type StepKey } from "@/features/broker/post-property/PostPropertyStepper";
 import { FreePlanUsageBar } from "@/features/broker/post-property/FreePlanUsageBar";
+import { PropertySpecificationsEmptyCard } from "@/features/broker/post-property/PropertySpecificationsEmptyCard";
 import { PropertySpecificationsSidebar } from "@/features/broker/post-property/PropertySpecificationsSidebar";
 import { PropertyLocationMapPreview } from "@/features/broker/post-property/PropertyLocationMapPreview";
 import { JVPartnersSection } from "@/features/broker/post-property/JVPartnersSection";
@@ -415,6 +416,12 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
             <PropertyLocationMapPreview />
           </div>
         </div>
+
+        {!propertyType && (
+          <div className="lg:col-span-1">
+            <PropertySpecificationsEmptyCard />
+          </div>
+        )}
 
         {isResidential && (
           <div className="lg:col-span-1">
