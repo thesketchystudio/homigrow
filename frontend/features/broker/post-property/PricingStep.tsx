@@ -80,6 +80,7 @@ function PriceField({
   prefix,
   unit,
   big,
+  inline,
   value,
   onChange,
   error,
@@ -91,6 +92,9 @@ function PriceField({
   prefix?: string;
   unit?: string;
   big?: boolean;
+  // Label and helper text sit in a fixed-width column beside a narrow input
+  // instead of stacked above a full-width one.
+  inline?: boolean;
   value: number | undefined;
   onChange: (value: number | undefined) => void;
   error?: string;
@@ -107,9 +111,16 @@ function PriceField({
   });
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <span className={fieldLabelClassName}>{label}</span>
-      <div className={cn("flex items-center gap-1 border-b pb-[15px] pt-[14px]", error ? "border-destructive" : "border-[rgba(198,198,205,0.3)]")}>
+    <div className={cn(inline ? "flex items-center gap-2" : "flex flex-col gap-2", className)}>
+      {inline ? (
+        <div className="flex w-[148px] shrink-0 flex-col gap-1">
+          <span className={fieldLabelClassName}>{label}</span>
+          {helperText && <p className="font-body text-[11px] text-muted-foreground">{helperText}</p>}
+        </div>
+      ) : (
+        <span className={fieldLabelClassName}>{label}</span>
+      )}
+      <div className={cn("flex items-center gap-1 border-b pb-[15px] pt-[14px]", inline && "w-[62px] px-3", error ? "border-destructive" : "border-[rgba(198,198,205,0.3)]")}>
         {prefix && <span className={cn("shrink-0 font-heading text-brand-primary-600/40", big ? "text-[24px]" : "text-[16px]")}>{prefix}</span>}
         <input
           type="text"
@@ -137,7 +148,7 @@ function PriceField({
         />
         {unit && <span className="shrink-0 font-heading text-[13px] text-brand-primary-600/40">{unit}</span>}
       </div>
-      {helperText && <p className="font-body text-[11px] text-muted-foreground">{helperText}</p>}
+      {!inline && helperText && <p className="font-body text-[11px] text-muted-foreground">{helperText}</p>}
       {error && <p className="text-[12px] text-destructive">{error}</p>}
     </div>
   );
@@ -324,30 +335,37 @@ export function PricingStep({ listingType, defaultValues, onBack, onContinue, on
             />
           </div>
 
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-2">
             <h2 className="font-heading text-[20px] font-bold text-foreground">Brokerage Details</h2>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                role="switch"
-                aria-checked={brokerageIncluded}
-                onClick={() => setValue("brokerage_included", !brokerageIncluded)}
-                className={cn("h-6 w-11 rounded-full transition-colors", brokerageIncluded ? "bg-foreground" : "bg-muted")}
-              >
-                <span className={cn("block size-5 translate-x-0.5 rounded-full bg-background transition-transform", brokerageIncluded && "translate-x-5")} />
-              </button>
-              <span className="font-body text-[15px] text-foreground">Brokerage included in listing price</span>
+            <div className="flex flex-col gap-5 rounded-[8px] bg-brand-secondary-100 p-4">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={brokerageIncluded}
+                  onClick={() => setValue("brokerage_included", !brokerageIncluded)}
+                  className={cn("relative h-[15px] w-7 shrink-0 rounded-full transition-colors", brokerageIncluded ? "bg-foreground" : "bg-muted")}
+                >
+                  <span
+                    className={cn(
+                      "absolute left-[1px] top-[1px] block size-[13px] rounded-full bg-background shadow-sm transition-transform",
+                      brokerageIncluded && "translate-x-[13px]",
+                    )}
+                  />
+                </button>
+                <span className="font-heading text-[15px] font-medium text-foreground">Brokerage included in listing price</span>
+              </div>
+              <PriceField
+                inline
+                label="Brokerage Percentage"
+                helperText="Your commission as % of transaction value"
+                placeholder="2"
+                unit="%"
+                value={brokeragePercent}
+                onChange={(v) => setValue("brokerage_percent", v)}
+                error={errors.brokerage_percent?.message}
+              />
             </div>
-            <PriceField
-              label="Brokerage Percentage"
-              helperText="Your commission as % of transaction value"
-              placeholder="2"
-              unit="%"
-              value={brokeragePercent}
-              onChange={(v) => setValue("brokerage_percent", v)}
-              error={errors.brokerage_percent?.message}
-              className="max-w-[200px]"
-            />
           </div>
         </div>
 

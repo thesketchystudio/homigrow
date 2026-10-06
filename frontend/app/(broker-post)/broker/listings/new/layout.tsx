@@ -15,7 +15,7 @@ import { UserRole } from "@/lib/enums";
 export default function PostPropertyLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard allowedRoles={[UserRole.broker]}>
-      <div className="flex min-h-svh flex-col bg-background">
+      <div className="flex min-h-svh flex-col bg-secondary">
         <PostPropertyHeader />
         <main className="flex flex-1 justify-center px-[150px] py-16">
           <div className="w-full max-w-[1100px]">{children}</div>
