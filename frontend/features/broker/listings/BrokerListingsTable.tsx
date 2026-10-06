@@ -156,9 +156,8 @@ export function BrokerListingsTable() {
     {
       key: "actions",
       header: "Actions",
-      className: "text-right",
       render: (property) => (
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-start gap-2">
           <Button variant="outline" size="icon" className="size-8" aria-label="Edit listing" asChild>
             <Link href={`/broker/listings/${property.id}/edit`}>
               <Pencil className="size-4" />

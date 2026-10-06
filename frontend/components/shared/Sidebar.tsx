@@ -7,6 +7,7 @@
 
 import type { ComponentType, ReactNode } from "react";
 
+import { cn } from "@/lib/utils";
 import {
   Sidebar as SidebarPrimitive,
   SidebarContent,
@@ -34,30 +35,52 @@ export type SidebarNavGroup = {
   items: SidebarNavItem[];
 };
 
+// Per-portal overrides for the spacing/typography of each sidebar region, so a
+// portal can match its own design without changing the shared defaults.
+export type AppSidebarClassNames = {
+  header?: string;
+  content?: string;
+  group?: string;
+  menu?: string;
+  item?: string;
+  footer?: string;
+};
+
 export type AppSidebarProps = {
   groups: SidebarNavGroup[];
   activeRoute: string;
   header?: ReactNode;
   footer?: ReactNode;
+  classNames?: AppSidebarClassNames;
   onNavigate?: (href: string) => void;
 };
 
-export default function AppSidebar({ groups, activeRoute, header, footer, onNavigate }: AppSidebarProps) {
+export default function AppSidebar({ groups, activeRoute, header, footer, classNames, onNavigate }: AppSidebarProps) {
   return (
     <SidebarPrimitive collapsible="icon">
-      {header && <SidebarHeader>{header}</SidebarHeader>}
-      <SidebarContent>
+      {header && <SidebarHeader className={classNames?.header}>{header}</SidebarHeader>}
+      <SidebarContent className={classNames?.content}>
         {groups.map((group, groupIndex) => (
-          <SidebarGroup key={group.label ?? groupIndex}>
+          <SidebarGroup key={group.label ?? groupIndex} className={classNames?.group}>
             {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className={classNames?.menu}>
                 {group.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeRoute === item.href;
                   return (
                     <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton asChild isActive={isActive} tooltip={item.label}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        tooltip={item.label}
+                        // A portal can set --sidebar-active to give the selected item a fill
+                        // distinct from hover; it falls back to the accent colour otherwise.
+                        className={cn(
+                          "data-[active=true]:bg-[var(--sidebar-active,var(--sidebar-accent))] data-[active=true]:text-[var(--sidebar-active-foreground,var(--sidebar-accent-foreground))]",
+                          classNames?.item,
+                        )}
+                      >
                         <a
                           href={item.href}
                           onClick={(event) => {
@@ -80,7 +103,7 @@ export default function AppSidebar({ groups, activeRoute, header, footer, onNavi
           </SidebarGroup>
         ))}
       </SidebarContent>
-      {footer && <SidebarFooter>{footer}</SidebarFooter>}
+      {footer && <SidebarFooter className={classNames?.footer}>{footer}</SidebarFooter>}
       <SidebarRail />
     </SidebarPrimitive>
   );
