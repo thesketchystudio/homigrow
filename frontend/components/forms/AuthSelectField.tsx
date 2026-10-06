@@ -66,7 +66,7 @@ export function AuthSelectField({
           ref={triggerRef}
           aria-invalid={Boolean(error)}
           className={cn(
-            "h-auto w-full rounded-none border-0 border-b bg-transparent px-0 pb-[5px] pt-1 font-heading text-[20px] leading-[28px] text-foreground shadow-none focus-visible:ring-0 disabled:cursor-default disabled:opacity-100",
+            "h-auto w-full rounded-none border-0 border-b bg-transparent px-0 pb-[5px] pt-1 font-heading text-[16px] font-medium leading-[24px] text-foreground shadow-none focus-visible:ring-0 disabled:cursor-default disabled:opacity-100",
             error ? "border-destructive" : "border-foreground focus-visible:border-brand-green-600",
           )}
         >

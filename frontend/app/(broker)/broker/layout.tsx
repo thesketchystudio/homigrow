@@ -9,14 +9,9 @@
 // below) rather than changing the shared sidebar's global tokens, since
 // components/shared/Sidebar.tsx is also used by the Admin portal.
 //
-// Dashboard, Listings, Leads, and Profile always navigate — all four render
-// real content either way (each shows its own empty state or the actual
-// list/table). Analytics has no real feature behind it yet, so it's gated
-// on whether the broker has ANY listing at all: zero listings routes there
-// to the "add a listing first" empty state (nudging a brand-new broker
-// toward posting one); once they have at least one, that link goes back to
-// the old "coming soon" toast instead of a page that would otherwise
-// misleadingly repeat the same empty-state pitch.
+// Dashboard, Listings, Leads, Analytics, and Profile always navigate — each
+// renders real content or its own empty state (Analytics shows the "add a
+// property" empty state for a broker with zero listings).
 //
 // No top header bar (sidebar-toggle icon, page label) above the content —
 // the Figma "Real Estate Broker Portal" screens (e.g. node 176:789) don't
@@ -25,7 +20,6 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
 import { BarChart3, FileText, Home, UserRound, Users2 } from "lucide-react";
 
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -35,7 +29,6 @@ import { useAuthStore } from "@/lib/stores/auth";
 import { UserRole } from "@/lib/enums";
 import { toast } from "@/lib/toast";
 import { initials } from "@/lib/utils";
-import { listMyProperties } from "@/lib/api/endpoints/properties";
 
 const NAV_GROUPS: SidebarNavGroup[] = [
   {
@@ -49,19 +42,14 @@ const NAV_GROUPS: SidebarNavGroup[] = [
   },
 ];
 
-// Always navigate — all four render real content regardless of listing count.
-const ALWAYS_BUILT_ROUTES = new Set(["/broker/dashboard", "/broker/listings", "/broker/leads", "/broker/profile"]);
-// Navigate only while the broker has zero listings; once they have one,
-// this falls back to the "coming soon" toast (see BrokerAnalyticsPage,
-// which self-corrects the same way on a direct visit).
-const GATED_ON_NO_LISTINGS_ROUTES = new Set(["/broker/analytics"]);
+// Pages that render real content (or their own empty state) regardless of
+// listing count; any other nav href falls back to the "coming soon" toast.
+const BUILT_ROUTES = new Set(["/broker/dashboard", "/broker/listings", "/broker/leads", "/broker/analytics", "/broker/profile"]);
 
 export default function BrokerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
-  const { data: myProperties } = useQuery({ queryKey: ["broker-my-properties"], queryFn: listMyProperties });
-  const hasListings = (myProperties?.length ?? 0) > 0;
 
   return (
     <AuthGuard allowedRoles={[UserRole.broker]}>
@@ -74,7 +62,7 @@ export default function BrokerLayout({ children }: { children: React.ReactNode }
             groups={NAV_GROUPS}
             activeRoute={pathname}
             onNavigate={(href) => {
-              if (ALWAYS_BUILT_ROUTES.has(href) || (GATED_ON_NO_LISTINGS_ROUTES.has(href) && !hasListings)) {
+              if (BUILT_ROUTES.has(href)) {
                 router.push(href);
               } else {
                 toast.info("Coming soon — this page isn't built yet.");

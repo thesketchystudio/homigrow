@@ -20,7 +20,7 @@ export function AuthPhoneField({ label, placeholder, error, register, className 
         {label}
       </label>
       <div className="flex items-start gap-3">
-        <div className="w-[46px] shrink-0 border-b border-foreground pb-[5px] pt-1 font-heading text-[20px] leading-[28px] text-foreground">
+        <div className="w-[46px] shrink-0 border-b border-foreground pb-[5px] pt-1 font-heading text-[16px] font-medium leading-[24px] text-foreground">
           +91
         </div>
         <input
@@ -31,7 +31,7 @@ export function AuthPhoneField({ label, placeholder, error, register, className 
           placeholder={placeholder}
           aria-invalid={Boolean(error)}
           className={cn(
-            "min-w-0 flex-1 border-b bg-transparent pb-[5px] pt-1 font-heading text-[20px] leading-[28px] text-foreground outline-none placeholder:text-brand-secondary-700",
+            "min-w-0 flex-1 border-b bg-transparent pb-[5px] pt-1 font-heading text-[16px] font-medium leading-[24px] text-foreground outline-none placeholder:text-brand-secondary-700",
             error ? "border-destructive" : "border-foreground focus:border-brand-green-600",
           )}
           {...register}

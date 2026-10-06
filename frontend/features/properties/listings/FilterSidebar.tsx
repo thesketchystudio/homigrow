@@ -114,7 +114,7 @@ export function FilterSidebar({ filters, onChange, className }: FilterSidebarPro
             multiple={false}
             value={filters.bhkMin === null ? null : String(filters.bhkMin)}
             onChange={(value) => set("bhkMin", filters.bhkMin === Number(value) ? null : Number(value))}
-            className="flex-nowrap"
+            className="flex-nowrap [&>button]:flex-1 [&>button]:justify-center [&>button]:px-0"
           />
         </div>
 

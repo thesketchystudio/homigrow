@@ -1,7 +1,9 @@
 // components/shared/CompareDrawer.tsx
-// Persistent floating tray (Figma node 133:3227 "Compare Drawer (Floating)",
-// exact colors/fonts pulled via get_design_context) shown across every
-// client page once 1+ property is queued for comparison. Not routed
+// Floating tray (Figma node 133:3227 "Compare Drawer (Floating)",
+// exact colors/fonts pulled via get_design_context) shown once 1+ property
+// is queued for comparison, but only on the screens where comparing
+// happens (Listings, Saved, Profile > Saved and Compare) — it does not follow the
+// user to unrelated pages even though the selection itself persists. Not routed
 // through the shared Modal — Modal's Dialog/Drawer variants are for
 // user-triggered open/close with a backdrop, not an always-mounted
 // element that should sit quietly out of the way of whatever else is on
@@ -9,20 +11,27 @@
 
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 
 import { useCompareProperties } from "@/lib/hooks/useCompareProperties";
 import { useCompareStore } from "@/lib/stores/compare";
 import { coverImageUrl } from "@/lib/property-media";
 
+const COMPARE_DRAWER_ROUTES = ["/properties", "/saved", "/profile/saved", "/compare"];
+
 export function CompareDrawer() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const ids = useCompareStore((state) => state.ids);
   const clear = useCompareStore((state) => state.clear);
   const { data } = useCompareProperties(ids);
 
-  if (ids.length === 0) return null;
+  // Once /compare is showing an actual comparison (2+ ids in the URL) the
+  // tray has done its job, so it only stays on the selection view.
+  const showingComparison = pathname === "/compare" && (searchParams.get("ids") ?? "").split(",").filter(Boolean).length >= 2;
+  if (ids.length === 0 || !COMPARE_DRAWER_ROUTES.includes(pathname) || showingComparison) return null;
 
   return (
     <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">

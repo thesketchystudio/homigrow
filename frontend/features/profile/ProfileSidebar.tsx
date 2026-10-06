@@ -35,7 +35,7 @@
 
 import type { ComponentType } from "react";
 import Link from "next/link";
-import { Bell, Building2, CreditCard, FileText, FolderOpen, Heart, History, LogOut, Shield, Star, User } from "lucide-react";
+import { Bell, Bookmark, Building2, CreditCard, FileText, FolderOpen, Heart, History, LogOut, Shield, Star, User } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -49,6 +49,7 @@ type NavItem = { label: string; href: string; icon: ComponentType<{ className?: 
 const PROFILE_ITEMS: NavItem[] = [
   { label: "Account", href: "/profile/account", icon: User },
   { label: "Preferences", href: "/profile/preferences", icon: Heart },
+  { label: "Saved", href: "/profile/saved", icon: Bookmark },
   { label: "My Properties", href: "/profile/my-properties", icon: Building2 },
   { label: "Purchase History", href: "/profile/purchase-history", icon: History },
   { label: "Loan Applications", href: "/profile/loan-applications", icon: FileText },

@@ -25,7 +25,7 @@ export function BudgetLocationStep({ preferences, onChange, onSkip, onContinue }
         <div className="flex flex-col gap-2">
           <h1 className="font-heading text-[36px] font-medium leading-[44px] text-brand-primary-700">Tell us about your next legacy.</h1>
           <p className="font-body text-[16px] leading-[26px] text-brand-secondary-800">
-            Establish your digital identity in the Homigrow ecosystem.
+            You can also skip these and fill them under ‘Preferences’ in your account later.
           </p>
         </div>
 

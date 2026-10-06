@@ -181,8 +181,8 @@ export function AgentConnectSection() {
                   key={a.name}
                   onClick={() => setSelected(i)}
                   style={{
-                    background: active ? "#090909" : "#f8f9fa",
-                    border: `1.5px solid ${active ? "#090909" : "rgba(198,198,205,0.3)"}`,
+                    background: active ? "#83dd68" : "#f8f9fa",
+                    border: `1.5px solid ${active ? "transparent" : "rgba(198,198,205,0.3)"}`,
                     borderRadius: 16,
                     padding: "24px 28px",
                     textAlign: "left",
@@ -210,7 +210,7 @@ export function AgentConnectSection() {
                         fontFamily: "'Space Grotesk', sans-serif",
                         fontWeight: 700,
                         fontSize: 16,
-                        color: "#fefeff",
+                        color: active ? "#232323" : "#fefeff",
                       }}
                     >
                       {a.initials}
@@ -224,7 +224,7 @@ export function AgentConnectSection() {
                           fontFamily: "'Space Grotesk', sans-serif",
                           fontWeight: 700,
                           fontSize: 16,
-                          color: active ? "#fefeff" : "#1a1a1a",
+                          color: active ? "#232323" : "#1a1a1a",
                         }}
                       >
                         {a.name}
@@ -234,7 +234,7 @@ export function AgentConnectSection() {
                           fontFamily: "'Space Grotesk', sans-serif",
                           fontWeight: 600,
                           fontSize: 12,
-                          color: active ? "#92f574" : "#1a1a1a",
+                          color: "#232323",
                           display: "flex",
                           alignItems: "center",
                           gap: 3,
@@ -248,7 +248,7 @@ export function AgentConnectSection() {
                         fontFamily: "'Plus Jakarta Sans', sans-serif",
                         fontWeight: 400,
                         fontSize: 13,
-                        color: active ? "rgba(255,255,255,0.6)" : "rgba(26,26,26,0.55)",
+                        color: active ? "#707070" : "rgba(26,26,26,0.55)",
                         margin: "0 0 6px 0",
                       }}
                     >
@@ -259,9 +259,9 @@ export function AgentConnectSection() {
                         style={{
                           fontFamily: "'Plus Jakarta Sans', sans-serif",
                           fontWeight: 400,
-                          fontSize: 13,
-                          color: "rgba(255,255,255,0.5)",
-                          lineHeight: "20px",
+                          fontSize: 12,
+                          color: "#707070",
+                          lineHeight: "18px",
                           margin: 0,
                         }}
                       >

@@ -32,13 +32,13 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
 
 import { AuthGuard } from "@/components/shared/AuthGuard";
 import { ProfileSidebar } from "@/features/profile/ProfileSidebar";
 import { ProfileHeaderActionsProvider } from "@/features/profile/ProfileHeaderActions";
 import { AccountTabSkeleton } from "@/features/profile/AccountTab";
 import { PreferencesTabSkeleton } from "@/features/profile/preferences/PreferencesTab";
+import { SavedTabSkeleton } from "@/features/profile/SavedTab";
 import { NotificationsTabSkeleton } from "@/features/profile/NotificationsTab";
 import { MyPropertiesTabSkeleton } from "@/features/profile/MyPropertiesTabSkeleton";
 import { PurchaseHistoryTabSkeleton } from "@/features/profile/PurchaseHistoryTabSkeleton";
@@ -57,6 +57,8 @@ function tabSkeletonFor(pathname: string) {
       return <AccountTabSkeleton />;
     case "/profile/preferences":
       return <PreferencesTabSkeleton />;
+    case "/profile/saved":
+      return <SavedTabSkeleton />;
     case "/profile/my-properties":
       return <MyPropertiesTabSkeleton />;
     case "/profile/purchase-history":
@@ -80,14 +82,16 @@ function ProfileHeader({ actions }: { actions?: React.ReactNode }) {
   const router = useRouter();
   return (
     <>
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex min-h-[53.8px] items-center justify-between gap-4">
         <button
           type="button"
           onClick={() => router.back()}
           aria-label="Back"
-          className="flex size-12 shrink-0 items-center justify-center text-slate-500"
+          className="flex size-12 shrink-0 items-center justify-center text-brand-secondary-800"
         >
-          <ArrowLeft className="size-6" />
+          <svg viewBox="0 0 48 48" className="size-12 fill-current" aria-hidden="true">
+            <path d="M42.7518 24C42.7518 24.5967 42.5147 25.169 42.0928 25.591C41.6708 26.0129 41.0985 26.25 40.5018 26.25H12.9393L22.5993 35.9081C23.022 36.3308 23.2594 36.9041 23.2594 37.5019C23.2594 38.0996 23.022 38.6729 22.5993 39.0956C22.1766 39.5183 21.6033 39.7558 21.0055 39.7558C20.4078 39.7558 19.8345 39.5183 19.4118 39.0956L5.91177 25.5956C5.70201 25.3866 5.53558 25.1382 5.42202 24.8647C5.30846 24.5912 5.25 24.298 5.25 24.0019C5.25 23.7057 5.30846 23.4125 5.42202 23.139C5.53558 22.8655 5.70201 22.6171 5.91177 22.4081L19.4118 8.9081C19.6211 8.69881 19.8695 8.53279 20.143 8.41952C20.4164 8.30625 20.7095 8.24795 21.0055 8.24795C21.3015 8.24795 21.5946 8.30625 21.8681 8.41952C22.1415 8.53279 22.39 8.69881 22.5993 8.9081C22.8086 9.1174 22.9746 9.36586 23.0879 9.63932C23.2011 9.91278 23.2594 10.2059 23.2594 10.5019C23.2594 10.7978 23.2011 11.0909 23.0879 11.3644C22.9746 11.6378 22.8086 11.8863 22.5993 12.0956L12.9393 21.75H40.5018C41.0985 21.75 41.6708 21.987 42.0928 22.409C42.5147 22.8309 42.7518 23.4032 42.7518 24Z" />
+          </svg>
         </button>
         {actions}
       </div>
@@ -109,9 +113,9 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
     <AuthGuard
       allowedRoles={ALL_ROLES}
       fallback={
-        <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 pt-48 pb-16">
+        <div className="mx-auto flex max-w-[1052px] flex-col gap-12 px-6 pt-[150px] pb-16">
           <ProfileHeader />
-          <div className="flex flex-col gap-8 md:flex-row md:gap-10">
+          <div className="flex flex-col gap-8 md:flex-row md:gap-12">
             <ProfileSidebar activeRoute={pathname} />
             <div className="min-w-0 flex-1">{tabSkeletonFor(pathname)}</div>
           </div>
@@ -120,9 +124,9 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
     >
       <ProfileHeaderActionsProvider>
         {(headerActions) => (
-          <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 pt-48 pb-16">
+          <div className="mx-auto flex max-w-[1052px] flex-col gap-12 px-6 pt-[150px] pb-16">
             <ProfileHeader actions={headerActions} />
-            <div className="flex flex-col gap-8 md:flex-row md:gap-10">
+            <div className="flex flex-col gap-8 md:flex-row md:gap-12">
               <ProfileSidebar user={user} activeRoute={pathname} />
               <div className="min-w-0 flex-1">{children}</div>
             </div>
