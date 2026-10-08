@@ -243,7 +243,8 @@ def signup(
     """
     Creates a user (and a broker_profile row when role=broker), then
     issues a signup-verification OTP by email. Raises 409 PHONE_TAKEN if
-    the phone is already registered, 409 EMAIL_TAKEN on a duplicate email.
+    the phone is already registered, 409 EMAIL_TAKEN on a duplicate email,
+    409 RERA_TAKEN when a broker reuses an existing RERA number.
     Both checks run before any insert: `db.flush()` below executes the
     pending INSERT immediately (needed to assign user.id for the
     broker_profile FK), so a unique-constraint violation would otherwise
@@ -266,6 +267,16 @@ def signup(
 
     if db.query(User).filter(User.email == email).first() is not None:
         raise ConflictError("EMAIL_TAKEN", "This email is already registered.")
+
+    # broker_profiles.rera_number is unique; checked up front for the same
+    # reason as phone/email, so a reused RERA number is a clean 409 instead
+    # of an IntegrityError at flush time.
+    if (
+        role == UserRole.broker
+        and rera_number
+        and db.query(BrokerProfile).filter(BrokerProfile.rera_number == rera_number).first() is not None
+    ):
+        raise ConflictError("RERA_TAKEN", "This RERA number is already registered.")
 
     preferences = {}
     if city:
