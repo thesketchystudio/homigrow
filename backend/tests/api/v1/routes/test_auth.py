@@ -77,6 +77,22 @@ class TestSignupRoute:
         assert response.status_code == 409
         assert response.json()["error"]["code"] == "EMAIL_TAKEN"
 
+    def test_duplicate_rera_number_returns_409(self, client):
+        payload = {"role": "broker", "rera_number": "RERA-KA-99001", "company_name": "Acme"}
+        first = client.post(
+            "/api/v1/auth/signup",
+            json={**payload, "phone": "+919876540031", "email": "rera-a@example.com"},
+        )
+        assert first.status_code == 201
+
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={**payload, "phone": "+919876540032", "email": "rera-b@example.com"},
+        )
+
+        assert response.status_code == 409
+        assert response.json()["error"]["code"] == "RERA_TAKEN"
+
     def test_weak_password_returns_422(self, client):
         response = client.post(
             "/api/v1/auth/signup",
