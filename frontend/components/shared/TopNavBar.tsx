@@ -1,15 +1,15 @@
-// components/shared/TopNavBar.tsx
+﻿// components/shared/TopNavBar.tsx
 // Fixed top navigation bar used across all Client View screens. Becomes
-// opaque with a blurred background once the page scrolls past 40px — but
+// opaque with a blurred background once the page scrolls past 40px â€” but
 // that transparent-until-scroll start state only makes sense over the
 // homepage's dark hero image. Every other (client) page has a light
 // background from the very top, so the nav renders opaque immediately
 // there instead of starting nearly invisible.
 //
 // Matches the canonical Figma "TopNavBar" component (Components page,
-// Section 3, node 470:1297 — 4 variants: logged-out/logged-in x
+// Section 3, node 470:1297 â€” 4 variants: logged-out/logged-in x
 // without/with search). The search box is a visual-only placeholder for
-// now — no Discover/search feature exists yet to wire it to. The logged-in
+// now â€” no Discover/search feature exists yet to wire it to. The logged-in
 // state shows a bell + initials avatar instead of the user's name, per
 // that component; it has no "List Property" button in any variant, so
 // that's been dropped here too (it wasn't part of the reusable nav design).
@@ -30,10 +30,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { SearchOverlay } from "@/features/search/SearchOverlay";
 import { FONT_HEADING as sg } from "@/lib/fonts";
 
+const NAV_LINKS = ["Home", "Discover", "Tools", "Compare"] as const;
+
 const NAV_LINK_HREFS: Record<string, string> = {
+  Home: "/",
   Discover: "/properties",
   "Tools": "/ai-tools",
-  Saved: "/saved",
   Compare: "/compare",
 };
 
@@ -59,7 +61,7 @@ export default function TopNavBar() {
   const [searchValue, setSearchValue] = useState("");
 
   // TopNavBar is mounted once in the (client) layout and persists across
-  // route changes — searchOpen must reset on every navigation, not just the
+  // route changes â€” searchOpen must reset on every navigation, not just the
   // ones initiated from inside SearchOverlay itself (nav links, browser
   // back/forward, etc. would otherwise leave the overlay floating over
   // whatever page is landed on next). Adjusting state during render (React's
@@ -76,7 +78,7 @@ export default function TopNavBar() {
     const query = searchValue.trim();
     if (!query) return;
     // `search` (free-text, matches title/description/city/locality/
-    // landmark/amenities) rather than `city` (exact match) — a typed
+    // landmark/amenities) rather than `city` (exact match) â€” a typed
     // "Whitefield" is a locality and "pool" is an amenity, neither of
     // which an exact city match would ever catch.
     const href = `/properties?search=${encodeURIComponent(query)}`;
@@ -133,14 +135,14 @@ export default function TopNavBar() {
         </Link>
 
         <div style={{ display: "flex", gap: 32, alignItems: "center" }} className="desktop-only">
-          {["Discover", "Tools", "Compare", "Saved"].map((link) => (
+          {NAV_LINKS.map((link) => (
             <Link
               key={link}
               href={NAV_LINK_HREFS[link] ?? "#"}
               style={{
                 fontFamily: sg,
                 fontWeight: 500,
-                fontSize: 15,
+                fontSize: 16,
                 color: scrolled ? "#64748b" : "rgba(254,254,255,0.85)",
                 textDecoration: "none",
                 transition: "color 0.2s",
@@ -159,20 +161,20 @@ export default function TopNavBar() {
             background: "#f8f9fa",
             border: "1px solid rgba(171,179,183,0.15)",
             borderRadius: 8,
-            padding: "9px 14px",
-            width: "clamp(180px, 20vw, 260px)",
+            padding: "5px 18px",
+            width: "clamp(220px, 32vw, 451px)",
           }}
           className="desktop-only"
         >
           <Search size={16} color="#707070" style={{ flexShrink: 0 }} />
           <input
             type="text"
-            placeholder="Search properties, locations..."
+            placeholder="Search locations..."
             value={searchValue}
             onChange={(event) => setSearchValue(event.target.value)}
             onFocus={() => setSearchOpen(true)}
             // Escape (below) closes the overlay without blurring the input,
-            // so a plain re-focus never fires on the next click — onClick
+            // so a plain re-focus never fires on the next click â€” onClick
             // reopens it explicitly regardless of prior focus state.
             onClick={() => setSearchOpen(true)}
             onKeyDown={(event) => {
@@ -259,7 +261,7 @@ export default function TopNavBar() {
           className="mobile-only"
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {["Discover", "Tools", "Compare", "Saved"].map((link) => (
+            {NAV_LINKS.map((link) => (
               <Link
                 key={link}
                 href={NAV_LINK_HREFS[link] ?? "#"}
@@ -267,7 +269,7 @@ export default function TopNavBar() {
                 style={{
                   fontFamily: sg,
                   fontWeight: 500,
-                  fontSize: 15,
+                  fontSize: 16,
                   color: "#64748b",
                   textDecoration: "none",
                   padding: "8px 0",
@@ -300,3 +302,4 @@ export default function TopNavBar() {
     </nav>
   );
 }
+

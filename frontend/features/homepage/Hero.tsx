@@ -117,7 +117,7 @@ export default function Hero() {
     <section
       style={{
         position: "relative",
-        minHeight: "clamp(600px, 100vh, 870px)",
+        minHeight: 638,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
