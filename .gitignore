@@ -17,6 +17,8 @@ backend/.pytest_cache/
 .env.local
 **/.env
 **/.env.local
+**/.env.prod
+**/.env.staging
 
 # OS/Editor
 .DS_Store
