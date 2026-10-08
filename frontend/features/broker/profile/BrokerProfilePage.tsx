@@ -32,7 +32,6 @@ import {
   FileText,
   Mail,
   MapPin,
-  Pencil,
   Phone,
   ShieldAlert,
   ShieldCheck,
@@ -49,11 +48,12 @@ import { listMyProperties } from "@/lib/api/endpoints/properties";
 import { listLeads } from "@/lib/api/endpoints/leads";
 import { getMe } from "@/lib/api/endpoints/users";
 import { LeadStatus, PropertyStatus, VerificationStatus } from "@/lib/enums";
+import { brokerLogout } from "@/features/broker/profile/brokerLogout";
 import { toast } from "@/lib/toast";
 import { cn, initials } from "@/lib/utils";
 
 const VERIFICATION_BADGE: Record<VerificationStatus, { label: string; icon: typeof CheckCircle2; className: string }> = {
-  [VerificationStatus.verified]: { label: "Verified", icon: CheckCircle2, className: "border-transparent bg-emerald-100 text-emerald-800" },
+  [VerificationStatus.verified]: { label: "Verified", icon: ShieldCheck, className: "border-[rgba(19,194,0,0.2)] bg-[#f0fdf4] text-[#13c200]" },
   [VerificationStatus.pending]: { label: "Verification Pending", icon: Clock, className: "border-transparent bg-amber-100 text-amber-800" },
   [VerificationStatus.unverified]: { label: "Not Verified", icon: ShieldAlert, className: "border-transparent bg-slate-100 text-slate-700" },
   [VerificationStatus.rejected]: { label: "Verification Rejected", icon: XCircle, className: "border-transparent bg-red-100 text-red-800" },
@@ -72,7 +72,7 @@ function SectionCard({ title, children, className }: { title: string; children: 
 
 function StatChip({ icon: Icon, value, label }: { icon: typeof Building2; value: number; label: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-brand-secondary-500 bg-brand-secondary-100 px-3.5 py-2">
+    <div className="flex items-center gap-2 rounded-lg border border-brand-secondary-500 bg-[#f9fafb] px-3.5 py-2">
       <Icon className="size-3.5 text-brand-primary-300" />
       <span className="font-heading text-[14px] font-medium text-brand-primary-400">{value}</span>
       <span className="font-body text-[12px] text-brand-primary-300">{label}</span>
@@ -172,11 +172,14 @@ export function BrokerProfilePage() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-6 rounded-lg border border-brand-secondary-500 bg-white p-8">
+    // The shell's <main> pads its content by 24px; the header band is
+    // full-bleed in the design, so the page cancels that padding and
+    // re-applies it to the content area below.
+    <div className="-m-6 flex flex-col">
+      <div className="flex flex-col gap-6 border-b border-brand-secondary-500 bg-white px-8 pt-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex gap-5">
-            <div className="relative shrink-0">
+          <div className="flex gap-6">
+            <div className="relative shrink-0 self-start">
               <button
                 type="button"
                 onClick={() => setEditOpen(true)}
@@ -185,7 +188,7 @@ export function BrokerProfilePage() {
               >
                 <span className="font-heading text-[28px] font-bold text-white">{initials(user.full_name)}</span>
               </button>
-              <span className="absolute bottom-0 right-0 flex size-7 items-center justify-center rounded-full border-2 border-white bg-emerald-500">
+              <span className="absolute bottom-0 right-0 flex size-7 items-center justify-center rounded-full border-[1.18px] border-white bg-[#13c200]">
                 <Camera className="size-3.5 text-white" />
               </span>
             </div>
@@ -218,38 +221,45 @@ export function BrokerProfilePage() {
                   </span>
                 )}
               </div>
+              <div className="flex flex-wrap gap-3 pt-1">
+                <StatChip icon={Building2} value={activeListings} label="Active Listings" />
+                <StatChip icon={Users2} value={leadsClosed} label="Leads Closed" />
+                <StatChip icon={FileText} value={propertiesSold} label="Properties Sold" />
+              </div>
             </div>
           </div>
-          <Button variant="outline" onClick={() => setEditOpen(true)}>
-            <Pencil className="size-4" />
-            Edit Profile
+          <Button
+            variant="outline"
+            onClick={brokerLogout}
+            className="border-[#ffe8e4] px-[26px] font-body text-[13px] font-medium text-[red] hover:bg-red-50 hover:text-[red]"
+          >
+            Log out
           </Button>
         </div>
 
-        <div className="flex flex-wrap gap-3 border-t border-brand-secondary-500 pt-4">
-          <StatChip icon={Building2} value={activeListings} label="Active Listings" />
-          <StatChip icon={Users2} value={leadsClosed} label="Leads Closed" />
-          <StatChip icon={FileText} value={propertiesSold} label="Properties Sold" />
-        </div>
-
-        <div className="flex gap-1 border-t border-brand-secondary-500 pt-4">
-          {TABS.map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => handleUnbuiltTab(item)}
-              className={cn(
-                "rounded-md px-4 py-2 font-body text-[13px] font-medium",
-                item === tab ? "bg-brand-primary-400 text-white" : "text-brand-primary-300 hover:text-brand-primary-400",
-              )}
-            >
-              {item}
-            </button>
-          ))}
+        <div className="flex items-center justify-between border-t border-brand-secondary-500 py-4">
+          <div className="flex gap-1">
+            {TABS.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => handleUnbuiltTab(item)}
+                className={cn(
+                  "rounded-md px-4 py-2 font-body text-[13px] font-medium",
+                  item === tab ? "bg-brand-primary-400 text-white" : "text-brand-primary-300 hover:text-brand-primary-400",
+                )}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+          <Button variant="outline" onClick={() => setEditOpen(true)} className="border-[#afafaf] px-[26px] font-body text-[13px] font-medium">
+            Edit Profile
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_342px]">
+      <div className="grid grid-cols-1 gap-5 p-8 lg:grid-cols-[1fr_342px]">
         <div className="flex flex-col gap-5">
           <SectionCard title="About">
             <p className="font-body text-[14px] leading-[22.75px] text-brand-primary-300">

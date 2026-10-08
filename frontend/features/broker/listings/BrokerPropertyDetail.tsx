@@ -20,7 +20,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BedDouble, Building2, Car, Compass, Pencil, RotateCcw, Ruler, Sofa, TrendingUp } from "lucide-react";
+import { ArrowLeft, BedDouble, Building2, Car, CheckCheck, Compass, Pencil, RotateCcw, Ruler, Sofa, TrendingUp } from "lucide-react";
 
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import ErrorState from "@/components/shared/ErrorState";
@@ -194,7 +194,8 @@ export function BrokerPropertyDetail({ propertyId }: { propertyId: string }) {
             </Link>
           </Button>
           {property.status === PropertyStatus.active && (
-            <Button className="bg-brand-green-500 text-brand-primary-700 hover:opacity-90" onClick={() => setConfirmCloseOpen(true)}>
+            <Button className="bg-[#13c200] text-white hover:opacity-90" onClick={() => setConfirmCloseOpen(true)}>
+              <CheckCheck className="size-4" />
               {closeLabel}
             </Button>
           )}
@@ -292,7 +293,7 @@ export function BrokerPropertyDetail({ propertyId }: { propertyId: string }) {
               <h3 className="font-heading text-[16px] font-medium text-white">Boost Your Listing</h3>
               <p className="font-body text-[13px] text-white/90">Get 3x more visibility and reach potential buyers faster</p>
             </div>
-            <Button className="bg-white text-brand-green-700 hover:bg-white/90" asChild>
+            <Button className="bg-white font-semibold text-[#13c200] hover:bg-white/90" asChild>
               <Link href={`/broker/listings/${propertyId}/boost`}>Upgrade Now</Link>
             </Button>
           </div>
