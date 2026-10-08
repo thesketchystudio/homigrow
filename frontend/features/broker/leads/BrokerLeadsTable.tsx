@@ -144,7 +144,7 @@ export function BrokerLeadsTable() {
       header: "Property Interest",
       render: (lead) => (
         <Link
-          href={`/properties/${lead.property_id}`}
+          href={`/broker/listings/${lead.property_id}`}
           target="_blank"
           rel="noopener noreferrer"
           className="font-body text-[14px] font-medium text-foreground hover:underline"

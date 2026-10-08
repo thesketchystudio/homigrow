@@ -224,7 +224,7 @@ export function BrokerAnalytics() {
       header: "",
       className: "text-right",
       render: (item) => (
-        <Link href={`/properties/${item.property_id}`} target="_blank" rel="noopener noreferrer" aria-label={`View ${item.title}`}>
+        <Link href={`/broker/listings/${item.property_id}`} aria-label={`View ${item.title}`}>
           <ArrowUpRight className="ml-auto size-4 text-muted-foreground" />
         </Link>
       ),

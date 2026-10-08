@@ -131,7 +131,7 @@ export function BrokerHomeDashboard() {
       header: "Property Interest",
       render: (lead) => (
         <Link
-          href={`/properties/${lead.property_id}`}
+          href={`/broker/listings/${lead.property_id}`}
           target="_blank"
           rel="noopener noreferrer"
           className="font-body text-[14px] text-foreground hover:underline"
@@ -203,7 +203,7 @@ export function BrokerHomeDashboard() {
           <p className="font-body text-[16px] text-brand-primary-300">Here&apos;s what&apos;s happening with your properties today</p>
         </div>
         <Button asChild className="shrink-0 bg-brand-green-600 text-brand-primary-400 hover:opacity-90">
-          <Link href="/broker/listings/new" target="_blank" rel="noopener noreferrer">
+          <Link href="/broker/listings/new">
             <Plus className="size-4" />
             Add Listing
           </Link>
@@ -285,7 +285,7 @@ export function BrokerHomeDashboard() {
                   location: `${property.locality}, ${property.city}`,
                   bhk: property.bhk ?? undefined,
                   areaSqft: property.area_sqft ?? undefined,
-                  href: `/properties/${property.id}`,
+                  href: `/broker/listings/${property.id}`,
                 }}
                 badge={{
                   label: "Active",
