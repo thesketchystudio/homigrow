@@ -12,15 +12,47 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// react-hook-form's `valueAsNumber: true` runs the raw string through
+// `Number()`, which turns a blank input into NaN rather than undefined —
+// NaN then fails an `.optional()` zod number field's base type check
+// with a confusing "expected number, received NaN" instead of being
+// treated as legitimately empty. Use as `register("field", { setValueAs:
+// toOptionalNumber })` for any optional numeric form field.
+export function toOptionalNumber(value: string): number | undefined {
+  return value === "" ? undefined : Number(value);
+}
+
+// Two-letter initials from a full name, for avatar circles that have no
+// photo (the broker sidebar footer and the Broker Profile page header).
+export function initials(name?: string): string {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+// Rounds to at most two decimals and drops trailing zeros, so 6.5 stays
+// "6.5" rather than collapsing to "7" or padding to "6.50".
+function trimmedScale(value: number): string {
+  return String(Number(value.toFixed(2)));
+}
+
 // Formats a rupee amount using Indian lakh/crore short-scale notation
-// (e.g. 7500000 -> "₹75L", 130000000 -> "₹13Cr"), matching the buyer
-// preference wizard's price-range display.
+// (e.g. 7500000 -> "₹75L", 65000000 -> "₹6.5Cr"), matching the buyer
+// preference wizard's price-range display. Fractional values are kept to
+// two decimals so a 6.5Cr listing is never shown as 7Cr.
 export function formatINR(amount: number): string {
-  if (amount >= 1_00_00_000) {
-    return `₹${Math.round(amount / 1_00_00_000)}Cr`;
+  const crores = amount / 1_00_00_000;
+  if (crores >= 1 || Number(crores.toFixed(2)) >= 1) {
+    return `₹${trimmedScale(crores)}Cr`;
   }
-  if (amount >= 1_00_000) {
-    return `₹${Math.round(amount / 1_00_000)}L`;
+  const lakhs = amount / 1_00_000;
+  if (lakhs >= 1) {
+    return `₹${trimmedScale(lakhs)}L`;
   }
   return `₹${amount.toLocaleString("en-IN")}`;
 }
@@ -34,4 +66,25 @@ export function formatListingPrice(item: { listing_type: ListingType; price: num
     return formatINR(item.price);
   }
   return `₹${Math.round(item.price).toLocaleString("en-IN")}/mo`;
+}
+
+// Formats a timestamp as "Listed Xd ago" for the broker Listings table,
+// matching the Figma design's relative-age column.
+export function formatListedAgo(dateString: string): string {
+  const days = Math.max(0, Math.floor((Date.now() - new Date(dateString).getTime()) / (1000 * 60 * 60 * 24)));
+  return days === 0 ? "Listed today" : `Listed ${days}d ago`;
+}
+
+// Generic "X minutes/hours/days ago" formatter for the broker Leads table's
+// Last Contacted column, matching the Figma design's relative-time style
+// ("2 hours ago") without the "Listed"-specific wording formatListedAgo uses.
+export function formatRelativeTime(dateString: string): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(dateString).getTime()) / 1000));
+  if (seconds < 60) return "Just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
 }

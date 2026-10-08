@@ -63,7 +63,7 @@ export function SavedCategoryPills({
   onCategoryChange: (category: SavedCategory) => void;
 }) {
   return (
-    <div className="flex w-fit items-center gap-2 rounded-xl bg-brand-green-200 p-1">
+    <div className="flex w-fit items-center gap-2 rounded-xl bg-brand-secondary-100 p-1">
       <CategoryPill label="All" active={category === "all"} onClick={() => onCategoryChange("all")} />
       <CategoryPill label="Villas" active={category === "villas"} onClick={() => onCategoryChange("villas")} />
       <CategoryPill label="Penthouses" active={false} disabled />

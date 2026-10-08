@@ -45,9 +45,29 @@ class PropertyType(str, Enum):
     villa = "villa"
     independent_house = "independent_house"
     plot = "plot"
+    land = "land"
     office = "office"
     shop = "shop"
     pg_colive = "pg_colive"
+    # Rent-only, per the Post Property wizard's "Commercial & Spaces" dropdown group.
+    commercial_building = "commercial_building"
+    built_to_suit = "built_to_suit"
+
+
+class PriceFlexibility(str, Enum):
+    """How open a broker is to negotiating a listing's price."""
+
+    fixed = "fixed"
+    negotiable = "negotiable"
+    highly_flexible = "highly_flexible"
+
+
+class PaymentStructure(str, Enum):
+    """How a buyer is expected to pay for a listing."""
+
+    full_payment = "full_payment"
+    emi_installments = "emi_installments"
+    construction_linked = "construction_linked"
 
 
 class Furnishing(str, Enum):
@@ -127,3 +147,24 @@ class OTPPurpose(str, Enum):
     login = "login"
     signup = "signup"
     broker_verification = "broker_verification"
+
+
+class OwnershipType(str, Enum):
+    """Legal ownership basis of a property listing, shown on the Edit Listing form."""
+
+    freehold = "freehold"
+    leasehold = "leasehold"
+    co_operative_society = "co_operative_society"
+    power_of_attorney = "power_of_attorney"
+
+
+class BrokerDocumentType(str, Enum):
+    """
+    Kind of a broker verification document. Not a Postgres enum type —
+    it only ever appears as the "type" field inside broker_profiles.
+    verification_documents (JSONB), never as a table column, so there's
+    nothing to migrate.
+    """
+
+    rera_certificate = "rera_certificate"
+    government_id = "government_id"

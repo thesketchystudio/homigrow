@@ -42,6 +42,7 @@ def update_me(
         email=payload.email,
         avatar_url=payload.avatar_url,
         preferences=payload.preferences,
+        broker_profile=payload.broker_profile.model_dump(exclude_unset=True) if payload.broker_profile is not None else None,
     )
     return UserRead.model_validate(updated)
 

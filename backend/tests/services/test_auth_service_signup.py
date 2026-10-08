@@ -108,6 +108,40 @@ class TestSignup:
 
         assert user.preferences == {}
 
+    def test_broker_verification_details_are_stored_on_broker_profile(self, db_session):
+        user = auth_service.signup(
+            db_session,
+            phone="+919876543262",
+            role=UserRole.broker,
+            full_name="Rohan Iyer",
+            email="rohan@example.com",
+            password="s3cure-pass",
+            company_name="Iyer Realty Group",
+            rera_number="RERA-KA-99887",
+            service_area="Bengaluru",
+        )
+
+        profile = db_session.query(BrokerProfile).filter(BrokerProfile.user_id == user.id).first()
+        assert profile.company_name == "Iyer Realty Group"
+        assert profile.rera_number == "RERA-KA-99887"
+        assert profile.service_areas == ["Bengaluru"]
+        assert profile.verification_status.value == "unverified"
+
+    def test_omitting_verification_details_leaves_broker_profile_blank(self, db_session):
+        user = auth_service.signup(
+            db_session,
+            phone="+919876543263",
+            role=UserRole.broker,
+            full_name="No Details",
+            email="nodetails@example.com",
+            password="s3cure-pass",
+        )
+
+        profile = db_session.query(BrokerProfile).filter(BrokerProfile.user_id == user.id).first()
+        assert profile.company_name is None
+        assert profile.rera_number is None
+        assert profile.service_areas == []
+
     def test_duplicate_phone_raises_409(self, db_session):
         make_user(db_session, phone="+919876543214")
 

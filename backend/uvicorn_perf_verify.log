@@ -1,0 +1,38 @@
+INFO:     Will watch for changes in these directories: ['D:\\Projects\\Sketchy\\homigrow-backend-wt\\backend']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [23240] using WatchFiles
+INFO:     Started server process [14828]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:57176 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54838 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56477 - "OPTIONS /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61942 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56477 - "OPTIONS /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56477 - "OPTIONS /api/v1/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50579 - "OPTIONS /api/v1/analytics/broker?range=30d HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61942 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63978 - "GET /api/v1/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56089 - "GET /api/v1/analytics/broker?range=30d HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56089 - "GET /api/v1/properties/mine HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:50579 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63978 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63978 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50017 - "GET /api/v1/properties/mine HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:50017 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50017 - "GET /api/v1/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49844 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63182 - "OPTIONS /api/v1/leads/0ce43655-8520-4479-a05f-f5081aa4aefa HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60433 - "GET /api/v1/leads/0ce43655-8520-4479-a05f-f5081aa4aefa HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52297 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49472 - "OPTIONS /api/v1/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57005 - "POST /api/v1/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49472 - "OPTIONS /api/v1/properties/18be2e82-715c-48f7-9d99-f455d2150816/media HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57005 - "POST /api/v1/properties/18be2e82-715c-48f7-9d99-f455d2150816/media HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49472 - "OPTIONS /api/v1/properties/18be2e82-715c-48f7-9d99-f455d2150816/media/video HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57005 - "POST /api/v1/properties/18be2e82-715c-48f7-9d99-f455d2150816/media/video HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49472 - "OPTIONS /api/v1/properties/18be2e82-715c-48f7-9d99-f455d2150816/submit HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57005 - "POST /api/v1/properties/18be2e82-715c-48f7-9d99-f455d2150816/submit HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54607 - "GET /api/v1/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57005 - "GET /api/v1/properties/mine HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54612 - "GET /api/v1/analytics/broker?range=30d HTTP/1.1" 200 OK

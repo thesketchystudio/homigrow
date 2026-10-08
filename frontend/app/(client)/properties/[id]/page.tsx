@@ -13,6 +13,7 @@ import ErrorState from "@/components/shared/ErrorState";
 import { PropertyHeroGallery } from "@/features/properties/PropertyHeroGallery";
 import { PropertyHeader } from "@/features/properties/PropertyHeader";
 import { PropertyDescription } from "@/features/properties/PropertyDescription";
+import { PropertyPricePredictor } from "@/features/properties/PropertyPricePredictor";
 import { PropertyVaastuChecker } from "@/features/properties/PropertyVaastuChecker";
 import { PropertyAmenities } from "@/features/properties/PropertyAmenities";
 import { PropertyContactCard } from "@/features/properties/PropertyContactCard";
@@ -37,7 +38,7 @@ export default function PropertyDetailsPage() {
   if (error || !property) {
     const notFound = error instanceof ApiError && error.status === 404;
     return (
-      <div className="mx-auto max-w-[1100px] px-6 pt-28 pb-20">
+      <div className="mx-auto max-w-[1148px] px-6 pt-28 pb-20">
         <ErrorState
           title={notFound ? "Property not found" : "Couldn't load this property"}
           body={notFound ? "This listing may have been removed or is no longer available." : "Please try again in a moment."}
@@ -47,17 +48,18 @@ export default function PropertyDetailsPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-[1100px] flex-col gap-16 px-6 pt-28 pb-20">
+    <div className="mx-auto flex max-w-[1148px] flex-col gap-16 px-6 pt-28 pb-20">
       <PropertyHeroGallery media={property.media} title={property.title} />
 
-      <div className="flex flex-col gap-16 lg:flex-row lg:gap-10">
-        <div className="flex min-w-0 flex-1 flex-col gap-16">
+      <div className="flex flex-col gap-12 py-8 lg:flex-row">
+        <div className="flex min-w-0 flex-1 flex-col gap-12">
           <PropertyHeader property={property} />
           <PropertyVaastuChecker />
           <PropertyDescription description={property.description} />
           <PropertyAmenities amenities={property.amenities} />
+          <PropertyPricePredictor />
         </div>
-        <div className="w-full shrink-0 lg:w-[380px]">
+        <div className="w-full shrink-0 lg:w-[378px]">
           <PropertyContactCard property={property} />
         </div>
       </div>

@@ -33,10 +33,35 @@ export const signupFormSchema = z
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirm_password: z.string().min(1, "Confirm your password"),
     agree_to_terms: z.literal(true, { error: "You must agree to continue" }),
+    // Broker-only "Verification Details" fields — required when
+    // role=broker (enforced below via superRefine), left blank/unused
+    // for role=client.
+    company_name: z.string().trim().optional(),
+    rera_number: z.string().trim().optional(),
+    service_area: z.string().trim().optional(),
   })
   .refine((values) => values.password === values.confirm_password, {
     message: "Passwords do not match",
     path: ["confirm_password"],
+  })
+  .superRefine((values, ctx) => {
+    if (values.role !== UserRole.broker) return;
+
+    if (!values.company_name) {
+      ctx.addIssue({ code: "custom", message: "Agency / firm name is required", path: ["company_name"] });
+    }
+    if (!values.rera_number) {
+      ctx.addIssue({ code: "custom", message: "License / RERA number is required", path: ["rera_number"] });
+    } else if (values.rera_number.length < 5 || values.rera_number.length > 50) {
+      ctx.addIssue({
+        code: "custom",
+        message: "RERA number must be between 5 and 50 characters",
+        path: ["rera_number"],
+      });
+    }
+    if (!values.service_area) {
+      ctx.addIssue({ code: "custom", message: "City of operation is required", path: ["service_area"] });
+    }
   });
 export type SignupFormValues = z.infer<typeof signupFormSchema>;
 

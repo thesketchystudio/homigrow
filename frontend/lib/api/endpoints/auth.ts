@@ -13,6 +13,10 @@ export type SignupPayload = {
   password: string;
   city?: string;
   state?: string;
+  // Broker-only "Verification Details" fields (Figma Step 2 form).
+  company_name?: string;
+  rera_number?: string;
+  service_area?: string;
 };
 
 export type SignupResponse = {

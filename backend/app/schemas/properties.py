@@ -4,20 +4,45 @@ app/schemas/properties.py
 Pydantic read shapes for the public property listing resources.
 """
 
-from datetime import datetime
-from typing import Optional
+from datetime import date, datetime
+from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from app.models.enums import (
     Furnishing,
+    LeadStatus,
     ListingType,
     MediaType,
+    OwnershipType,
+    PaymentStructure,
+    PriceFlexibility,
+    PropertyStatus,
     PropertyType,
     VerificationStatus,
 )
 from app.schemas._pagination import PaginatedResponse
+
+
+DESCRIPTION_MAX_WORDS = 250
+
+
+def _validate_description_length(value: Optional[str]) -> Optional[str]:
+    """
+    Caps a listing description at DESCRIPTION_MAX_WORDS words. The limit is
+    word-based (not character-based) to match the counter the Post Property
+    and Edit Listing forms show, so the two can't disagree. Blank input is
+    normalised to None so an empty textarea doesn't store an empty string.
+    """
+    if value is None:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    if len(value.split()) > DESCRIPTION_MAX_WORDS:
+        raise ValueError(f"Description must be {DESCRIPTION_MAX_WORDS} words or fewer")
+    return value
 
 
 class PropertyMediaRead(BaseModel):
@@ -31,6 +56,97 @@ class PropertyMediaRead(BaseModel):
     is_cover: bool
     width: Optional[int] = None
     height: Optional[int] = None
+
+
+class PlotDetails(BaseModel):
+    """Sub-fields shown only when property_type is "plot" — stored in Property.plot_details (JSONB)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    dimension: Optional[str] = Field(default=None, max_length=50)  # e.g. "30x40"
+    is_corner_plot: Optional[bool] = None
+
+
+class LandDetails(BaseModel):
+    """Sub-fields shown only when property_type is "land" — stored in Property.land_details (JSONB)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    land_use: Optional[str] = None  # "residential" | "commercial"
+    approvals: list[str] = []  # e.g. ["RERA", "BMRDA"]
+
+
+class JVPartner(BaseModel):
+    """One row of Property.jv_details.partners — a joint-venture co-owner and their stake."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str = Field(min_length=1, max_length=150)
+    role: Optional[str] = Field(default=None, max_length=100)
+    split_percent: Optional[float] = Field(default=None, ge=0, le=100)
+    email: Optional[str] = Field(default=None, max_length=255)
+    can_edit: bool = False
+    can_approve: bool = False
+    can_publish: bool = False
+
+
+class JVDetails(BaseModel):
+    """
+    Sub-fields shown only when Property.is_jv_property is true — stored in
+    Property.jv_details (JSONB). Not tied to a specific property_type: the
+    Figma design shows the same "Is this a JV Property?" toggle on every
+    Sell property type's Step 1 form.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    partners: list[JVPartner] = []
+    commission_mode: Optional[Literal["auto", "manual"]] = None
+    # Object key of the uploaded JV agreement document (private bucket, not
+    # a public URL) — set by POST /properties/{id}/jv-agreement, after the
+    # property already exists.
+    agreement_document_key: Optional[str] = None
+
+
+class PGDetails(BaseModel):
+    """
+    Sub-fields shown only when property_type is "pg_colive" — stored in
+    Property.pg_details (JSONB). Covers three distinct Figma sub-forms in
+    one flexible blob (same reasoning as PlotDetails/LandDetails: read and
+    written as a whole, never filtered on):
+      - Sell: building-level fields (listing_scope is None)
+      - Rent, "Entire Building" (listing_scope="entire")
+      - Rent, "Unit / Room" (listing_scope="unit")
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    listing_scope: Optional[Literal["entire", "unit"]] = None
+
+    # Sell: PG/co-living building details.
+    total_floors: Optional[int] = None
+    currently_operational: Optional[bool] = None
+    estimated_monthly_revenue: Optional[float] = None
+
+    # Shared across Sell and Rent/Entire.
+    total_rooms: Optional[int] = None
+    occupancy_types: list[str] = []  # e.g. ["Single", "Double", "Triple"]
+    gender: Optional[str] = None  # "Male" | "Female" | "Mixed"
+
+    # Rent/Entire only.
+    monthly_rent_per_bed: Optional[float] = None
+
+    # Rent/Unit only.
+    room_type: Optional[str] = None
+    floor: Optional[int] = None
+    bathroom_type: Optional[str] = None  # "Attached" | "Common"
+    ac: Optional[str] = None  # "AC" | "Non-AC"
+    gender_preference: Optional[str] = None  # "Male" | "Female" | "Any"
+    monthly_rent: Optional[float] = None
+
+    # Shared across both Rent sub-forms.
+    meals_included: Optional[bool] = None
+    amenities: list[str] = []
 
 
 class PropertyBrokerVerification(BaseModel):
@@ -55,12 +171,21 @@ class PropertyRead(BaseModel):
     id: UUID
     title: str
     description: Optional[str] = None
+    status: PropertyStatus
     listing_type: ListingType
     property_type: PropertyType
     price: float
+    price_per_sqft: Optional[float] = None
+    token_amount: Optional[float] = None
     maintenance_monthly: Optional[float] = None
     deposit: Optional[float] = None
     is_negotiable: bool
+    price_flexibility: Optional[PriceFlexibility] = None
+    payment_structure: Optional[PaymentStructure] = None
+    stamp_duty_percent: Optional[float] = None
+    registration_fee_percent: Optional[float] = None
+    brokerage_included: bool
+    brokerage_percent: Optional[float] = None
     bhk: Optional[int] = None
     bathrooms: Optional[int] = None
     area_sqft: Optional[float] = None
@@ -71,6 +196,14 @@ class PropertyRead(BaseModel):
     parking_slots: Optional[int] = None
     furnishing: Optional[Furnishing] = None
     amenities: list[str]
+    plot_details: Optional[PlotDetails] = None
+    land_details: Optional[LandDetails] = None
+    pg_details: Optional[PGDetails] = None
+    is_jv_property: bool
+    jv_details: Optional[JVDetails] = None
+    virtual_tour_url: Optional[str] = None
+    ownership_type: Optional[OwnershipType] = None
+    available_from: Optional[date] = None
     address_line: str
     locality: str
     city: str
@@ -112,6 +245,53 @@ class PropertyListResponse(PaginatedResponse[PropertyListItem]):
     """Pagination envelope for GET /properties: page/page_size in, total/total_pages computed for the caller."""
 
 
+class BrokerPropertyListItem(PropertyListItem):
+    """
+    GET /properties/mine's card shape — PropertyListItem plus status and
+    created_at, since a broker (unlike the public search grid) needs to see
+    draft/pending listings too (which have no published_at yet) and the
+    Listings table's "Listed Xd ago" column needs a timestamp that's always
+    present regardless of status. views_count/leads_count back the Listings
+    table's Performance column — real per-property aggregates from
+    PropertyView/Lead, computed via a correlated subquery per row rather
+    than the Property Detail page's N+1-safe-for-one-row query pattern.
+    """
+
+    status: PropertyStatus
+    created_at: datetime
+    views_count: int
+    leads_count: int
+
+
+class BrokerPropertyLeadSummary(BaseModel):
+    """One row of a BrokerPropertyDetailRead's recent-leads list — just enough to render a name/time/status row."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    contact_name: Optional[str] = None
+    status: LeadStatus
+    created_at: datetime
+
+
+class BrokerPropertyDetailRead(PropertyRead):
+    """
+    GET /properties/mine/{id}'s shape — PropertyRead plus the broker
+    Property Detail page's Performance card. leads_count/recent_leads and
+    shortlisted_count are computed from the real Lead/SavedProperty tables;
+    views_count is a real count from the property_views log (added for the
+    broker Analytics page), not the dead Property.views_count column. There
+    is still no per-day view time series scoped to a single property, so
+    the page renders an honest "coming soon" placeholder for that chart
+    instead of fabricating trend data.
+    """
+
+    views_count: int
+    leads_count: int
+    shortlisted_count: int
+    recent_leads: list[BrokerPropertyLeadSummary]
+
+
 class PropertyCompareResponse(BaseModel):
     """GET /properties/compare — a normalized spec table, reusing PropertyRead's full field set."""
 
@@ -125,3 +305,118 @@ class NeighborhoodSummary(BaseModel):
     city: str
     property_count: int
     cover_image_url: Optional[str] = None
+
+
+class PropertyCreateRequest(BaseModel):
+    """
+    The Post Property wizard's full submission — Step 1 (Property Info) +
+    Step 3 (Pricing) fields together in one request. Steps 1 and 2 only
+    collect data client-side; nothing is persisted until this fires,
+    because `Property.price` is NOT NULL with a `price > 0` check
+    constraint, so a valid row can't exist before pricing is known.
+    Supports residential listings (apartment/villa/independent_house),
+    Plot, Land, PG/co-living (Sell and Rent, including Rent's Entire
+    Building / Unit-Room split), and the Rent-only commercial types
+    (shop/commercial_building/built_to_suit) — plus a cross-cutting JV
+    toggle available on any Sell property type. The schema itself doesn't
+    enforce which property_type values are "allowed" for a given
+    listing_type; the wizard's frontend does, by only offering the
+    combinations it has a Step 1 sub-form for.
+    """
+
+    title: str = Field(min_length=1, max_length=200)
+    description: Optional[str] = None
+    listing_type: ListingType
+    property_type: PropertyType
+    bhk: Optional[int] = None
+    bathrooms: Optional[int] = None
+    area_sqft: Optional[float] = Field(default=None, gt=0)
+    facing: Optional[str] = Field(default=None, max_length=20)
+    furnishing: Optional[Furnishing] = None
+    built_year: Optional[int] = None
+    amenities: list[str] = []
+    plot_details: Optional[PlotDetails] = None
+    land_details: Optional[LandDetails] = None
+    pg_details: Optional[PGDetails] = None
+    is_jv_property: bool = False
+    jv_details: Optional[JVDetails] = None
+    virtual_tour_url: Optional[str] = Field(default=None, max_length=500)
+    address_line: str = Field(min_length=1, max_length=255)
+    locality: str = Field(min_length=1, max_length=100)
+    city: str = Field(min_length=1, max_length=100)
+    state: str = Field(min_length=1, max_length=100)
+    pincode: str = Field(min_length=1, max_length=6)
+    landmark: Optional[str] = None
+    price: float = Field(gt=0)
+    price_per_sqft: Optional[float] = Field(default=None, gt=0)
+    token_amount: Optional[float] = Field(default=None, gt=0)
+    maintenance_monthly: Optional[float] = Field(default=None, gt=0)
+    deposit: Optional[float] = Field(default=None, gt=0)
+    is_negotiable: bool = False
+    price_flexibility: Optional[PriceFlexibility] = None
+    payment_structure: Optional[PaymentStructure] = None
+    stamp_duty_percent: Optional[float] = Field(default=None, ge=0)
+    registration_fee_percent: Optional[float] = Field(default=None, ge=0)
+    brokerage_included: bool = True
+    brokerage_percent: Optional[float] = Field(default=None, ge=0)
+
+    @field_validator("description")
+    @classmethod
+    def _check_description(cls, value: Optional[str]) -> Optional[str]:
+        return _validate_description_length(value)
+
+
+class PropertyUpdateRequest(BaseModel):
+    """
+    The Edit Listing form's submission (Figma node 177:4065). Every field is
+    optional and only the ones present in the request body are applied
+    (service layer reads this via `model_dump(exclude_unset=True)`) — a
+    genuine partial PATCH, not a full replace. Deliberately excludes
+    listing_type and property_type: both determine which type-specific
+    sub-form (plot/land/pg/jv) applies to a listing, and changing either
+    post-creation is not supported by this endpoint.
+    """
+
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    description: Optional[str] = None
+    bhk: Optional[int] = None
+    bathrooms: Optional[int] = None
+    area_sqft: Optional[float] = Field(default=None, gt=0)
+    floor: Optional[int] = None
+    total_floors: Optional[int] = None
+    facing: Optional[str] = Field(default=None, max_length=20)
+    furnishing: Optional[Furnishing] = None
+    built_year: Optional[int] = None
+    parking_slots: Optional[int] = None
+    amenities: Optional[list[str]] = None
+    plot_details: Optional[PlotDetails] = None
+    land_details: Optional[LandDetails] = None
+    pg_details: Optional[PGDetails] = None
+    is_jv_property: Optional[bool] = None
+    jv_details: Optional[JVDetails] = None
+    virtual_tour_url: Optional[str] = Field(default=None, max_length=500)
+    ownership_type: Optional[OwnershipType] = None
+    available_from: Optional[date] = None
+    address_line: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    locality: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    city: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    state: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    pincode: Optional[str] = Field(default=None, min_length=1, max_length=6)
+    landmark: Optional[str] = None
+    price: Optional[float] = Field(default=None, gt=0)
+    price_per_sqft: Optional[float] = Field(default=None, gt=0)
+    token_amount: Optional[float] = Field(default=None, gt=0)
+    maintenance_monthly: Optional[float] = Field(default=None, gt=0)
+    deposit: Optional[float] = Field(default=None, gt=0)
+    is_negotiable: Optional[bool] = None
+    price_flexibility: Optional[PriceFlexibility] = None
+    payment_structure: Optional[PaymentStructure] = None
+    stamp_duty_percent: Optional[float] = Field(default=None, ge=0)
+    registration_fee_percent: Optional[float] = Field(default=None, ge=0)
+    brokerage_included: Optional[bool] = None
+    brokerage_percent: Optional[float] = Field(default=None, ge=0)
+
+    @field_validator("description")
+    @classmethod
+    def _check_description(cls, value: Optional[str]) -> Optional[str]:
+        return _validate_description_length(value)

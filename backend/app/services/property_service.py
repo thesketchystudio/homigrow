@@ -7,16 +7,18 @@ nothing today needs a broker to view their own unpublished property ahead
 of moderation.
 """
 
+import re
 from typing import Literal, Optional
 from uuid import UUID
 
 from sqlalchemy import Text, func, or_
-from sqlalchemy.dialects.postgresql import array
+from sqlalchemy.dialects.postgresql import array, insert as pg_insert
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.exceptions import NotFoundError, ValidationFailed
 from app.models.enums import ListingType, PropertyStatus, PropertyType
 from app.models.property import Property, PropertyMedia
+from app.models.property_view import PropertyView
 from app.models.user import User
 from app.schemas.properties import NeighborhoodSummary, PropertyListItem
 from app.services._property_query_helpers import build_property_list_item, cover_image_subquery
@@ -33,6 +35,79 @@ _SORT_CLAUSES = {
 # Comparison screen's own Figma copy says "up to 3"), not a parsing limit.
 MAX_COMPARE_IDS = 3
 
+# Words to drop when parsing a nav-search query — connective filler that
+# carries no signal once a property-type token has been pulled out (e.g.
+# "villas in indiranagar" -> "indiranagar", not "in indiranagar").
+_SEARCH_STOPWORDS = {"in", "at", "near", "for", "a", "the", "properties", "property"}
+
+# Multi-word aliases are checked first, as substrings, since PropertyType's
+# own two-word values ("independent_house") don't tokenize the way a single
+# search word does. Checked before the single-word map below so "independent
+# house" resolves as one type rather than leaving "independent" as stray
+# area text.
+_MULTI_WORD_PROPERTY_TYPE_ALIASES: dict[str, PropertyType] = {
+    "independent house": PropertyType.independent_house,
+    "independent houses": PropertyType.independent_house,
+    "co living": PropertyType.pg_colive,
+    "co-living": PropertyType.pg_colive,
+}
+
+_PROPERTY_TYPE_ALIASES: dict[str, PropertyType] = {
+    "villa": PropertyType.villa,
+    "villas": PropertyType.villa,
+    "apartment": PropertyType.apartment,
+    "apartments": PropertyType.apartment,
+    "flat": PropertyType.apartment,
+    "flats": PropertyType.apartment,
+    "house": PropertyType.independent_house,
+    "houses": PropertyType.independent_house,
+    "plot": PropertyType.plot,
+    "plots": PropertyType.plot,
+    "land": PropertyType.plot,
+    "office": PropertyType.office,
+    "offices": PropertyType.office,
+    "shop": PropertyType.shop,
+    "shops": PropertyType.shop,
+    "store": PropertyType.shop,
+    "stores": PropertyType.shop,
+    "pg": PropertyType.pg_colive,
+    "colive": PropertyType.pg_colive,
+    "coliving": PropertyType.pg_colive,
+}
+
+
+def _parse_search_query(search: str) -> tuple[Optional[PropertyType], Optional[str]]:
+    """
+    Splits a free-text nav-search query into an optional property type
+    (matched against known type names/plurals, e.g. "villas" -> villa) and
+    the remaining words joined back into an area phrase — so "villas in
+    indiranagar" resolves to property_type=villa + area="indiranagar"
+    instead of one dead substring match against the literal full phrase.
+    Returns (None, None) when no type token is found, so the caller can
+    fall back to today's plain whole-string substring match.
+    """
+    normalized = re.sub(r"\s+", " ", search.strip().lower())
+    matched_type: Optional[PropertyType] = None
+
+    for phrase, property_type in _MULTI_WORD_PROPERTY_TYPE_ALIASES.items():
+        if phrase in normalized:
+            matched_type = property_type
+            normalized = normalized.replace(phrase, " ")
+            break
+
+    remaining: list[str] = []
+    for token in normalized.split(" "):
+        if not token or token in _SEARCH_STOPWORDS:
+            continue
+        if matched_type is None and token in _PROPERTY_TYPE_ALIASES:
+            matched_type = _PROPERTY_TYPE_ALIASES[token]
+            continue
+        remaining.append(token)
+
+    if matched_type is None:
+        return None, None
+    return matched_type, " ".join(remaining) or None
+
 
 def get_property_detail(db: Session, property_id: UUID) -> Property:
     """Returns an active property with its media and broker eager-loaded, or 404s."""
@@ -48,6 +123,24 @@ def get_property_detail(db: Session, property_id: UUID) -> Property:
     if property_ is None or property_.status != PropertyStatus.active:
         raise NotFoundError("PROPERTY_NOT_FOUND", "Property not found.")
     return property_
+
+
+def record_view(db: Session, property_id: UUID, viewer_id: Optional[UUID]) -> None:
+    """
+    Logs one property-detail view for the broker Analytics page. Logged-in
+    viewers are deduped via ON CONFLICT DO NOTHING against the partial
+    unique index on (property_id, viewer_id) — a repeat view from the same
+    account is a no-op. Anonymous viewers (viewer_id is None) fall outside
+    that partial index, so every anonymous view is logged as its own row;
+    there's no stable identity to dedupe an anonymous visitor against.
+    """
+    stmt = pg_insert(PropertyView).values(property_id=property_id, viewer_id=viewer_id)
+    stmt = stmt.on_conflict_do_nothing(
+        index_elements=[PropertyView.property_id, PropertyView.viewer_id],
+        index_where=PropertyView.viewer_id.isnot(None),
+    )
+    db.execute(stmt)
+    db.commit()
 
 
 def compare_properties(db: Session, ids: list[UUID]) -> list[Property]:
@@ -99,14 +192,16 @@ def list_properties(
     JSONB `?|`), matching the sidebar's multi-select checkbox UX. `city`/
     `locality` are exact (case-insensitive) matches, driven by dropdowns
     and neighborhood links that already know the precise value. `search`
-    is separate: a free-text substring match against title, description,
-    city, locality, landmark, and amenities (matches ANY of them) — for
-    the nav search box, which can't know what kind of value was typed.
-    Deliberately just substring matching, not keyword/facet parsing (e.g.
-    detecting "villa" or "4bhk" as a structured filter) — that's already
-    covered precisely by the `property_type`/`bhk_min` params and the
-    Listings sidebar built on them; a second, fuzzier way to do the same
-    filtering would only be inconsistent with it.
+    is separate, for the nav search box, which can't know what kind of
+    value was typed: `_parse_search_query` first tries to pull a known
+    property type out of it (e.g. "villas in indiranagar" -> type=villa,
+    area="indiranagar"), filtering by the structured `property_type`
+    column plus a substring match on the remaining words against city/
+    locality/landmark. When no type token is found, falls back to the
+    original plain substring match against title, description, city,
+    locality, landmark, and amenities (matches ANY of them) — so a bare
+    keyword search (a title word, an amenity, ...) still works exactly as
+    before.
     """
     conditions = [Property.status == PropertyStatus.active]
     if city:
@@ -114,17 +209,30 @@ def list_properties(
     if locality:
         conditions.append(func.lower(Property.locality) == locality.lower())
     if search:
-        pattern = f"%{search.lower()}%"
-        conditions.append(
-            or_(
-                func.lower(Property.title).like(pattern),
-                func.lower(Property.description).like(pattern),
-                func.lower(Property.city).like(pattern),
-                func.lower(Property.locality).like(pattern),
-                func.lower(Property.landmark).like(pattern),
-                func.lower(Property.amenities.cast(Text)).like(pattern),
+        parsed_type, area = _parse_search_query(search)
+        if parsed_type is not None:
+            conditions.append(Property.property_type == parsed_type)
+            if area:
+                pattern = f"%{area}%"
+                conditions.append(
+                    or_(
+                        func.lower(Property.city).like(pattern),
+                        func.lower(Property.locality).like(pattern),
+                        func.lower(Property.landmark).like(pattern),
+                    )
+                )
+        else:
+            pattern = f"%{search.lower()}%"
+            conditions.append(
+                or_(
+                    func.lower(Property.title).like(pattern),
+                    func.lower(Property.description).like(pattern),
+                    func.lower(Property.city).like(pattern),
+                    func.lower(Property.locality).like(pattern),
+                    func.lower(Property.landmark).like(pattern),
+                    func.lower(Property.amenities.cast(Text)).like(pattern),
+                )
             )
-        )
     if listing_type is not None:
         conditions.append(Property.listing_type == listing_type)
     if property_type:

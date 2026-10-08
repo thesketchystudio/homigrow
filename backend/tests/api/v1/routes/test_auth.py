@@ -77,10 +77,57 @@ class TestSignupRoute:
         assert response.status_code == 409
         assert response.json()["error"]["code"] == "EMAIL_TAKEN"
 
+    def test_duplicate_rera_number_returns_409(self, client):
+        payload = {"role": "broker", "rera_number": "RERA-KA-99001", "company_name": "Acme"}
+        first = client.post(
+            "/api/v1/auth/signup",
+            json={**payload, "phone": "+919876540031", "email": "rera-a@example.com"},
+        )
+        assert first.status_code == 201
+
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={**payload, "phone": "+919876540032", "email": "rera-b@example.com"},
+        )
+
+        assert response.status_code == 409
+        assert response.json()["error"]["code"] == "RERA_TAKEN"
+
     def test_weak_password_returns_422(self, client):
         response = client.post(
             "/api/v1/auth/signup",
             json={"phone": "+919876540004", "role": "client", "email": "weakpass4@example.com", "password": "whatever"},
+        )
+
+        assert response.status_code == 422
+
+    def test_broker_signup_accepts_verification_details(self, client):
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={
+                "phone": "+919876540007",
+                "role": "broker",
+                "full_name": "Test Broker",
+                "email": "testbroker7@example.com",
+                "password": "s3cure-pass",
+                "company_name": "Test Realty",
+                "rera_number": "RERA-KA-11223",
+                "service_area": "Bengaluru",
+            },
+        )
+
+        assert response.status_code == 201
+
+    def test_short_rera_number_returns_422(self, client):
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={
+                "phone": "+919876540008",
+                "role": "broker",
+                "email": "shortrera8@example.com",
+                "password": "s3cure-pass",
+                "rera_number": "AB1",
+            },
         )
 
         assert response.status_code == 422

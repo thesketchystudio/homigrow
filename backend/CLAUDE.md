@@ -1,0 +1,805 @@
+## Backend Status
+
+Backend-specific ongoing status and decisions — loads automatically
+when working under `backend/`. See the root `CLAUDE.md` for
+project-wide rules (git workflow, secrets, coding standards) and
+shared Phase 1 history; see `frontend/CLAUDE.md` for frontend status.
+
+### ⏳ Pending — Phase 2 (Weeks 5–8)
+- P2-T10 `sms_service.py` MSG91 adapter — shelved 2026-07-14, not
+  needed for signup verification (email OTP instead, see P2-T11
+  above); revisit only if a future phone-based flow (2FA, phone
+  login) is actually designed
+- P2-T12 OTP-login path — out of current scope 2026-07-14, no
+  OTP-login screen exists in the Figma design (password login only)
+- P2-T32 2FA (TOTP) backend — explicitly deferred to P4, see T27/T31
+  notes above
+- **CORS closed 2026-07-14** — `CORSMiddleware` added in `app/main.py`
+  (`allow_origins=[settings.FRONTEND_ORIGIN]`, `allow_credentials=True`),
+  needed once frontend Phase 2's real signup form started making real
+  cross-origin `fetch()` calls. Verified live: an OPTIONS preflight from
+  `Origin: http://localhost:3000` returns the right `access-control-*`
+  headers, and a real end-to-end `POST /auth/signup` from that origin
+  succeeds (201, user row created and deleted after verifying). 131/131
+  tests still pass.
+- **P2-T17/T18 shipped 2026-07-15** — see Frontend Phase 2 below.
+- **Duplicate-email signup bug fixed 2026-07-16** — `auth_service.signup()`
+  relied on catching `IntegrityError` around `db.commit()` to turn a
+  duplicate email into `409 EMAIL_TAKEN`, but the unique-constraint
+  violation actually fires at the `db.flush()` a few lines earlier
+  (needed to assign `user.id` for the broker_profile FK), outside that
+  try/except — so it fell through to the catch-all handler as a bare
+  `500 INTERNAL_ERROR` instead. Found via manual UI testing, not a test
+  gap that was ever exercised: there was a `test_duplicate_phone_returns_409`
+  but no email equivalent. Fixed by checking `User.email` proactively
+  before any insert, same pattern as the existing phone check; added
+  the missing test. 133/133 tests pass (1 new). New
+  **`backend/scripts/delete_test_user.py`** — deletes a given email's
+  `otp_codes` + `users` row (cascades to `broker_profiles`/
+  `refresh_tokens`) so one real email can be reused repeatedly for
+  manual signup testing, since Resend's sandbox only delivers to one
+  verified address.
+- **Signup now auto-logs in after email verification, 2026-07-16** —
+  previously `POST /auth/otp/verify` always returned a bare 204, so the
+  signup wizard sent a freshly verified user to `/login` to type their
+  password a second time right after supplying it. For
+  `OTPPurpose.signup` specifically, `verify_otp()` now also mints a
+  session (same `_issue_session()` helper `login()` uses) and the route
+  returns the same `TokenResponse` shape as `/login`/`/refresh` (200 +
+  refresh cookie) instead of 204; every other purpose (`broker_verification`)
+  is unchanged and still returns a bare 204, since that fires from an
+  already-logged-in broker's profile, not a fresh signup. Frontend:
+  `SignupWizard.tsx` now calls `setAuth()` with the returned session and
+  redirects straight to `/` instead of `/login`. 133/133 backend tests
+  pass (1 new, covering the broker_verification purpose is unaffected).
+  Live-verified with Playwright: signed up a fresh user, verified the
+  OTP, landed directly on `/` with no login screen — confirmed genuinely
+  authenticated (not just coincidentally on `/`) by visiting
+  `/broker/dashboard` immediately after and getting redirected home for
+  a role mismatch rather than to `/login`.
+
+### Backend Phase 2 — Broker signup (on `feature/phase_2_backend_broker`, cut
+from `dev` 2026-08-14 — this branch existed as an empty pointer since the
+2026-07-21 portal split but had no commits until now; fast-forwarded 96
+commits to `dev` before starting)
+- **Broker verification-details signup + document upload shipped
+  2026-08-14** — pulled forward from its originally-scheduled P4 slot
+  (`11_Phase_4.md` P4-T11), same pattern as the homepage in Phase 1, per
+  your explicit call after reviewing the real Figma "Broker - Sign up"
+  section (node `431:279`, Onboarding page) and finding it fully
+  designed already: a 3-step wizard sharing the client signup shell,
+  Step 2 form with a broker-only "Verification Details" block (Agency/
+  Firm Name, License/RERA No., City of Operation) appended below the
+  usual fields, Step 3 a two-file document upload ("Broker
+  verification"), then two post-submit status screens
+  (`BrokerPendingScreen`/`BrokerStatusScreen`) with no client
+  equivalent. **Schema needed zero migration** — `broker_profiles`
+  already had `rera_number`, `company_name`, `verification_status`
+  (`unverified/pending/verified/rejected`), `verification_documents`
+  jsonb (`[{type, url, uploaded_at}]`), and `service_areas` jsonb since
+  M1; the architecture doc had already designed this exact shape, just
+  scheduled later. No dedicated "City of Operation" column exists —
+  seeds `service_areas` as a one-item list instead, since Figma's
+  single field is just that list's first entry (P4-T10's later profile
+  edit screen is where it'd grow to multiple areas).
+  `SignupRequest` gained 3 optional broker-only fields
+  (`company_name`/`rera_number`/`service_area`), written onto the
+  `broker_profile` row `signup()` already creates — same pattern as
+  the existing `city`/`state` fields, submitted in the same call as
+  the rest of the form (unlike the client Phase B buyer-preference
+  wizard, which is genuinely post-login; Figma bundles broker's
+  verification fields into the Step 2 form itself). **RERA numbers
+  have no fixed format** — confirmed each state RERA authority issues
+  its own scheme (Maharashtra, Karnataka, etc. all differ) — so
+  `rera_number` only gets a basic 5–50 character sanity check, not a
+  format/regex validation.
+  New `POST /api/v1/brokers/me/verification-documents`
+  (`app/api/v1/routes/brokers.py`, `app/services/broker_service.py`) —
+  authenticated, broker-only, accepts the two files as multipart,
+  uploads both, replaces `verification_documents` outright (not
+  append — same call handles first submit and resubmit-after-rejection),
+  and flips `verification_status` to `pending`. **No admin review or
+  content verification exists** — explicitly out of scope per your
+  instruction ("accept any documents uploaded to get to the next
+  part"); that's P4-T12, a separate later task.
+  New **`app/services/storage_service.py`** — uploads via the S3
+  protocol (boto3) against **Supabase Storage's S3-compatible
+  endpoint**, not Cloudflare R2 (the originally planned provider,
+  `00_Project_Overview.md`) — R2 requires a card on file to activate
+  even its free $0 tier, which wasn't available this session; flagged
+  in ClickUp (`need clarification` status, see below) rather than
+  silently substituted. Since the code talks to storage purely via the
+  S3 protocol, swapping to R2 later is a config/endpoint change, not a
+  rewrite. Bucket is private (`broker-documents`); the module returns
+  internal object keys, not fetchable URLs — presigned-GET generation
+  is a P4 concern (nothing reads these back yet). Validates content
+  type (PDF/JPG/PNG only) and a 5MB max, matching Figma's own upload
+  copy — this is input hygiene, not the "verification" that's out of
+  scope; new `BrokerDocumentType` enum (`app/models/enums.py`, not a
+  Postgres type — it only ever lives inside the JSONB, never a column).
+  New config: `SUPABASE_ACCESS_KEY_ID`/`SUPABASE_SECRET_ACCESS_KEY`/
+  `SUPABASE_S3_ENDPOINT`/`SUPABASE_S3_REGION`/`SUPABASE_S3_BUCKET`, all
+  default `""` (feature-gated, same pattern as `GOOGLE_CLIENT_ID`/
+  `MSG91_AUTH_KEY`, not fail-fast-required). New deps: `boto3==1.43.70`,
+  `python-multipart==0.0.20` (the latter needed for FastAPI's
+  `UploadFile`/`File(...)` params — first multipart route in the
+  codebase). 195→211 tests pass (16 new across
+  `tests/services/test_auth_service_signup.py`,
+  `tests/api/v1/routes/test_auth.py`,
+  `tests/services/test_storage_service.py`,
+  `tests/services/test_broker_service.py`,
+  `tests/api/v1/routes/test_brokers.py`); new autouse
+  `_mock_s3_client` fixture in `conftest.py` stubs only the boto3
+  client itself (not the whole `upload_broker_document` function), so
+  the real validation logic (content type/size) stays genuinely
+  exercised in tests, mirroring the existing `email_service` mocking
+  precedent. `ruff` clean.
+  **Two real bugs found only by live-verifying against the real
+  Supabase project, not by the passing test suite (which mocks the S3
+  client entirely):** (1) boto3 defaults to virtual-hosted-style S3
+  addressing (`bucket.endpoint/key`), but Supabase's S3-compatible
+  endpoint only supports path-style (`endpoint/bucket/key`) — every
+  real upload 500'd inside botocore with an empty error message until
+  `Config(s3={"addressing_style": "path"})` was added to the client;
+  (2) the bucket you'd created in the Supabase dashboard was actually
+  named `broker-dcouments` (typo — missing "u") while `.env` and the
+  code both expected `broker-documents` — `put_object` failed because
+  the target bucket genuinely didn't exist under that name;
+  `list_buckets()` surfaced the actual name directly. Fixed by you
+  creating a correctly-named bucket (your choice over renaming/config
+  workaround). Live-verified end-to-end against the real Supabase dev
+  DB + real Supabase Storage bucket via curl, using a throwaway
+  worktree server (`python -m uvicorn`, not the bare `uvicorn` shim —
+  same past gotcha): broker signup with verification-details fields →
+  201 → OTP verify → auto-login (existing P2-T11 behavior) → real
+  multipart upload of a PDF + JPG → `200 {"verification_status":
+  "pending"}` → confirmed via direct SQL that `company_name`/
+  `rera_number`/`service_areas`/`verification_documents` all landed
+  correctly → confirmed via `list_objects_v2` that both files
+  genuinely exist in the bucket → confirmed a client-role token gets
+  `403` and an unsupported file type (`.zip`) gets `422
+  UNSUPPORTED_FILE_TYPE`. Test user, throwaway client user, and both
+  uploaded objects deleted afterward.
+- **Frontend (Step 2 broker fields, Step 3 upload screen, pending/
+  rejected status screens) not started** — separate task, backend-first
+  per your explicit ordering.
+
+### Backend Phase 3 (on `feature/phase_3_backend_client`, cut from `dev`)
+- **Property Details read API shipped 2026-07-29** — `GET /api/v1/properties/{id}`,
+  the first Property CRUD/read work (P3-T04), built backend-first per this
+  session's explicit ordering (backend → frontend → homepage-linking, each a
+  separate task). Public, no auth — serves the Property Details screen.
+  New `app/schemas/properties.py` (`PropertyRead`/`PropertyMediaRead`/
+  `PropertyBrokerRead`, `metro_distance_km` as a `@computed_field` from
+  `metro_distance_m`, same convention `config.py` uses for `DATABASE_URL`),
+  `app/services/property_service.py` (`get_property_detail`: 404s via the
+  existing `NotFoundError` if missing or `status != active` — no
+  owner-preview-while-pending path, nothing needs it yet), and
+  `app/api/v1/routes/properties.py`, registered in `router.py`.
+  **Migration M6** closes two real gaps found by checking the Figma
+  "property details" screen's Quick Stats against the model: added
+  `parking_slots` (no column existed for parking count at all), and
+  replaced `age_years` with `built_year` — the design shows a fixed
+  "Year Built: 2022", not a relative age, and storing age as an offset
+  would silently go stale every year; `age_years` was referenced only in
+  the M1 migration and the model itself (confirmed via grep), so the
+  swap is a clean replacement, not a breaking change. Upgrade → downgrade
+  → upgrade verified clean against the real dev DB. New
+  **`scripts/create_test_property.py`** / **`delete_test_property.py`**
+  (paired like the existing test-user scripts) seed one real, active
+  demo property ("The Obsidian Estate", matching the Figma content
+  exactly — price, bhk/bathrooms/area, amenities, description, 4 media
+  rows on stable placeholder image URLs since no R2/Stream pipeline
+  exists yet) plus a broker fixture user — broker-side property
+  creation isn't built yet (deferred to a future broker page), so this
+  is the standing way to get real data to develop the frontend screen
+  against. 155/155 tests pass (5 new, `tests/api/v1/routes/
+  test_properties.py`); `ruff` clean. Live-verified end-to-end against
+  the real Supabase dev DB: ran the seed script, confirmed the full
+  response shape via curl (including `parking_slots`/`built_year`/
+  `metro_distance_km` and the nested `broker.broker_profile.
+  verification_status`), confirmed a missing id and a non-active status
+  both return `404 PROPERTY_NOT_FOUND`. **The seeded property is left in
+  the DB on purpose** (not cleaned up like other verification scripts)
+  since the very next task is building the frontend screen against this
+  exact real record.
+  **Deferred, not part of this task:** the Vaastu Compliance checker,
+  "Redesign with AI" button, and Market Context/"Download Market
+  Report" card from the Figma design (node IDs recorded in project
+  memory); `POST /properties/{id}/enquire` (contact-form submission);
+  linking the page in from the homepage/`PropertyCard` — all separate,
+  later tasks (tracked in ClickUp).
+- **Compare properties endpoint shipped 2026-08-04** (P3-T42, backend
+  half) — `GET /api/v1/properties/compare?ids=a,b,c`, public, reusing
+  `PropertyRead` as the normalized spec table (`PropertyCompareResponse`
+  in `app/schemas/properties.py`). New `compare_properties()` in
+  `app/services/property_service.py` (same eager-load pattern as
+  `get_property_detail`, filters to active only, silently drops
+  missing/non-active ids, reorders results back into the caller's
+  requested id order since SQL `IN` doesn't preserve it). Route parses
+  the comma-separated `ids` query string itself, raising
+  `422 INVALID_COMPARE_IDS`/`422 TOO_MANY_COMPARE_IDS`; registered ahead
+  of `GET /{property_id}` in the router file as defensive ordering.
+  **Max compare count resolved as 3, not the 4 originally drafted in
+  `05_API_Design.md`** — the real Figma "Comparison" screen's own hint
+  copy says "up to 3", found only once the design was actually pulled
+  this session (no Figma access was available when this task was first
+  scoped); both `05_API_Design.md` and this file's own P3-T42 backlog
+  line in `10_Phase_3.md` were corrected from 4 to 3 to match, your
+  explicit call over the alternative of changing the Figma copy. 185/185
+  tests pass (5 new); `ruff` clean. Live-verified against the real
+  Supabase dev DB + seeded demo properties via curl: order preservation,
+  a missing id and a non-active id both silently dropped, a malformed id
+  and a 4th id both correctly 422.
+- **Property Listings search endpoint shipped 2026-07-30** —
+  `GET /api/v1/properties`, the search/grid endpoint backing the
+  Listings page (10_Phase_3.md P3-T10), built after pulling the real
+  Figma "Curated Listings" screen (`search` frame, node `28:646`,
+  `Client view` page) so frontend work lands on the same real design.
+  That screen's filter sidebar has more filters than real schema
+  supports today (a named metro-station picker, commercial
+  sub-categories like Cafe/Restaurant, a "founder's property" toggle,
+  a map view) — scoped down to what real columns/enums back, same
+  pattern as Property Details' Vaastu/AI/Market-Report deferrals;
+  confirmed with you before building. Filters: `city` (case-
+  insensitive exact match), `listing_type`, `property_type`
+  (repeatable), `price_min`/`price_max`, `bhk_min`, `amenities`
+  (repeatable, matches ANY via Postgres JSONB `?|` — mirrors the
+  sidebar's multi-select checkboxes). Sort: `newest` (default,
+  `published_at desc nullslast`) / `price_asc` / `price_desc` — an
+  invalid `sort` value 422s automatically via a `Literal` type, no
+  custom validation code needed. Pagination: `page`/`page_size`
+  (default 20, max 50, doc's existing convention), response envelope
+  is `{items, page, page_size, total, total_pages}`. New
+  `PropertyListItem`/`PropertyListResponse` in `schemas/properties.py`
+  (lighter than `PropertyRead` — no media gallery/broker detail, just
+  one cover image via a correlated subquery on `PropertyMedia.
+  is_cover`) and `property_service.list_properties()`. **Found and
+  fixed a real gap while building this:** `published_at` was declared
+  on the `Property` model and even has a dedicated partial index
+  (`ix_properties_active_published_at`) but was never actually *set*
+  anywhere — not by the seed script, not by anything else — so
+  "newest first" sorting had nothing real to sort by. Fixed
+  `create_test_property.py` to set it, backfilled the one existing
+  Obsidian Estate row (which predated this fix) directly against the
+  dev DB, and set staggered values in the new seed data below so
+  "newest" sort has a real, distinct order to verify against. New
+  **`scripts/seed_demo_properties.py`**/**`delete_demo_properties.py`**
+  (same create/delete pair convention as `create_test_property.py`) —
+  10 more active demo listings spanning 5 cities (Bengaluru, Mumbai,
+  Delhi, Gurugram, Pune, Hyderabad, Chennai), all 3 `ListingType`
+  values, 6 of the 7 `PropertyType` values, and a price range from
+  ₹18k/mo rent to ₹6.5 Cr sale — enough real variation to exercise
+  every filter combination once the frontend grid exists. 167/167
+  tests pass (12 new, `TestListProperties` in the existing
+  `test_properties.py`); `ruff` clean. **Test isolation note:** these
+  tests run against the real dev DB (`tests/conftest.py`'s
+  transactional rollback only undoes what a test itself inserts, not
+  pre-existing committed rows like the intentionally-left-seeded
+  Obsidian Estate) — every list test scopes its query to a per-test
+  throwaway city name to stay exact regardless of what else is
+  sitting in the shared dev DB. Live-verified end-to-end against the
+  real Supabase dev DB: ran both seed scripts, then curled every
+  filter/sort/pagination combination and confirmed exact matching
+  result sets, plus confirmed `sort=bogus` and `page_size=999` both
+  422. Checked the query plan (`EXPLAIN ANALYZE`) for a representative
+  filtered query — the composite indexes (`ix_properties_status_
+  listing_type`, `ix_properties_city_locality`, `ix_properties_price`)
+  are correctly shaped for this access pattern; at the current ~11-row
+  seed volume Postgres reasonably picks a sequential scan over them
+  (expected at this scale, not a bug) — P3-T10's literal ask for an
+  EXPLAIN ANALYZE against ~1k seeded rows was descoped along with the
+  rest of the "handful of varied properties" plan agreed with you,
+  not silently skipped.
+- **Backend cleanup review completed 2026-07-31, no changes needed** —
+  once the frontend Listings/Details pages were brought fully in line
+  with Figma, checked the backend for real cleanup work before touching
+  anything: `ruff check` clean, 167/167 tests pass, no stray TODO/FIXME
+  markers, and the one `alembic check` finding (`spatial_ref_sys`) is
+  the known-harmless PostGIS extension artifact, not real drift. Read
+  through `property_service.py`/`routes/properties.py` in full — nothing
+  actionable found. **One real gap surfaced and deliberately left
+  open:** `10_Phase_3.md` P3-T04 scopes `GET /properties/{id}/similar`
+  alongside the detail endpoint, but it was never built, and no
+  "Similar Properties" section exists in the Figma Property Details
+  frame either — building it now would be an endpoint with zero
+  consumers, so it stays un-built and just noted here rather than
+  silently dropped from the record.
+- **Saved Properties backend shipped 2026-08-03** (P3-T40, backend
+  half only) — `GET /api/v1/saved-properties` (paginated, newest-saved
+  first, embeds the same `PropertyListItem`/PropertyCard shape the
+  Listings endpoint uses, plus a `saved_at` timestamp),
+  `PUT /api/v1/saved-properties/{property_id}` (idempotent save, 204;
+  404 `PROPERTY_NOT_FOUND` if the property doesn't exist at all), and
+  `DELETE /api/v1/saved-properties/{property_id}` (idempotent unsave,
+  204 whether or not it was ever saved). New
+  `app/schemas/saved_properties.py` (`SavedPropertyItem` extends
+  `PropertyListItem` with `saved_at`, same `PropertyListResponse`
+  pagination-envelope convention), `app/services/
+  saved_property_service.py`, `app/api/v1/routes/
+  saved_properties.py`, registered in `router.py`. No migration
+  needed — `saved_properties` (composite PK, cascade deletes) has
+  existed unused since the original Phase 1 M1 migration. A saved
+  property deliberately stays in the list even if the listing later
+  goes off-market — it's the user's own save history, not a live
+  search result, so nothing gets filtered out post-save. This
+  worktree (`homigrow-backend-wt`) had gone stale (unregistered,
+  emptied) since the last backend session — recreated via
+  `git worktree add` on `feature/phase_3_backend_client` before
+  starting; its `.env` doesn't survive a fresh worktree checkout
+  (gitignored, untracked) and had to be copied over from the main
+  `homigrow/backend` checkout before tests/server would boot. 167→178
+  tests pass (11 new, `tests/api/v1/routes/test_saved_properties.py`);
+  `ruff` clean. Live-verified end-to-end against the real Supabase dev
+  DB from a freshly started `python -m uvicorn` (not the bare
+  `uvicorn` shim — same past gotcha) using the standing test account
+  and a real seeded property: save → appears correctly in the list →
+  save again (still one row, still 204) → unsave → list empty again →
+  unsave again (still 204) → save a made-up id (404) → list with no
+  auth token (401). **Not part of this task, separate follow-ups
+  next:** wiring `PropertyCard`'s existing (currently cosmetic)
+  `isSaved`/`onToggleSave` props to these endpoints, and building real
+  content for the `/profile/my-properties` tab.
+- **Saved Properties category filter + sort shipped 2026-08-03** (P3-T41
+  backend follow-up) — `GET /api/v1/saved-properties` gained two more
+  optional query params: `property_type` (list, filters to the given
+  `PropertyType` categories — `saved_property_service.
+  list_saved_properties` now joins `Property` in the count query too,
+  not just the row query, so `total`/`total_pages` stay correct under
+  the filter) and `sort` (new `SavedSortOption = Literal["recent",
+  "price_asc", "price_desc"]`, mirroring `property_service.SortOption`;
+  `"recent"` is the pre-existing default `SavedProperty.created_at.desc()`
+  order, unchanged). Driven by the frontend's real Figma pull for this
+  screen — the "Villas"/"Commercial" category pills map to
+  `[villa]`/`[office, shop]` respectively; "Penthouses" has no matching
+  `PropertyType` at all, left to the frontend to render disabled.
+  178→182 tests pass (2 new: property-type filter, price sort); `ruff`
+  clean. **Live-verification caught a real stale-server repeat of the
+  documented class of bug** (see prior worktree-server notes above): the
+  process listening on port 8000 was traced via
+  `Get-CimInstance Win32_Process` to a `python -m uvicorn` launched from
+  the *original* `homigrow/backend` directory, not this worktree — so it
+  silently served the pre-P3-T41 route with zero errors, only caught by
+  diffing `GET /openapi.json`'s params against what was just added. Fixed
+  by killing that process and its orphaned `--reload` multiprocessing
+  child, then restarting `python -m uvicorn app.main:app --reload --port
+  8000` with cwd actually set to this worktree. Re-verified live
+  end-to-end afterward against the real Supabase dev DB: villa filter,
+  commercial filter, and both price sorts all returned exactly the
+  expected subset/order.
+- **Nav search now parses "type in area" queries, 2026-08-30** — the
+  existing `search` param on `GET /properties` previously did one
+  whole-string substring match, so a real nav-search query like "villas
+  in indiranagar" matched nothing — no single column contains that
+  literal phrase. New `property_service._parse_search_query()`:
+  tokenizes the query, pulls a known `PropertyType` out of it via a
+  name/plural alias map (`villa`/`villas`, `apartment`/`apartments`/
+  `flat`/`flats`, `house`/`houses`, `plot`/`plots`/`land`, `office`,
+  `shop`/`store`, `pg`/`coliving`, plus multi-word `independent house`/
+  `co-living` checked first since `PropertyType`'s own two-word values
+  don't tokenize), drops connective stopwords ("in", "at", "near",
+  "for", ...), and returns the remaining words as an area phrase.
+  `list_properties` then filters by the structured `property_type`
+  column (not text) plus a substring match on the area words against
+  city/locality/landmark — or falls back to the original plain
+  substring match when no type token is found, so a bare keyword search
+  (title word, amenity, ...) is unaffected. A bare type word with no
+  area (`search=villa`) also now correctly matches every villa by its
+  actual `property_type`, not just ones with "Villa" literally in the
+  title — stricter than the old accidental-substring behavior. No
+  frontend changes needed — the nav search box already sends whatever's
+  typed straight through the same `search` param. 198/198 tests pass (3
+  new: `test_search_combines_property_type_and_area`,
+  `test_search_property_type_alone_matches_by_type_not_title_text`,
+  `test_search_falls_back_to_substring_when_no_type_token`); `ruff`
+  clean. Live-verified against the real backend + Supabase dev DB + real
+  seeded demo properties: `search=villas in indiranagar` → exactly "The
+  Obsidian Estate"; `search=apartment in whitefield` → exactly
+  "Whitefield Tech Loft"; `search=villa` alone → all 3 real villas;
+  `search=indiranagar` alone (no type) → unchanged old substring
+  behavior. Hit the same stale-orphaned-`--reload`-worker class of bug
+  documented above while restarting the worktree server to verify (a
+  `multiprocessing` child from an earlier session had outlived its
+  parent and was still holding port 8000); killed it and started fresh
+  from this worktree before testing.
+- **Plot + Land property types shipped 2026-08-30** — first of a
+  planned one-at-a-time rollout closing the gap between the wizard
+  (residential-only: apartment/villa/independent_house) and the real
+  Figma "Broker view > post property" design, which lets a broker pick
+  Plot, Land, PG/Co-living, or Commercial Building too (PG/Commercial
+  and JV Property are separate follow-up passes, backend-first per
+  your explicit ordering). New `PropertyType.land` enum value; two new
+  nullable `plot_details`/`land_details` JSONB columns on `Property`
+  (migration M7, `aa1defd89f8c`), following the same reserved-JSONB-
+  bucket pattern `pg_details` already established rather than adding
+  5+ narrow typed columns — `{dimension, is_corner_plot}` and
+  `{land_use, approvals}` respectively. Plot's Facing field and Land's
+  Total Area reuse the existing (previously wizard-unused) `facing`/
+  `area_sqft` columns, no new column needed for either. New
+  `PlotDetails`/`LandDetails` schemas in `app/schemas/properties.py`,
+  wired into `PropertyRead` and `PropertyCreateRequest`;
+  `broker_property_service.create_property()` persists both. M7's
+  `ALTER TYPE ... ADD VALUE` can't be reversed directly (Postgres has
+  no `DROP VALUE`), so its downgrade rebuilds `property_type` via
+  rename → recreate → cast → drop-old, same as the standard pattern
+  for this class of migration — verified upgrade → downgrade → upgrade
+  clean against the real dev DB. 224→226 tests pass (2 new in
+  `test_broker_properties.py`, covering plot and land creation +
+  round-trip, plus an added assertion that residential creates still
+  get `null` for both new fields). Live-verified end-to-end against
+  the real Supabase dev DB via curl using the standing test broker
+  (`broker.login.test@homigrow.local`): created one real plot listing
+  and one real land listing, confirmed both `plot_details`/
+  `land_details` round-tripped exactly through the response, confirmed
+  each other's detail field stayed `null`; both verification rows
+  deleted afterward via `delete_test_property.py`. **Frontend wizard
+  changes (Property Type dropdown, conditional Plot/Land sub-forms)
+  not started — separate task, backend-first per your explicit
+  ordering.**
+- **`BrokerPropertyListItem.created_at` added, 2026-09-05** — small,
+  targeted addition for the frontend broker Listings table (Figma node
+  `176:789`), which needs a "Listed Xd ago" column that's always present
+  regardless of status; `published_at` (the only timestamp
+  `PropertyListItem` already had) is null for draft/pending listings,
+  which is most of what a broker actually sees day-to-day. `Property.
+  created_at` already existed as a column — just wasn't exposed on this
+  schema. `list_my_properties()` now passes it through alongside
+  `status`. No migration, no other endpoint touched (the public
+  `PropertyListItem` base class is unchanged). 242/242 tests pass
+  (pre-existing `test_broker_properties.py` assertions check specific
+  keys, not full-object equality, so none needed updating); `ruff`
+  clean.
+- **Broker lead pipeline shipped 2026-09-07** — on `feature/phase_3_backend_client`,
+  alongside the `POST /properties/{id}/enquire` endpoint from the same
+  branch: new broker-authenticated `GET /leads` (list, newest first),
+  `GET /leads/{id}` (detail + note history), `PATCH /leads/{id}`
+  (status and/or `follow_up_at`), and `POST /leads/{id}/notes` — the
+  first routes to actually read/write `Lead`/`LeadNote`, both of which
+  existed since the original Phase 1 schema with no consumer. New
+  `app/api/v1/routes/leads.py`; `lead_service.py` gained
+  `list_leads_for_broker`/`get_lead_for_broker`/`update_lead`/
+  `add_lead_note`, all scoped by `broker_id` (404 `LEAD_NOT_FOUND` on
+  any lead not owned by the caller — no cross-broker leak path).
+  `LeadListItem` flattens in the lead's property title/locality/city/
+  price/listing_type (avoids a second round trip for the table's
+  Property Interest/Budget columns) and a computed `last_contacted_at`
+  (the most recent note's timestamp, `null` if none exist yet — not the
+  lead's own `created_at`, which would misleadingly read as "already
+  contacted" for a brand-new lead). 242→257 tests pass (15 new); `ruff`
+  clean. Live-verified
+  end-to-end with Playwright against the real Supabase dev DB, logged
+  in as the demo broker (`vikram.broker.test@homigrow.local`): a real
+  enquiry submitted via `POST /properties/{id}/enquire` appeared in the
+  broker's `/broker/leads` table, status change persisted (`PATCH`),
+  a note round-tripped and flipped `last_contacted_at` from `null` to a
+  live relative timestamp, and a follow-up date persisted — confirmed
+  via a direct DB query, then all test rows deleted afterward.
+- **Broker Property Detail API shipped 2026-09-08** — on a new
+  `feature/phase_3_backend_broker_detail` branch (cut fresh from
+  `dev` rather than reopening the already-merged
+  `feature/phase_3_backend_broker`), backing the matching frontend
+  Property Detail page (Figma node `177:3345`). New
+  `GET /properties/mine/{id}` (`broker_property_service.
+  get_property_detail`): the broker-owned counterpart to
+  `property_service.get_property_detail` — any status, not just
+  active — returning `BrokerPropertyDetailRead` (`PropertyRead` plus
+  `views_count` from the existing-but-previously-unexposed
+  `Property.views_count` column, `leads_count`/`recent_leads` computed
+  from the `Lead` table, and `shortlisted_count` computed from the
+  `SavedProperty` watchlist join table via its existing
+  `ix_saved_properties_property` index). Registered under the literal
+  `/properties/mine/` prefix (not `/properties/{id}`), so it can never
+  collide with `properties.router`'s public active-only route
+  regardless of router registration order — a stronger guarantee than
+  the existing `/properties/mine` list route gets from registration
+  order alone. New `POST /properties/{id}/close`
+  (`broker_property_service.close_property`): the single "Mark as
+  Sold"/"Mark as Rented" action, using the existing lifecycle state
+  machine's active -> sold|rented transition — targets `sold` for a
+  sale listing, `rented` for rent/PG, `422 INVALID_STATUS_TRANSITION`
+  for anything not currently active. **No per-day view time series
+  exists anywhere in the schema** (no events table), so the response
+  deliberately has no field for one — the frontend's "Views - Last 30
+  Days" chart renders its own honest "coming soon" placeholder rather
+  than the backend fabricating trend data. 226→234 tests pass (8 new
+  in `test_broker_properties.py`: full detail shape with real
+  leads/shortlisted numbers and ordered recent-leads, draft-listing
+  visibility unlike the public endpoint, ownership 403/401, sold vs.
+  rented targeting by listing type, invalid-transition 422). Verified
+  clean via 3 separate real-Supabase-dev-DB test runs — two full-suite
+  runs each hit one unrelated statement-timeout on a plain `users`
+  INSERT near the end of the file (transient DB contention from
+  running the same 36-test file back-to-back three times in a few
+  minutes, confirmed by both failures being on different, unrelated
+  tests each time), while running only the 8 new tests in isolation
+  passed cleanly twice. Live-verified end-to-end with Playwright
+  against this worktree's own `uvicorn` (confirmed via
+  `GET /openapi.json` showing both new paths registered) + the real
+  Supabase dev DB, logged in as the demo-data broker
+  (`vikram.broker.test@homigrow.local`): the real Property Detail page
+  rendered real `leads_count`/`recent_leads` for a listing with an
+  actual lead attached; the "Mark as Sold" confirm dialog opens
+  correctly (cancelled rather than confirmed, to avoid mutating this
+  shared demo broker's 11 real listings used elsewhere in the app).
+- **Reopen action added, 2026-09-08 (same day, same branch)** — your
+  explicit call after reviewing the above: a broker who clicks "Mark
+  as Sold"/"Mark as Rented" by mistake had no way back — `sold`/
+  `rented` were coded as fully terminal states with zero outgoing
+  transitions. `property_lifecycle.py`'s state machine now allows
+  `sold -> active` and `rented -> active` ("reopen") as the only
+  outgoing edge from either — everything else about them stays
+  terminal (still can't go to `draft`/`pending` directly). New
+  `POST /properties/{id}/reopen`
+  (`broker_property_service.reopen_property`), the mirror image of
+  `close_property`. 234→238 tests pass (4 new in
+  `test_broker_properties.py`: sold->active, rented->active,
+  reopening a non-sold/rented listing 422s, ownership 403) plus
+  `test_property_lifecycle.py` updated — `(sold, active)`/
+  `(rented, active)` moved from its `ILLEGAL` table to `LEGAL`, and
+  its "terminal states have no outgoing transitions" comment/grouping
+  rewritten since that's no longer true. **Real bug hit live while
+  verifying this, unrelated to the new code's own correctness:** the
+  worktree's `uvicorn --reload` process had an orphaned
+  `--multiprocessing-fork` worker still bound to port 8000 from hours
+  earlier in the session, silently serving stale pre-`/close`-and-
+  `/reopen` code the entire time — `netstat`/`Get-NetTCPConnection`
+  both still attributed the listening socket to the original
+  reloader's PID even though `Get-CimInstance`/`Get-Process` confirmed
+  that PID no longer existed, so a plain "kill that PID and restart"
+  didn't help until the actual orphaned child process was found and
+  killed directly. A real `POST .../reopen` 404'd against this stale
+  server before the fix, then round-tripped correctly (`active ->
+  sold -> reopen -> active`, confirmed via the status pill) once a
+  single clean server was actually running. **Lesson for next time:**
+  when a worktree server has been running a long time across several
+  restart attempts, don't trust that killing the PID `netstat` names
+  actually frees the port — enumerate every `python.exe`
+  (`Get-CimInstance Win32_Process -Filter "Name='python.exe'"`,
+  which also shows each one's full command line) and kill anything
+  stale before starting fresh.
+
+- **Property view tracking + broker Analytics API shipped 2026-09-10**
+  — pulled forward from `11_Phase_4.md` (P4-T01 event tracking /
+  P4-T50 aggregate queries), same "design ready, pull it forward"
+  pattern as P4-T11's broker verification-details signup and the P1
+  homepage. New **`property_views`** table (migration M11,
+  `325028026423`): `record_view()` in `property_service.py` issues a
+  Postgres `INSERT ... ON CONFLICT DO NOTHING` against a partial
+  unique index on `(property_id, viewer_id) WHERE viewer_id IS NOT
+  NULL` — a logged-in viewer is deduped to one row per property no
+  matter how many times they revisit, while an anonymous viewer (no
+  stable identity to dedupe against) gets a fresh row every view.
+  `GET /properties/{id}` now calls this after serving the response.
+  The pre-existing `Property.views_count` column (present since Phase
+  1, never incremented anywhere) is superseded by this real event log
+  rather than backfilled — nothing reads that column anymore.
+  New **`GET /analytics/broker?range=7d|30d|6m`**
+  (`app/services/analytics_service.py`, `app/api/v1/routes/
+  analytics.py`, `app/schemas/analytics.py`), `RequireBroker`-gated,
+  scoped to the caller's own properties/leads: 4 KPIs (Total Views,
+  Total Leads, Enquiry Calls — leads whose `source == "number_request"`,
+  the closest real signal to a phone enquiry since no call-log table
+  exists — and Est. Revenue, a sum of listing price across the
+  period's `closed_won` leads, explicitly not a real commission figure
+  since no deal-value field exists), each with a period-over-period %
+  change that's `None` rather than a fabricated "0%"/"∞%" when the
+  prior period has no baseline to compare against; a Views/Leads trend
+  bucketed daily (7d/30d) or monthly (6m); a property-type lead
+  breakdown; a top-6 leads-by-city list; and a top-5 listings table
+  ranked by view→lead conversion rate. Every number is a live
+  aggregate over real `Lead`/`PropertyView` rows — nothing seeded or
+  mocked.
+  **Real migration-chaining bug hit shipping this:** M11 was
+  originally chained onto M10 (`b7e2f1a9c3d4`, the `ownership_type`/
+  `available_from` columns from the Edit Listing PATCH work below) —
+  but M10 was only applied locally against the dev DB at the time, not
+  yet committed to git. CI builds its database from git history alone,
+  so it failed with "Revision b7e2f1a9c3d4 ... is not present" the
+  moment this branch built. Fixed by rechaining M11 onto M9
+  (`4afa53dc5ab7`, the actual head of dev's committed migration
+  history at that point) — `property_views` has no dependency on M10's
+  columns either way. Upgrade/downgrade verified clean once rechained.
+  238→254 tests pass (16 new: 13 in new `tests/api/v1/routes/
+  test_analytics.py`, 3 in `test_properties.py` covering anonymous
+  multi-logging vs. logged-in-viewer dedup); `ruff` clean.
+  **Backfilled entry, 2026-09-11:** this task shipped with no
+  corresponding write-up in this file — caught during a Phase 3/4
+  progress audit the day after. Written directly from the committed
+  code/migration/tests, not from session notes, so unlike this file's
+  other entries it carries no live-verification narrative (Playwright/
+  curl steps, cleanup confirmation) — that step may not have happened,
+  or simply wasn't logged; worth a real live check next time this area
+  is touched. Separately, a full suite run during this same audit found
+  `test_boost.py::TestListBoostPlans::test_returns_active_plans_only`
+  failing (expected exactly 1 active plan, the real dev DB legitimately
+  has 4 once `scripts/seed_boost_plans.py`'s 3 real plans exist) —
+  **fixed same day (2026-09-11):** the test's own root cause was
+  assuming a pristine `boost_plans` table, the same class of bug
+  `test_properties.py`'s `_unique_city()` was written to prevent for
+  property listings — this suite predates that convention. Added a
+  matching `_unique_name()` helper and gave `_make_plan()` a `name`
+  override; the test now asserts its own uniquely-named active plan is
+  present and its own uniquely-named inactive plan is absent, rather
+  than asserting an exact `len(body) == 1` against a catalog real seed
+  data also lives in. 315/315 tests pass (no new tests — this fixed an
+  existing one).
+- **`BrokerPropertyDetail`'s Total Views fixed to a real number,
+  2026-09-11** — `get_property_detail()` in `broker_property_service.py`
+  was still returning `property_.views_count`, the dead `Property`
+  column the Analytics entry above already documents as "never
+  incremented anywhere." Since `property_views` exists now, swapped to
+  `db.query(func.count(PropertyView.id)).filter(PropertyView.property_id
+  == property_id).scalar()` — an honest, real per-property lifetime view
+  count (all-time, unlike the Analytics page's own range-scoped
+  aggregate). `BrokerPropertyDetailRead`'s docstring in
+  `schemas/properties.py` updated to match (it still said "no per-day
+  view time series... exists"/pointed at the dashboard's now-stale
+  precedent). No API shape change — `views_count: int` stays the same
+  field name/type, so the frontend needed no code change, just its own
+  stale header comment fixed (frontend CLAUDE.md, same day). Strengthened
+  the existing `TestGetMyProperty::test_returns_full_detail_with_real_
+  performance_numbers` test (previously asserted `views_count == 0`
+  without ever seeding a view, which never actually exercised the real
+  aggregation) to seed one logged-in + one anonymous `PropertyView` row
+  and assert `views_count == 2`. 315/315 tests pass (no new tests —
+  strengthened an existing one); `ruff` clean.
+
+- **Edit Listing PATCH + delete-media endpoints shipped 2026-09-09**
+  (backs the Figma "Edit Listing" screen, node `177:4065`, frontend
+  CLAUDE.md same day). New `PATCH /properties/{id}`
+  (`update_property`) — a genuine partial update: `PropertyUpdateRequest`
+  (`app/schemas/properties.py`) has every field optional, and the
+  service reads it via `model_dump(exclude_unset=True)`, so an omitted
+  field is left untouched rather than nulled. Deliberately excludes
+  `listing_type`/`property_type` — both gate which type-specific
+  sub-form (plot/land/pg/jv) applies, and changing either post-creation
+  isn't supported here. Editing a currently-`active` listing now
+  transitions it to `pending` for re-moderation, closing the gap
+  `property_lifecycle.py` already documented (`active -> pending`) but
+  nothing implemented — your explicit call when this was scoped;
+  draft/pending/rejected listings keep their status since they haven't
+  been published yet. New `DELETE /properties/{id}/media/{media_id}`
+  (`delete_media`) removes one photo/video; if it was the cover image,
+  the next-lowest-position remaining item is promoted so a listing is
+  never left without one. Doesn't touch the underlying storage
+  object — `PropertyMedia` rows are this codebase's existing source of
+  truth for what's shown, and nothing else cleans up orphaned storage
+  objects either.
+  **Migration M10** (`b7e2f1a9c3d4`) adds two columns Figma's Edit
+  Listing screen needs that neither the `Property` model nor the Post
+  Property wizard ever collected: `ownership_type` (new
+  `OwnershipType` enum — freehold/leasehold/co_operative_society/
+  power_of_attorney) and `available_from` (`Date`), both nullable so
+  existing rows need no backfill. Upgrade → downgrade → upgrade
+  verified clean against the real dev DB (the only `alembic check`
+  drift is the pre-existing, unrelated `spatial_ref_sys` PostGIS
+  system table, not from this migration). 272/272 tests pass (12 new
+  in `test_broker_properties.py`: partial-field PATCH, active->pending
+  transition, draft-stays-draft, plot_details replaced whole, 404 on
+  an unknown media id, ownership 403/401 on both new endpoints, cover
+  promotion on delete). `ruff` clean. Live-verified end-to-end via the
+  real frontend against this worktree's own `uvicorn` + the real
+  Supabase dev DB (see frontend CLAUDE.md for the Playwright detail):
+  a real `PATCH` against the demo broker's active listing correctly
+  flipped it to `pending`; the edited title/amenities/status were
+  reverted afterward via a direct DB fix to keep this shared broker's
+  demo data clean.
+
+- **Broker profile self-edit shipped 2026-09-10** (backs the Figma
+  "Real Estate Broker Portal > Profile" screen, node `177:2805`,
+  frontend CLAUDE.md same day). `PATCH /users/me` gained a nested,
+  optional `broker_profile` field (new `BrokerProfileUpdateRequest` in
+  `app/schemas/users.py`: `bio`/`company_name`/`experience_years`/
+  `specializations`/`service_areas` — the editable subset of
+  `BrokerProfileOut`). Deliberately excludes `rera_number` and
+  `verification_status`: changing either belongs to the verification-
+  document resubmission flow (`POST /brokers/me/verification-documents`),
+  not a plain profile edit. `user_service.update_me()` applies only the
+  fields actually supplied (route passes
+  `payload.broker_profile.model_dump(exclude_unset=True)`), and is a
+  no-op when the caller isn't a broker or has no `broker_profile` row
+  yet rather than erroring — a client account simply has nothing here
+  to update. Also added `created_at` to `UserRead` (real column via
+  `TimestampMixin`, just never exposed via the API before) — needed
+  for the Profile page's real "Member Since" field. No migration
+  needed for either change (no new columns). Several Figma sections on
+  this screen have no backing data model at all — Avg Rating, a
+  per-broker activity feed, and NAR/MagicBricks-style third-party
+  certifications — deliberately left unbuilt (honest empty states on
+  the frontend) rather than fabricated, your explicit scope call.
+  291/291 tests pass (3 new across `test_user_service.py`/
+  `test_users.py`: partial broker_profile update, ignored for a
+  client/missing-row account, route-level shape). `ruff` clean. Live-verified end-to-end against the real
+  Supabase dev DB using the standing `broker.login.test@homigrow.local`
+  test broker (see frontend CLAUDE.md for the Playwright detail): a
+  real edit (bio/company/experience/specializations/service areas) via
+  the new page round-tripped correctly and rendered live; `rera_number`
+  stayed untouched since it isn't sent by this form. **Found the same
+  class of stale/orphaned-server bug documented above, twice in this
+  session** — an old `--reload` worker from the *main* `homigrow/backend`
+  checkout (not this worktree) was still holding port 8000 and serving
+  pre-change schemas with zero errors; then, after killing it, a second
+  orphaned `multiprocessing` child from an even older run of this same
+  worktree's server was *also* still bound to the port. Diagnosed both
+  via `Get-CimInstance Win32_Process` (parent/child chains, not just
+  `netstat`, since a dead PID can still show `LISTENING` briefly) and
+  killed explicitly before a genuinely fresh `python -m uvicorn` server
+  reflected the real code. **Separately found and fixed while setting up
+  verification, unrelated to this task's own code:** the broker Leads
+  backend (`feature/phase_3_backend_client`, 2026-09-07) was never
+  actually merged into `dev` — two commits
+  (`db8481d`/`8030d87`) sat unmerged on that branch with no PR ever
+  opened for them, even though the frontend Leads table already ships
+  against it. Opened as its own separate PR rather than folded into
+  this branch.
+- **Boost Listing checkout (no payment yet) shipped 2026-09-10** — the
+  boost/payments system was originally scoped whole to Phase 6
+  (`20_Phase_6.md`: coupons, `boost_orders` with required Razorpay
+  fields, webhook idempotency, admin plan CRUD), but the Figma "Boost
+  Listing" checkout page (node `178:5300`) was ready and you asked to
+  pull the plan/duration selection + order creation forward now,
+  explicitly deferring the actual payment gateway — same "design ready,
+  pull it forward" precedent as the P1 homepage. Confirmed the pull-
+  forward's exact shape with you first (three scope questions): real
+  order persistence (not just a UI stub), `boost_plans.price`
+  repurposed as a ₹/day rate with duration chosen per-order instead of
+  fixed per plan (the existing M1 schema's `duration_days` on the plan
+  conflicted with the Figma design's independent 7/15/30-day selector +
+  volume discount), and the Figma "Optional Add-ons" section (no
+  backend model exists for it) shipped as a static, disabled "coming
+  soon" section rather than modeled. Migration M12
+  (`cde17bb27e5c`): drops `boost_plans.duration_days`, adds
+  `boost_plans.reach_estimate` (jsonb — the checkout page's "Expected
+  Reach" views/leads/calls ranges, admin-editable marketing copy, not
+  measured analytics), and creates `boost_orders` (broker_id/
+  property_id/plan_id, duration_days, frozen `base_amount`/
+  `discount_amount`/`gst_amount`/`total_amount`, `status` defaulting
+  `created`, nullable `starts_at`/`ends_at`) — deliberately **without**
+  `razorpay_order_id`/`razorpay_payment_id`/`coupon_id`/
+  `activation_failed`, since nothing here ever moves an order past
+  `created` yet; those columns land with real Razorpay integration
+  later. Verified up/down/up clean against the real dev DB (only
+  pre-existing `spatial_ref_sys` autogenerate noise, unrelated).
+  New `app/services/boost_service.py`: `DURATION_DISCOUNT_PERCENT`
+  (`{7: 0, 15: 10, 30: 20}`, not admin-editable yet — that's the
+  coupon/plan-admin work P6 already scopes) × flat 18% GST, plain
+  Decimal rupee math (not the real billing service's integer-paise
+  math — no money is actually moving yet, so the P6 precision
+  requirement doesn't apply here); `create_order()` enforces own +
+  `PropertyStatus.active` (409 `PROPERTY_NOT_ACTIVE` otherwise, 403 if
+  not owned) before freezing the price breakdown onto the order — a
+  later admin price edit to the plan must never alter an already-placed
+  order's amount. New `GET /boost-plans` (public, active only, per
+  `05_API_Design.md`'s original spec) and `POST /boost-orders`
+  (broker-only). New `scripts/seed_boost_plans.py` (idempotent per
+  tier) seeded the 3 real plans/copy from the Figma design (Basic/
+  Featured/Premium Spotlight) into the real dev DB. 315/315 tests pass
+  (17 new: pricing math incl. exact rounding at each duration tier,
+  ownership/active/plan-not-found guards, route-level auth/role/status
+  codes). Live-verified end-to-end against the real dev DB (see
+  frontend CLAUDE.md for the Playwright detail): a real order round-
+  tripped through the actual checkout UI, confirmed via direct SQL —
+  `base_amount=1485.00, discount_amount=148.50, gst_amount=240.57,
+  total_amount=1577.07, status=created` for a Basic/15-day selection
+  on the demo broker's real "Bandra Garden Villa" listing (left in
+  place — a `created`-status order has no visible effect anywhere,
+  same as other harmless verification artifacts documented elsewhere
+  in this file). **Hit the exact same stale-orphaned-server class of
+  bug documented twice above, a third time**: the process bound to
+  port 8000 was `python -m uvicorn` running from the *main*
+  `homigrow/backend` checkout (currently on `feature/phase_3_frontend_broker`,
+  not this worktree) — confirmed via `Get-CimInstance Win32_Process`'s
+  `CommandLine` column before killing it and starting a genuinely fresh
+  server from this worktree.
+  **Deliberately not built here, per the phase-6 scope it was pulled
+  from:** the actual Razorpay order/webhook, coupons, admin plan CRUD,
+  and boost-tier search/ranking surfacing — this task only unblocks the
+  frontend checkout UI + a real `created`-status order row.
+
+### Known open decisions
+- (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
+  docs/architecture/15_Decision_Log.md); integrate via
+  `services/sms_service.py` adapter if a phone-based flow is ever
+  designed. Not currently in use — signup verification uses email OTP
+  via Resend instead (ADR-011 amendment, 2026-07-14).
+

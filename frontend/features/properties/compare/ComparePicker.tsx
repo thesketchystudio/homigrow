@@ -41,7 +41,7 @@ export function ComparePicker() {
         </p>
       </div>
 
-      <CompareSelectionBar />
+      <CompareSelectionBar spread />
 
       {!isAuthenticated ? (
         <EmptyState

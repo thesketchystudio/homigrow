@@ -42,7 +42,25 @@ class UserRead(BaseModel):
     is_phone_verified: bool
     is_email_verified: bool
     preferences: dict
+    created_at: datetime
     broker_profile: Optional[BrokerProfileOut] = None
+
+
+class BrokerProfileUpdateRequest(BaseModel):
+    """
+    Editable subset of BrokerProfileOut — rera_number and
+    verification_status are excluded since changing either belongs to
+    the verification-document resubmission flow
+    (POST /brokers/me/verification-documents), not a plain profile edit.
+    Only fields the caller actually supplied are applied (see
+    UserUpdateRequest's own PATCH-semantics note).
+    """
+
+    bio: Optional[str] = None
+    company_name: Optional[str] = None
+    experience_years: Optional[int] = None
+    specializations: Optional[list[str]] = None
+    service_areas: Optional[list[str]] = None
 
 
 class UserUpdateRequest(BaseModel):
@@ -57,6 +75,11 @@ class UserUpdateRequest(BaseModel):
     email: Optional[str] = None
     avatar_url: Optional[str] = None
     preferences: Optional[dict] = None
+    # Only applied when the caller's role is broker and a broker_profile
+    # row already exists (always true for a broker account, created at
+    # signup) — silently ignored otherwise rather than erroring, since a
+    # client account simply has nothing here to update.
+    broker_profile: Optional[BrokerProfileUpdateRequest] = None
 
 
 class PasswordChangeRequest(BaseModel):

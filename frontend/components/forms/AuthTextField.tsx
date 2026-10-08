@@ -14,12 +14,15 @@ type AuthTextFieldProps = {
   error?: string;
   register: UseFormRegisterReturn;
   className?: string;
+  // Overrides the default label color — e.g. the Post Property wizard's
+  // Figma labels are darker (rgba(26,26,26,0.8)) than the auth flow's.
+  labelClassName?: string;
 };
 
-export function AuthTextField({ label, placeholder, type = "text", error, register, className }: AuthTextFieldProps) {
+export function AuthTextField({ label, placeholder, type = "text", error, register, className, labelClassName }: AuthTextFieldProps) {
   return (
     <div className={cn("flex flex-col gap-3 w-full", className)}>
-      <label htmlFor={register.name} className="font-body font-bold text-[12px] leading-[18px] text-brand-primary-100">
+      <label htmlFor={register.name} className={cn("font-body font-bold text-[12px] leading-[18px] text-brand-primary-100", labelClassName)}>
         {label}
       </label>
       <input
@@ -28,7 +31,7 @@ export function AuthTextField({ label, placeholder, type = "text", error, regist
         placeholder={placeholder}
         aria-invalid={Boolean(error)}
         className={cn(
-          "w-full border-b bg-transparent pb-[5px] pt-1 font-heading text-[20px] leading-[28px] text-foreground outline-none placeholder:text-brand-secondary-700",
+          "w-full border-b bg-transparent pb-[5px] pt-1 font-heading text-[16px] leading-[24px] text-foreground outline-none placeholder:text-brand-secondary-700",
           error ? "border-destructive" : "border-foreground focus:border-brand-green-600",
         )}
         {...register}

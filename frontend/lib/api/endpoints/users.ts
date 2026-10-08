@@ -27,6 +27,7 @@ export type UserRead = {
   is_phone_verified: boolean;
   is_email_verified: boolean;
   preferences: Record<string, unknown>;
+  created_at: string;
   broker_profile?: BrokerProfileOut;
 };
 
@@ -34,11 +35,20 @@ export function getMe(): Promise<UserRead> {
   return apiRequest<UserRead>("/users/me");
 }
 
+export type BrokerProfileUpdatePayload = {
+  bio?: string;
+  company_name?: string;
+  experience_years?: number;
+  specializations?: string[];
+  service_areas?: string[];
+};
+
 export type UserUpdatePayload = {
   full_name?: string;
   email?: string;
   avatar_url?: string;
   preferences?: Record<string, unknown>;
+  broker_profile?: BrokerProfileUpdatePayload;
 };
 
 export function updateMe(payload: UserUpdatePayload): Promise<UserRead> {

@@ -148,19 +148,19 @@ export default function PropertyCard({
 
       <div className={cn("flex flex-col gap-3", size === "sm" ? "p-4" : "p-5")}>
         <div className="flex flex-col gap-1">
-          <span className={cn("font-semibold leading-tight", size === "sm" ? "text-sm" : "text-base")}>
+          <span className={cn("font-heading font-bold leading-tight", size === "sm" ? "text-sm" : "text-base")}>
             {property.title}
           </span>
-          <span className="text-muted-foreground flex items-center gap-1 text-xs">
+          <span className="text-muted-foreground font-body flex items-center gap-1 text-xs">
             <MapPin className="size-3.5 shrink-0" />
             {property.location}
           </span>
         </div>
 
-        <span className={cn("font-semibold", size === "sm" ? "text-sm" : "text-base")}>{property.price}</span>
+        <span className={cn("font-heading font-bold", size === "sm" ? "text-sm" : "text-base")}>{property.price}</span>
 
         {(property.bhk !== undefined || property.areaSqft !== undefined) && (
-          <div className="text-muted-foreground flex items-center gap-4 border-t pt-3 text-xs">
+          <div className="text-muted-foreground font-body flex items-center gap-4 border-t pt-3 text-xs">
             {property.bhk !== undefined && (
               <span className="flex items-center gap-1.5">
                 <BedDouble className="size-3.5" />

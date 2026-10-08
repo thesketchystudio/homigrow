@@ -36,3 +36,8 @@ httpx==0.28.1
 
 # Lint (T14 backend CI)
 ruff==0.15.20
+
+# Broker verification document storage: S3-compatible client, used
+# against Supabase Storage's S3 endpoint (see config.py SUPABASE_S3_*).
+boto3==1.43.70
+python-multipart==0.0.20

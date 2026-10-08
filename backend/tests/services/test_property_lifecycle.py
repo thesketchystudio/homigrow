@@ -3,8 +3,8 @@ tests/services/test_property_lifecycle.py
 
 Exercises every legal transition in the property status state machine,
 plus a representative sample of illegal ones: skip-ahead transitions,
-exits from terminal states, reversals of valid edges, and identity
-transitions.
+sold/rented reopening to anywhere but active, reversals of valid edges,
+and identity transitions.
 """
 
 import pytest
@@ -22,6 +22,8 @@ LEGAL = [
     (S.active, S.pending),
     (S.expired, S.active),
     (S.rejected, S.draft),
+    (S.sold, S.active),
+    (S.rented, S.active),
 ]
 
 ILLEGAL = [
@@ -30,10 +32,8 @@ ILLEGAL = [
     (S.draft, S.sold),
     (S.pending, S.sold),
     (S.pending, S.expired),
-    # terminal states have no outgoing transitions
-    (S.sold, S.active),
+    # sold/rented can only reopen back to active, nowhere else
     (S.sold, S.draft),
-    (S.rented, S.active),
     (S.rented, S.pending),
     # reverse of a valid edge is not itself valid
     (S.active, S.draft),

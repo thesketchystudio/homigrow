@@ -12,6 +12,7 @@ import pytest
 
 from app.core.exceptions import AppError
 from app.core.security import create_refresh_token, hash_refresh_token, verify_password
+from app.models.broker_profile import BrokerProfile
 from app.models.enums import ListingType, PropertyStatus, PropertyType, UserRole
 from app.models.property import Property
 from app.models.refresh_token import RefreshToken
@@ -52,6 +53,14 @@ def _make_property(db_session, broker, *, status: PropertyStatus = PropertyStatu
     return prop
 
 
+def _make_broker_profile(db_session, user, **kwargs) -> BrokerProfile:
+    profile = BrokerProfile(user_id=user.id, **kwargs)
+    db_session.add(profile)
+    db_session.flush()
+    db_session.refresh(user)
+    return profile
+
+
 class TestUpdateMe:
     def test_updates_only_supplied_fields(self, db_session):
         user = make_user(db_session, phone="+919876560001", full_name="Original Name")
@@ -61,6 +70,42 @@ class TestUpdateMe:
         )
 
         assert updated.full_name == "New Name"
+
+    def test_broker_profile_update_applies_only_supplied_fields(self, db_session):
+        broker = make_user(db_session, phone="+919876560006", role=UserRole.broker)
+        _make_broker_profile(db_session, broker, bio="Old bio", company_name="Old Co", rera_number="MH/1/2020")
+
+        updated = user_service.update_me(
+            db_session,
+            broker,
+            full_name=None,
+            email=None,
+            avatar_url=None,
+            preferences=None,
+            broker_profile={"bio": "New bio", "specializations": ["Residential", "Commercial"]},
+        )
+
+        assert updated.broker_profile.bio == "New bio"
+        assert updated.broker_profile.specializations == ["Residential", "Commercial"]
+        # Not supplied this call — must stay untouched.
+        assert updated.broker_profile.company_name == "Old Co"
+        assert updated.broker_profile.rera_number == "MH/1/2020"
+
+    def test_broker_profile_update_ignored_when_no_broker_profile_row(self, db_session):
+        client = make_user(db_session, phone="+919876560007", role=UserRole.client)
+
+        # Must not raise even though client has no broker_profile at all.
+        updated = user_service.update_me(
+            db_session,
+            client,
+            full_name=None,
+            email=None,
+            avatar_url=None,
+            preferences=None,
+            broker_profile={"bio": "Should be ignored"},
+        )
+
+        assert updated.broker_profile is None
 
     def test_changing_email_resets_verification_and_logs(self, db_session, caplog):
         user = make_user(db_session, phone="+919876560002", email="old@example.com")

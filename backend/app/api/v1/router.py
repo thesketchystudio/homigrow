@@ -7,10 +7,20 @@ main.py mounts one router instead of importing each route module.
 
 from fastapi import APIRouter
 
-from app.api.v1.routes import auth, properties, saved_properties, users
+from app.api.v1.routes import analytics, auth, boost, broker_properties, brokers, leads, properties, saved_properties, users
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router)
 api_router.include_router(users.router)
+api_router.include_router(brokers.router)
+api_router.include_router(analytics.router)
+api_router.include_router(leads.router)
+api_router.include_router(boost.router)
+# broker_properties (which declares the literal GET /properties/mine)
+# must be registered before properties (whose GET /properties/{property_id}
+# would otherwise swallow it first — same reasoning that keeps
+# /properties/compare and /properties/neighborhoods declared ahead of
+# /properties/{property_id} within properties.py itself).
+api_router.include_router(broker_properties.router)
 api_router.include_router(properties.router)
 api_router.include_router(saved_properties.router)

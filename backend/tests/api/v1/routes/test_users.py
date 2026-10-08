@@ -7,6 +7,8 @@ live in tests/services/test_user_service.py.
 """
 
 from app.core.security import create_access_token
+from app.models.broker_profile import BrokerProfile
+from app.models.enums import UserRole
 from tests.conftest import make_user
 
 
@@ -25,6 +27,7 @@ class TestGetMe:
         assert body["phone"] == "+919876570001"
         assert body["full_name"] == "Asha Rao"
         assert body["broker_profile"] is None
+        assert body["created_at"] is not None
 
     def test_without_a_token_returns_401(self, client):
         response = client.get("/api/v1/users/me")
@@ -53,6 +56,22 @@ class TestUpdateMe:
 
         assert response.status_code == 409
         assert response.json()["error"]["code"] == "EMAIL_TAKEN"
+
+    def test_updates_broker_profile_fields(self, client, db_session):
+        broker = make_user(db_session, phone="+919876570013", role=UserRole.broker)
+        db_session.add(BrokerProfile(user_id=broker.id))
+        db_session.flush()
+
+        response = client.patch(
+            "/api/v1/users/me",
+            headers=_auth_headers(broker),
+            json={"broker_profile": {"bio": "8 years in residential real estate.", "specializations": ["Residential", "Luxury Villas"]}},
+        )
+
+        assert response.status_code == 200
+        body = response.json()["broker_profile"]
+        assert body["bio"] == "8 years in residential real estate."
+        assert body["specializations"] == ["Residential", "Luxury Villas"]
 
 
 class TestChangePasswordRoute:

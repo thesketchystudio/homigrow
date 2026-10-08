@@ -236,11 +236,15 @@ def signup(
     password: Optional[str],
     city: Optional[str] = None,
     state: Optional[str] = None,
+    company_name: Optional[str] = None,
+    rera_number: Optional[str] = None,
+    service_area: Optional[str] = None,
 ) -> User:
     """
     Creates a user (and a broker_profile row when role=broker), then
     issues a signup-verification OTP by email. Raises 409 PHONE_TAKEN if
-    the phone is already registered, 409 EMAIL_TAKEN on a duplicate email.
+    the phone is already registered, 409 EMAIL_TAKEN on a duplicate email,
+    409 RERA_TAKEN when a broker reuses an existing RERA number.
     Both checks run before any insert: `db.flush()` below executes the
     pending INSERT immediately (needed to assign user.id for the
     broker_profile FK), so a unique-constraint violation would otherwise
@@ -249,12 +253,30 @@ def signup(
     land in the same free-form preferences JSONB the profile Account tab
     reads/writes — left out entirely, not stored as empty strings, when
     the signup form didn't send them.
+
+    company_name/rera_number/service_area are the broker-only
+    "Verification Details" fields from Figma's Step 2 form; only
+    written when role=broker (silently dropped otherwise, same as a
+    client sending them). service_area seeds broker_profiles.
+    service_areas — a JSONB list a broker can expand later via profile
+    edit (P4) — as a one-item list; there's no dedicated single-city
+    column since Figma's one field is just this list's first entry.
     """
     if db.query(User).filter(User.phone == phone).first() is not None:
         raise ConflictError("PHONE_TAKEN", "This phone number is already registered.")
 
     if db.query(User).filter(User.email == email).first() is not None:
         raise ConflictError("EMAIL_TAKEN", "This email is already registered.")
+
+    # broker_profiles.rera_number is unique; checked up front for the same
+    # reason as phone/email, so a reused RERA number is a clean 409 instead
+    # of an IntegrityError at flush time.
+    if (
+        role == UserRole.broker
+        and rera_number
+        and db.query(BrokerProfile).filter(BrokerProfile.rera_number == rera_number).first() is not None
+    ):
+        raise ConflictError("RERA_TAKEN", "This RERA number is already registered.")
 
     preferences = {}
     if city:
@@ -274,7 +296,14 @@ def signup(
     db.flush()  # assigns user.id for the broker_profile FK below
 
     if role == UserRole.broker:
-        db.add(BrokerProfile(user_id=user.id))
+        db.add(
+            BrokerProfile(
+                user_id=user.id,
+                company_name=company_name,
+                rera_number=rera_number,
+                **({"service_areas": [service_area]} if service_area else {}),
+            )
+        )
 
     _issue_otp(db, email, OTPPurpose.signup)
     db.commit()
