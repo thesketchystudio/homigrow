@@ -35,15 +35,24 @@ export function initials(name?: string): string {
     .toUpperCase();
 }
 
+// Rounds to at most two decimals and drops trailing zeros, so 6.5 stays
+// "6.5" rather than collapsing to "7" or padding to "6.50".
+function trimmedScale(value: number): string {
+  return String(Number(value.toFixed(2)));
+}
+
 // Formats a rupee amount using Indian lakh/crore short-scale notation
-// (e.g. 7500000 -> "₹75L", 130000000 -> "₹13Cr"), matching the buyer
-// preference wizard's price-range display.
+// (e.g. 7500000 -> "₹75L", 65000000 -> "₹6.5Cr"), matching the buyer
+// preference wizard's price-range display. Fractional values are kept to
+// two decimals so a 6.5Cr listing is never shown as 7Cr.
 export function formatINR(amount: number): string {
-  if (amount >= 1_00_00_000) {
-    return `₹${Math.round(amount / 1_00_00_000)}Cr`;
+  const crores = amount / 1_00_00_000;
+  if (crores >= 1 || Number(crores.toFixed(2)) >= 1) {
+    return `₹${trimmedScale(crores)}Cr`;
   }
-  if (amount >= 1_00_000) {
-    return `₹${Math.round(amount / 1_00_000)}L`;
+  const lakhs = amount / 1_00_000;
+  if (lakhs >= 1) {
+    return `₹${trimmedScale(lakhs)}L`;
   }
   return `₹${amount.toLocaleString("en-IN")}`;
 }

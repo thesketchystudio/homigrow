@@ -115,12 +115,12 @@ function PreferencesForm({ user }: { user: UserRead }) {
 
   useProfileHeaderActions(
     mode === "edit" ? (
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-end gap-3">
         <button
           type="button"
           onClick={() => setMode("view")}
           disabled={mutation.isPending}
-          className="font-heading rounded border border-[rgba(38,38,38,0.3)] px-6 py-2.5 text-[16px] font-bold text-slate-500 disabled:opacity-50"
+          className="font-heading rounded border-[0.8px] border-[rgba(38,38,38,0.3)] px-4 py-2.5 text-[16px] leading-6 font-bold text-[#64748b] disabled:opacity-50"
         >
           Discard Changes
         </button>
@@ -128,7 +128,7 @@ function PreferencesForm({ user }: { user: UserRead }) {
           type="button"
           onClick={() => mutation.mutate(draft)}
           disabled={mutation.isPending}
-          className="bg-brand-primary-600 text-background font-heading rounded px-6 py-2.5 text-[16px] font-bold disabled:opacity-50"
+          className="bg-brand-primary-600 text-background font-heading rounded px-[17px] py-2.5 text-[16px] leading-6 font-bold disabled:opacity-50"
         >
           {mutation.isPending ? "Saving…" : "Save Changes"}
         </button>

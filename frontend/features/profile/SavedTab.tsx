@@ -28,7 +28,7 @@ export function SavedTab() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+      <div className="flex flex-col items-start justify-between gap-4 pt-4 pb-6 sm:flex-row sm:items-center">
         <SavedCategoryPills category={category} onCategoryChange={changeCategory} />
         <CompareSelectionBar />
       </div>

@@ -69,7 +69,7 @@ export default function Listings() {
 
   return (
     <section style={{ background: "#f8f9fa" }}>
-      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "clamp(60px, 10vw, 100px) clamp(20px, 5vw, 150px)" }}>
+      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "clamp(60px, 10vw, 80px) clamp(20px, 5vw, 150px)" }}>
         <div
           style={{
             display: "flex",
