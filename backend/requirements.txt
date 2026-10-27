@@ -1,19 +1,19 @@
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
 sqlalchemy==2.0.36
 alembic==1.14.0
 psycopg2-binary==2.9.10
 geoalchemy2==0.16.0
-python-dotenv==1.0.1
+python-dotenv==1.2.2
 pydantic-settings==2.7.1
-sentry-sdk[fastapi]==2.19.2
+sentry-sdk[fastapi]==2.73.0
 
 # Auth (P2): password hashing + JWT. bcrypt pinned <4.1 — newer releases
 # dropped the __about__.__version__ attribute passlib's bcrypt backend
 # reads to detect the installed version.
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
-PyJWT==2.10.1
+PyJWT==2.15.1
 slowapi==0.1.10
 zxcvbn==4.5.0
 
@@ -24,11 +24,11 @@ zxcvbn==4.5.0
 # elsewhere in this file doesn't cover this, google-auth only ships an
 # adapter for requests/urllib3, not httpx.
 google-auth==2.37.0
-requests==2.32.3
+requests==2.34.2
 
 # Test tooling (pulled forward from T13 — T10's lifecycle tests need pytest
 # to run; T13 adds the fuller conftest.py/DB-fixture scaffolding on top).
-pytest==8.3.4
+pytest==9.0.3
 
 # httpx also backs FastAPI's TestClient above, but is now a runtime
 # dependency too: app/services/email_service.py's Resend adapter.
@@ -40,4 +40,4 @@ ruff==0.15.20
 # Broker verification document storage: S3-compatible client, used
 # against Supabase Storage's S3 endpoint (see config.py SUPABASE_S3_*).
 boto3==1.43.70
-python-multipart==0.0.20
+python-multipart==0.0.32
