@@ -95,8 +95,11 @@ def make_user(
 ) -> User:
     """
     Creates and flushes a User row for tests that need one already
-    persisted, without going through the signup service/OTP flow.
+    persisted, without going through the signup service/OTP flow. The
+    email is marked verified by default (pass is_email_verified=False to
+    model a half-finished signup), since login rejects unverified ones.
     """
+    kwargs.setdefault("is_email_verified", True)
     user = User(
         phone=phone,
         role=role,
