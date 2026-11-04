@@ -420,3 +420,11 @@ class PropertyUpdateRequest(BaseModel):
     @classmethod
     def _check_description(cls, value: Optional[str]) -> Optional[str]:
         return _validate_description_length(value)
+
+
+class PropertyViewRequest(BaseModel):
+    """Optional body of POST /properties/{id}/view."""
+
+    # Random id the browser keeps in localStorage; lets anonymous views be
+    # deduped across IP changes. Absent when the browser cannot store one.
+    visitor_id: Optional[str] = Field(default=None, min_length=8, max_length=64)

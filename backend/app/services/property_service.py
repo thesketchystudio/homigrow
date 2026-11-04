@@ -8,6 +8,7 @@ of moderation.
 """
 
 import re
+from datetime import timedelta
 from typing import Literal, Optional
 from uuid import UUID
 
@@ -24,6 +25,9 @@ from app.schemas.properties import NeighborhoodSummary, PropertyListItem
 from app.services._property_query_helpers import build_property_list_item, cover_image_subquery
 
 SortOption = Literal["newest", "price_asc", "price_desc"]
+
+# One anonymous visitor counts once per property within this window.
+ANONYMOUS_VIEW_WINDOW = timedelta(hours=1)
 
 _SORT_CLAUSES = {
     "newest": Property.published_at.desc().nullslast(),
@@ -125,21 +129,47 @@ def get_property_detail(db: Session, property_id: UUID) -> Property:
     return property_
 
 
-def record_view(db: Session, property_id: UUID, viewer_id: Optional[UUID]) -> None:
+def record_view(db: Session, property_id: UUID, viewer_id: Optional[UUID], visitor_hash: Optional[str]) -> None:
     """
-    Logs one property-detail view for the broker Analytics page. Logged-in
-    viewers are deduped via ON CONFLICT DO NOTHING against the partial
-    unique index on (property_id, viewer_id) — a repeat view from the same
-    account is a no-op. Anonymous viewers (viewer_id is None) fall outside
-    that partial index, so every anonymous view is logged as its own row;
-    there's no stable identity to dedupe an anonymous visitor against.
+    Logs one property-detail view for the broker Analytics page, 404ing if
+    the property is not active. Logged-in viewers are deduped via ON
+    CONFLICT DO NOTHING against the partial unique index on (property_id,
+    viewer_id). Anonymous viewers are deduped by visitor_hash: a repeat
+    view within ANONYMOUS_VIEW_WINDOW is skipped, so reloads and scripted
+    loops cannot inflate the count or grow the table without bound.
     """
-    stmt = pg_insert(PropertyView).values(property_id=property_id, viewer_id=viewer_id)
-    stmt = stmt.on_conflict_do_nothing(
-        index_elements=[PropertyView.property_id, PropertyView.viewer_id],
-        index_where=PropertyView.viewer_id.isnot(None),
+    is_active = (
+        db.query(Property.id)
+        .filter(Property.id == property_id, Property.status == PropertyStatus.active)
+        .first()
     )
-    db.execute(stmt)
+    if is_active is None:
+        raise NotFoundError("PROPERTY_NOT_FOUND", "Property not found.")
+
+    if viewer_id is not None:
+        stmt = pg_insert(PropertyView).values(property_id=property_id, viewer_id=viewer_id)
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=[PropertyView.property_id, PropertyView.viewer_id],
+            index_where=PropertyView.viewer_id.isnot(None),
+        )
+        db.execute(stmt)
+        db.commit()
+        return
+
+    if visitor_hash is not None:
+        recently_seen = (
+            db.query(PropertyView.id)
+            .filter(
+                PropertyView.property_id == property_id,
+                PropertyView.visitor_hash == visitor_hash,
+                PropertyView.viewed_at > func.now() - ANONYMOUS_VIEW_WINDOW,
+            )
+            .first()
+        )
+        if recently_seen is not None:
+            return
+
+    db.add(PropertyView(property_id=property_id, viewer_id=None, visitor_hash=visitor_hash))
     db.commit()
 
 

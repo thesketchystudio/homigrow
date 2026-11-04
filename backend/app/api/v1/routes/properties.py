@@ -7,12 +7,14 @@ public Property Details and Listings screens.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import OptionalCurrentUser
+from app.core.client_ip import get_client_ip
 from app.core.exceptions import ValidationFailed
 from app.core.middleware import limiter
+from app.core.visitor import is_bot_user_agent, visitor_fingerprint
 from app.db.session import get_db
 from app.models.enums import ListingType, PropertyType
 from app.schemas.leads import EnquireRequest, EnquireResponse
@@ -21,6 +23,7 @@ from app.schemas.properties import (
     PropertyCompareResponse,
     PropertyListResponse,
     PropertyRead,
+    PropertyViewRequest,
 )
 from app.services import lead_service, property_service
 from app.services.property_service import MAX_COMPARE_IDS, SortOption
@@ -103,11 +106,31 @@ def compare_properties(
 
 
 @router.get("/{property_id}", response_model=PropertyRead)
-def get_property(property_id: UUID, requester: OptionalCurrentUser, db: Session = Depends(get_db)) -> PropertyRead:
-    """Returns an active property's full detail; 404 if missing or not active. Logs a view for the broker Analytics page."""
-    property_ = property_service.get_property_detail(db, property_id)
-    property_service.record_view(db, property_id, requester.id if requester else None)
-    return PropertyRead.model_validate(property_)
+def get_property(property_id: UUID, db: Session = Depends(get_db)) -> PropertyRead:
+    """Returns an active property's full detail; 404 if missing or not active. Read-only —
+    views are logged by POST /{property_id}/view so crawlers and link previews are not counted."""
+    return PropertyRead.model_validate(property_service.get_property_detail(db, property_id))
+
+
+@router.post("/{property_id}/view", status_code=204)
+@limiter.limit("120/minute")
+def record_property_view(
+    property_id: UUID,
+    request: Request,
+    requester: OptionalCurrentUser,
+    payload: PropertyViewRequest | None = None,
+    db: Session = Depends(get_db),
+) -> Response:
+    """Logs one detail-page view for the broker Analytics page. Called by the browser once the
+    page has rendered, which is why crawlers and link-preview fetchers (that never run the page)
+    are not counted. Requests from recognisable bots get the same 204 without a row being written."""
+    user_agent = request.headers.get("user-agent", "")
+    if not is_bot_user_agent(user_agent):
+        visitor_hash = None
+        if requester is None:
+            visitor_hash = visitor_fingerprint(get_client_ip(request), user_agent, payload.visitor_id if payload else None)
+        property_service.record_view(db, property_id, requester.id if requester else None, visitor_hash)
+    return Response(status_code=204)
 
 
 @router.post("/{property_id}/enquire", response_model=EnquireResponse, status_code=201)
