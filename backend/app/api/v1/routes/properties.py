@@ -5,9 +5,11 @@ Public property-listing endpoints. No auth required — these serve the
 public Property Details and Listings screens.
 """
 
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, Response
+from pydantic import StringConstraints
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import OptionalCurrentUser
@@ -30,6 +32,14 @@ from app.services.property_service import MAX_COMPARE_IDS, SortOption
 
 router = APIRouter(prefix="/properties", tags=["properties"])
 
+# Upper bounds on public search inputs: every filter value is compared
+# against rows on each call, so unbounded text or list sizes let one request
+# do arbitrary amounts of work.
+MAX_FILTER_TEXT_LENGTH = 100
+MAX_AMENITY_FILTERS = 20
+MAX_AMENITY_LENGTH = 50
+MAX_PAGE = 500
+
 
 def _parse_compare_ids(raw: str) -> list[UUID]:
     """
@@ -51,19 +61,21 @@ def _parse_compare_ids(raw: str) -> list[UUID]:
 
 
 @router.get("", response_model=PropertyListResponse)
+@limiter.limit("60/minute")
 def list_properties(
+    request: Request,
     db: Session = Depends(get_db),
-    city: str | None = None,
-    locality: str | None = None,
-    search: str | None = None,
+    city: str | None = Query(default=None, max_length=MAX_FILTER_TEXT_LENGTH),
+    locality: str | None = Query(default=None, max_length=MAX_FILTER_TEXT_LENGTH),
+    search: str | None = Query(default=None, max_length=MAX_FILTER_TEXT_LENGTH),
     listing_type: ListingType | None = None,
     property_type: list[PropertyType] = Query(default=[]),
     price_min: float | None = Query(default=None, ge=0),
     price_max: float | None = Query(default=None, ge=0),
     bhk_min: int | None = Query(default=None, ge=1),
-    amenities: list[str] = Query(default=[]),
+    amenities: Annotated[list[Annotated[str, StringConstraints(max_length=MAX_AMENITY_LENGTH)]], Query(max_length=MAX_AMENITY_FILTERS)] = [],
     sort: SortOption = "newest",
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=MAX_PAGE),
     page_size: int = Query(default=20, ge=1, le=50),
 ) -> PropertyListResponse:
     """The search/listings grid endpoint. Filters are typed query params; unknown `sort` values 422 automatically via the Literal type."""
@@ -86,7 +98,9 @@ def list_properties(
 
 
 @router.get("/neighborhoods", response_model=list[NeighborhoodSummary])
+@limiter.limit("60/minute")
 def list_neighborhoods(
+    request: Request,
     limit: int = Query(default=4, ge=1, le=12),
     db: Session = Depends(get_db),
 ) -> list[NeighborhoodSummary]:
@@ -95,7 +109,9 @@ def list_neighborhoods(
 
 
 @router.get("/compare", response_model=PropertyCompareResponse)
+@limiter.limit("60/minute")
 def compare_properties(
+    request: Request,
     ids: str = Query(..., description=f"Comma-separated property ids, max {MAX_COMPARE_IDS}"),
     db: Session = Depends(get_db),
 ) -> PropertyCompareResponse:
@@ -106,7 +122,8 @@ def compare_properties(
 
 
 @router.get("/{property_id}", response_model=PropertyRead)
-def get_property(property_id: UUID, db: Session = Depends(get_db)) -> PropertyRead:
+@limiter.limit("120/minute")
+def get_property(property_id: UUID, request: Request, db: Session = Depends(get_db)) -> PropertyRead:
     """Returns an active property's full detail; 404 if missing or not active. Read-only —
     views are logged by POST /{property_id}/view so crawlers and link previews are not counted."""
     return PropertyRead.model_validate(property_service.get_property_detail(db, property_id))

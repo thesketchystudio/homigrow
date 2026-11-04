@@ -80,6 +80,20 @@ _PROPERTY_TYPE_ALIASES: dict[str, PropertyType] = {
 }
 
 
+LIKE_ESCAPE = "\\"
+
+
+def _contains_pattern(text: str) -> str:
+    """
+    Builds a case-insensitive "contains" LIKE pattern from user text, escaping
+    the LIKE wildcards (% _) and the escape character itself so they match
+    literally. Callers must pass escape=LIKE_ESCAPE to .like().
+    """
+    escaped = text.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+
 def _parse_search_query(search: str) -> tuple[Optional[PropertyType], Optional[str]]:
     """
     Splits a free-text nav-search query into an optional property type
@@ -243,24 +257,24 @@ def list_properties(
         if parsed_type is not None:
             conditions.append(Property.property_type == parsed_type)
             if area:
-                pattern = f"%{area}%"
+                pattern = _contains_pattern(area)
                 conditions.append(
                     or_(
-                        func.lower(Property.city).like(pattern),
-                        func.lower(Property.locality).like(pattern),
-                        func.lower(Property.landmark).like(pattern),
+                        func.lower(Property.city).like(pattern, escape=LIKE_ESCAPE),
+                        func.lower(Property.locality).like(pattern, escape=LIKE_ESCAPE),
+                        func.lower(Property.landmark).like(pattern, escape=LIKE_ESCAPE),
                     )
                 )
         else:
-            pattern = f"%{search.lower()}%"
+            pattern = _contains_pattern(search)
             conditions.append(
                 or_(
-                    func.lower(Property.title).like(pattern),
-                    func.lower(Property.description).like(pattern),
-                    func.lower(Property.city).like(pattern),
-                    func.lower(Property.locality).like(pattern),
-                    func.lower(Property.landmark).like(pattern),
-                    func.lower(Property.amenities.cast(Text)).like(pattern),
+                    func.lower(Property.title).like(pattern, escape=LIKE_ESCAPE),
+                    func.lower(Property.description).like(pattern, escape=LIKE_ESCAPE),
+                    func.lower(Property.city).like(pattern, escape=LIKE_ESCAPE),
+                    func.lower(Property.locality).like(pattern, escape=LIKE_ESCAPE),
+                    func.lower(Property.landmark).like(pattern, escape=LIKE_ESCAPE),
+                    func.lower(Property.amenities.cast(Text)).like(pattern, escape=LIKE_ESCAPE),
                 )
             )
     if listing_type is not None:

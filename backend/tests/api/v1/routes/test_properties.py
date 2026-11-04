@@ -536,6 +536,60 @@ class TestListProperties:
         assert response.status_code == 422
 
 
+class TestPublicSearchLimits:
+    def test_percent_and_underscore_in_search_match_literally(self, client, db_session):
+        city = _unique_city()
+        _make_property(db_session, title="Plain Villa", city=city)
+        _make_property(db_session, title="100% Sea View", city=city)
+        _make_property(db_session, title="Sea_View Cottage", city=city)
+
+        percent = client.get("/api/v1/properties", params={"city": city, "search": "%"}).json()
+        underscore = client.get("/api/v1/properties", params={"city": city, "search": "_"}).json()
+
+        assert [item["title"] for item in percent["items"]] == ["100% Sea View"]
+        assert [item["title"] for item in underscore["items"]] == ["Sea_View Cottage"]
+
+    def test_over_long_text_filters_are_rejected(self, client):
+        too_long = "x" * 101
+
+        for param in ("search", "city", "locality"):
+            assert client.get("/api/v1/properties", params={param: too_long}).status_code == 422, param
+
+    def test_too_many_or_too_long_amenity_filters_are_rejected(self, client):
+        assert client.get("/api/v1/properties", params={"amenities": [f"a{i}" for i in range(21)]}).status_code == 422
+        assert client.get("/api/v1/properties", params={"amenities": ["y" * 51]}).status_code == 422
+        assert client.get("/api/v1/properties", params={"amenities": [f"a{i}" for i in range(20)]}).status_code == 200
+
+    def test_page_number_is_capped(self, client):
+        assert client.get("/api/v1/properties", params={"page": 501}).status_code == 422
+        assert client.get("/api/v1/properties", params={"page": 500}).status_code == 200
+
+    def test_search_is_rate_limited_per_ip(self, client, monkeypatch):
+        monkeypatch.setattr(settings, "CLIENT_IP_HEADER", "X-Forwarded-For")
+        monkeypatch.setattr(settings, "TRUSTED_PROXY_HOPS", 1)
+        scraper = {"X-Forwarded-For": "198.51.100.90"}
+
+        statuses = [client.get("/api/v1/properties", params={"page_size": 1}, headers=scraper).status_code for _ in range(61)]
+
+        assert statuses[:60] == [200] * 60
+        assert statuses[60] == 429
+        assert client.get("/api/v1/properties", headers={"X-Forwarded-For": "198.51.100.91"}).status_code == 200
+
+    def test_detail_compare_and_neighborhoods_are_rate_limited(self, client, db_session, monkeypatch):
+        monkeypatch.setattr(settings, "CLIENT_IP_HEADER", "X-Forwarded-For")
+        monkeypatch.setattr(settings, "TRUSTED_PROXY_HOPS", 1)
+        headers = {"X-Forwarded-For": "198.51.100.92"}
+        missing = uuid.uuid4()
+
+        neighborhoods = [client.get("/api/v1/properties/neighborhoods", headers=headers).status_code for _ in range(61)]
+        compare = [client.get(f"/api/v1/properties/compare?ids={missing}", headers=headers).status_code for _ in range(61)]
+        detail = [client.get(f"/api/v1/properties/{missing}", headers=headers).status_code for _ in range(121)]
+
+        assert neighborhoods[-1] == 429 and neighborhoods[0] == 200
+        assert compare[-1] == 429 and compare[0] != 429
+        assert detail[-1] == 429 and detail[0] == 404
+
+
 class TestListNeighborhoods:
     def test_returns_top_localities_by_active_count_with_cover_image(self, client, db_session):
         city = _unique_city()
