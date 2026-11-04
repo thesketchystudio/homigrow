@@ -80,13 +80,18 @@ def _error_response(status_code: int, code: str, message: str, fields: Optional[
     return JSONResponse(status_code=status_code, content={"error": body})
 
 
+# Pydantic prepends this to the message of any error raised from a custom
+# validator; it is noise for end users, who see the message verbatim.
+_VALUE_ERROR_PREFIX = "Value error, "
+
+
 def _validation_fields(exc: RequestValidationError) -> dict:
-    """Maps pydantic's error list to {field_path: message}, dropping the leading body/query/path location marker."""
+    """Maps pydantic's error list to {field_path: message}, dropping the leading body/query/path location marker and pydantic's "Value error, " prefix on custom-validator messages."""
     fields: dict = {}
     for error in exc.errors():
         loc = [str(part) for part in error["loc"] if part not in ("body", "query", "path")]
         key = ".".join(loc) or "__root__"
-        fields[key] = error["msg"]
+        fields[key] = error["msg"].removeprefix(_VALUE_ERROR_PREFIX)
     return fields
 
 
