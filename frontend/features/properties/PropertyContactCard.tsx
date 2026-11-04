@@ -7,12 +7,16 @@
 // Report" just toasts, since no backend exists for that.
 //
 // Both CTAs hit POST /properties/{id}/enquire, which works for anonymous
-// and logged-in visitors alike and reveals the broker's phone number on
-// success — GET /properties/{id} never exposes it.
+// and logged-in visitors alike. Only logged-in visitors get the broker's
+// phone number back; anonymous visitors' request still reaches the broker,
+// and they are offered a login to see the number. GET /properties/{id}
+// never exposes it.
 
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { MapPin, ShieldCheck, User } from "lucide-react";
 
@@ -27,6 +31,7 @@ export function PropertyContactCard({ property }: { property: PropertyRead }) {
   const [phone, setPhone] = useState("");
   const [date, setDate] = useState("");
   const [revealed, setRevealed] = useState<EnquireResponse | null>(null);
+  const pathname = usePathname();
   const isVerified = property.broker.broker_profile?.verification_status === VerificationStatus.verified;
 
   const enquireMutation = useMutation({
@@ -34,10 +39,12 @@ export function PropertyContactCard({ property }: { property: PropertyRead }) {
       enquireProperty(property.id, { name, phone, source, preferred_date: date || undefined }),
     onSuccess: (data) => {
       setRevealed(data);
-      toast.success("Request sent — the broker's number is below.");
+      toast.success(data.broker_phone ? "Request sent — the broker's number is below." : "Request sent — the broker will contact you.");
     },
     onError: (error: ApiError) => {
-      toast.error(error.code === "LEAD_ALREADY_OPEN" ? error.message : "Couldn't send your request. Please try again.");
+      const fieldMessage = error.fields ? Object.values(error.fields)[0] : undefined;
+      const showServerMessage = ["LEAD_ALREADY_OPEN", "TOO_MANY_ENQUIRIES", "PROPERTY_BUSY", "RATE_LIMITED"].includes(error.code);
+      toast.error(fieldMessage ?? (showServerMessage ? error.message : "Couldn't send your request. Please try again."));
     },
   });
 
@@ -67,12 +74,26 @@ export function PropertyContactCard({ property }: { property: PropertyRead }) {
         {revealed ? (
           <div className="flex flex-col gap-3">
             <p className="font-body text-[14px] text-brand-primary-600">Thanks, {name}! Your request has been sent.</p>
-            <a
-              href={`tel:${revealed.broker_phone}`}
-              className="rounded-md bg-brand-green-500 py-4 text-center font-heading text-[14px] font-bold uppercase tracking-[1.4px] text-brand-primary-400"
-            >
-              Call {revealed.broker_name ?? "the broker"}: {revealed.broker_phone ?? "not available"}
-            </a>
+            {revealed.broker_phone ? (
+              <a
+                href={`tel:${revealed.broker_phone}`}
+                className="rounded-md bg-brand-green-500 py-4 text-center font-heading text-[14px] font-bold uppercase tracking-[1.4px] text-brand-primary-400"
+              >
+                Call {revealed.broker_name ?? "the broker"}: {revealed.broker_phone}
+              </a>
+            ) : (
+              <>
+                <p className="font-body text-[14px] text-brand-primary-600/80">
+                  {revealed.broker_name ?? "The broker"} will contact you on the number you gave. Log in to see their number too.
+                </p>
+                <Link
+                  href={`/login?returnTo=${encodeURIComponent(pathname)}`}
+                  className="rounded-md bg-brand-green-500 py-4 text-center font-heading text-[14px] font-bold uppercase tracking-[1.4px] text-brand-primary-400"
+                >
+                  Log in to see the number
+                </Link>
+              </>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-4">
@@ -95,6 +116,9 @@ export function PropertyContactCard({ property }: { property: PropertyRead }) {
               <input
                 id="contact-phone"
                 value={phone}
+                type="tel"
+                inputMode="tel"
+                maxLength={20}
                 onChange={(event) => setPhone(event.target.value)}
                 placeholder="Enter your number"
                 className="rounded-sm bg-brand-secondary-400 px-4 py-3 font-body text-[14px] text-brand-primary-600 placeholder:text-brand-primary-300 outline-none"

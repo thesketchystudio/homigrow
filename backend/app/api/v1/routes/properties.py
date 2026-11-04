@@ -134,7 +134,7 @@ def record_property_view(
 
 
 @router.post("/{property_id}/enquire", response_model=EnquireResponse, status_code=201)
-@limiter.limit("5/minute")
+@limiter.limit("5/minute;30/day")
 def enquire_property(
     property_id: UUID,
     payload: EnquireRequest,
@@ -143,13 +143,14 @@ def enquire_property(
     db: Session = Depends(get_db),
 ) -> EnquireResponse:
     """Creates a Lead from the Property Details contact card's two CTAs — works for both
-    anonymous and logged-in visitors. On success reveals the broker's phone number, which
-    GET /{property_id} never exposes."""
+    anonymous and logged-in visitors. Logged-in requesters get the broker's phone number in the
+    response (GET /{property_id} never exposes it); anonymous visitors get a null number and are
+    asked to log in, so numbers cannot be harvested without a verified account."""
     property_ = property_service.get_property_detail(db, property_id)
     lead = lead_service.create_enquiry(db, property_, requester, payload)
     return EnquireResponse(
         id=lead.id,
         status=lead.status,
         broker_name=property_.broker.full_name,
-        broker_phone=property_.broker.phone,
+        broker_phone=property_.broker.phone if requester else None,
     )

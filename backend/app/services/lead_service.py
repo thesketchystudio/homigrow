@@ -7,12 +7,14 @@ pipeline: listing a broker's own leads, viewing one in detail, updating
 its status/follow-up date, and logging notes against it.
 """
 
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.core.exceptions import ConflictError, NotFoundError
+from app.core.exceptions import ConflictError, NotFoundError, RateLimited
 from app.models.enums import LeadStatus, NotificationType
 from app.models.lead import Lead, LeadNote
 from app.models.property import Property
@@ -21,6 +23,11 @@ from app.schemas.leads import EnquireRequest, LeadDetail, LeadListItem, LeadNote
 from app.services import notification_service
 
 _OPEN_STATUSES_EXCLUDED = (LeadStatus.closed_won, LeadStatus.closed_lost)
+# Abuse limits on public enquiries. Counted from the leads table itself so
+# they survive restarts and hold across instances, unlike the in-process
+# per-IP limiter on the route.
+MAX_ENQUIRIES_PER_PERSON_PER_DAY = 5
+MAX_ENQUIRIES_PER_PROPERTY_PER_HOUR = 15
 _SOURCE_LABELS = {"tour_request": "requested a private tour", "number_request": "requested your number"}
 
 
@@ -33,6 +40,36 @@ def _has_open_lead(db: Session, property_id: UUID, *, client_id: Optional[UUID],
     return query.first() is not None
 
 
+def _enforce_enquiry_limits(db: Session, property_id: UUID, *, client_id: Optional[UUID], phone: str) -> None:
+    """
+    Caps enquiries per person per day (keyed on the phone number and, when
+    logged in, the account) and per property per hour. The phone cap stops
+    a visitor from pointing many brokers at someone else's number; the
+    account cap stops one login from rotating through made-up numbers; the
+    property cap stops a single broker's listing being flooded with leads.
+    """
+    now = datetime.now(timezone.utc)
+
+    person_match = Lead.contact_phone == phone
+    if client_id is not None:
+        person_match = or_(person_match, Lead.client_id == client_id)
+    recent_by_person = (
+        db.query(func.count(Lead.id))
+        .filter(person_match, Lead.created_at > now - timedelta(days=1))
+        .scalar()
+    )
+    if recent_by_person >= MAX_ENQUIRIES_PER_PERSON_PER_DAY:
+        raise RateLimited("TOO_MANY_ENQUIRIES", "You have sent several enquiries today. Please try again tomorrow.")
+
+    recent_on_property = (
+        db.query(func.count(Lead.id))
+        .filter(Lead.property_id == property_id, Lead.created_at > now - timedelta(hours=1))
+        .scalar()
+    )
+    if recent_on_property >= MAX_ENQUIRIES_PER_PROPERTY_PER_HOUR:
+        raise RateLimited("PROPERTY_BUSY", "This listing is receiving a lot of enquiries. Please try again in a little while.")
+
+
 def create_enquiry(db: Session, property: Property, requester: Optional[User], data: EnquireRequest) -> Lead:
     """
     Creates a Lead for `property` from either an anonymous visitor or a
@@ -40,9 +77,11 @@ def create_enquiry(db: Session, property: Property, requester: Optional[User], d
     this property (open = status not in closed_won/closed_lost): keyed by
     client_id when logged in, by contact_phone when anonymous — an
     anonymous visitor has no other stable identity to key on. Raises
-    ConflictError on collision.
+    ConflictError on collision, and RateLimited when the daily or hourly
+    enquiry caps are hit.
     """
     client_id = requester.id if requester else None
+    _enforce_enquiry_limits(db, property.id, client_id=client_id, phone=data.phone)
     if _has_open_lead(db, property.id, client_id=client_id, contact_phone=None if requester else data.phone):
         raise ConflictError("LEAD_ALREADY_OPEN", "You already have an open enquiry for this property.")
 

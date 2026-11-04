@@ -67,7 +67,7 @@ class TestEnquireProperty:
         assert response.status_code == 201
         body = response.json()
         assert body["broker_name"] == "Vikram Sethi"
-        assert body["broker_phone"] == "+919812340000"
+        assert body["broker_phone"] is None
 
         lead = db_session.query(Lead).filter(Lead.property_id == property_.id).first()
         assert lead is not None
@@ -80,6 +80,20 @@ class TestEnquireProperty:
         notification = db_session.query(Notification).filter(Notification.user_id == broker.id).first()
         assert notification is not None
         assert notification.data["lead_id"] == str(lead.id)
+
+    def test_logged_in_enquiry_reveals_the_broker_phone(self, client, db_session):
+        broker = make_user(db_session, phone="+919812340010", role=UserRole.broker, full_name="Vikram Sethi")
+        client_user = make_user(db_session, phone="+919876580110")
+        property_ = _make_property(db_session, broker=broker)
+
+        response = client.post(
+            f"/api/v1/properties/{property_.id}/enquire",
+            headers=_auth_headers(client_user),
+            json={"name": "Logged In User", "phone": "+919876580110", "source": "number_request"},
+        )
+
+        assert response.status_code == 201
+        assert response.json()["broker_phone"] == "+919812340010"
 
     def test_logged_in_enquiry_populates_client_id(self, client, db_session):
         client_user = make_user(db_session, phone="+919876580100")
@@ -159,6 +173,96 @@ class TestEnquireProperty:
 
         assert response.status_code == 404
         assert response.json()["error"]["code"] == "PROPERTY_NOT_FOUND"
+
+
+class TestEnquiryInputValidation:
+    def _post(self, client, property_, **fields):
+        payload = {"name": "Test Visitor", "phone": "+919876500300", "source": "number_request", **fields}
+        return client.post(f"/api/v1/properties/{property_.id}/enquire", json=payload)
+
+    def test_phone_is_normalised_before_it_is_stored(self, client, db_session):
+        property_ = _make_property(db_session)
+
+        response = self._post(client, property_, phone="98765 43212")
+
+        assert response.status_code == 201
+        lead = db_session.query(Lead).filter(Lead.property_id == property_.id).one()
+        assert lead.contact_phone == "+919876543212"
+
+    def test_same_number_written_differently_is_still_deduped(self, client, db_session):
+        property_ = _make_property(db_session)
+
+        first = self._post(client, property_, phone="+91 98765-43211")
+        second = self._post(client, property_, phone="09876543211")
+
+        assert first.status_code == 201
+        assert second.status_code == 409
+
+    def test_implausible_phone_numbers_are_rejected(self, client, db_session):
+        property_ = _make_property(db_session)
+
+        for bad in ("12345", "0000000000", "9999999999", "5876543210", "1234567890", "abcdefghij", "+441234567890"):
+            response = self._post(client, property_, phone=bad)
+            assert response.status_code == 422, bad
+            assert "phone" in response.json()["error"]["fields"]
+
+    def test_junk_names_are_rejected(self, client, db_session):
+        property_ = _make_property(db_session)
+
+        for bad in ("1234", "x", "   ", "visit http://spam.example now", "www.spam.example"):
+            assert self._post(client, property_, name=bad).status_code == 422, bad
+
+    def test_oversized_message_is_rejected(self, client, db_session):
+        property_ = _make_property(db_session)
+
+        assert self._post(client, property_, message="x" * 1001).status_code == 422
+
+
+class TestEnquiryAbuseLimits:
+    def _enquire(self, client, property_, phone, headers=None):
+        return client.post(
+            f"/api/v1/properties/{property_.id}/enquire",
+            headers=headers or {},
+            json={"name": "Test Visitor", "phone": phone, "source": "number_request"},
+        )
+
+    def test_one_number_cannot_enquire_on_more_than_five_listings_a_day(self, client, db_session):
+        phone = "+919876500400"
+        for _ in range(5):
+            _make_lead(db_session, property_=_make_property(db_session), contact_phone=phone)
+
+        response = self._enquire(client, _make_property(db_session), phone)
+
+        assert response.status_code == 429
+        assert response.json()["error"]["code"] == "TOO_MANY_ENQUIRIES"
+
+    def test_old_enquiries_do_not_count_toward_the_daily_cap(self, client, db_session):
+        phone = "+919876500401"
+        two_days_ago = datetime.now(timezone.utc) - timedelta(days=2)
+        for _ in range(5):
+            _make_lead(db_session, property_=_make_property(db_session), contact_phone=phone, created_at=two_days_ago)
+
+        assert self._enquire(client, _make_property(db_session), phone).status_code == 201
+
+    def test_one_account_cannot_rotate_numbers_past_the_daily_cap(self, client, db_session):
+        account = make_user(db_session, phone="+919876580402")
+        for i in range(5):
+            _make_lead(db_session, property_=_make_property(db_session), client_id=account.id, contact_phone=f"+91987650050{i}")
+
+        response = self._enquire(client, _make_property(db_session), "+919876500409", headers=_auth_headers(account))
+
+        assert response.status_code == 429
+        assert response.json()["error"]["code"] == "TOO_MANY_ENQUIRIES"
+
+    def test_a_listing_cannot_be_flooded_with_enquiries_in_an_hour(self, client, db_session):
+        property_ = _make_property(db_session)
+        for i in range(15):
+            _make_lead(db_session, property_=property_, contact_phone=f"+91987650060{i:02d}")
+
+        response = self._enquire(client, property_, "+919876500699")
+
+        assert response.status_code == 429
+        assert response.json()["error"]["code"] == "PROPERTY_BUSY"
 
 
 class TestEnquireRateLimiting:
