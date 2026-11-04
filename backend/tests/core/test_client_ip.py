@@ -12,7 +12,6 @@ not pooled into a single bucket.
 from starlette.requests import Request
 
 from app.core.config import settings
-from tests.conftest import make_user
 
 
 def _request(peer: str = "10.0.0.1", headers: dict | None = None) -> Request:
@@ -85,10 +84,11 @@ class TestGetClientIp:
 
 
 class TestRateLimitIsPerClientIp:
-    def test_different_forwarded_ips_do_not_share_a_rate_limit_bucket(self, client, db_session, monkeypatch):
+    def test_different_forwarded_ips_do_not_share_a_rate_limit_bucket(self, client, monkeypatch):
         monkeypatch.setattr(settings, "CLIENT_IP_HEADER", "X-Forwarded-For")
         monkeypatch.setattr(settings, "TRUSTED_PROXY_HOPS", 1)
-        make_user(db_session, phone="+919876540090", password="correct-horse-battery-staple")
+        # An unknown account, so repeated failures hit only the IP rate limit
+        # and never the per-account lockout (which would answer 423).
         body = {"phone_or_email": "+919876540090", "password": "wrong-password"}
 
         for _ in range(5):
