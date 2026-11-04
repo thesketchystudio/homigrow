@@ -796,6 +796,37 @@ commits to `dev` before starting)
   and boost-tier search/ranking surfacing — this task only unblocks the
   frontend checkout UI + a real `created`-status order row.
 
+### Security hardening (on `fix/security-critical-high`, cut from `dev`)
+Critical/high findings from the pre-launch security review, fixed in order:
+- **C1** dependency CVEs upgraded (FastAPI 0.162, PyJWT, python-multipart,
+  requests, sentry-sdk 2.73, Next 16.4.3); `pip-audit`/`npm audit` clean.
+- **C2** dev server `*.log` files untracked and gitignored (they can hold
+  OTP codes and reset tokens).
+- **H1** password login requires a verified email (`403 EMAIL_NOT_VERIFIED`,
+  a fresh OTP is sent). A new signup may take over an unverified account
+  that owns no property or lead (`auth_service._is_claimable`), so nobody can
+  squat an address they don't own. Google sign-in and password reset prove
+  mailbox ownership: they mark the email verified, and Google also removes
+  any password and revokes sessions on a previously unverified account.
+- **H3** rate limits and session IPs use the real client IP
+  (`app/core/client_ip.py`). `CLIENT_IP_HEADER` / `TRUSTED_PROXY_HOPS`
+  must be set at deploy time behind a proxy or CDN.
+- **H4** property views are logged by `POST /properties/{id}/view` (called
+  by the property page after render), not by `GET`. Anonymous visitors are
+  deduped to one view per property per hour via `property_views.visitor_hash`
+  (M13); bot user-agents are skipped (`app/core/visitor.py`).
+- **H5** `POST /properties/{id}/enquire` returns the broker's phone only to
+  logged-in users. Phone is validated and normalised to `+91XXXXXXXXXX`
+  (`app/core/phone.py`); caps of 5 enquiries/day per number or account and
+  15/hour per listing, plus 5/min and 30/day per IP.
+- **H6** public search inputs are length-capped, LIKE wildcards are escaped,
+  and list/compare/neighborhoods/detail reads are rate limited per IP.
+- 422 messages no longer carry pydantic's "Value error, " prefix.
+- **Open:** H2 (listings auto-approve to `active` with no moderation) is
+  deliberately unchanged pending a decision on the approval policy. Public
+  search still uses `LIKE '%…%'`; move to full-text/trigram indexing once
+  listing volume warrants it.
+
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
   docs/architecture/15_Decision_Log.md); integrate via

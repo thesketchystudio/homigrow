@@ -12,6 +12,7 @@ Every route is rate-limited: 5/min/IP except otp/request at 3/min/IP.
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
+from app.core.client_ip import get_client_ip
 from app.core.config import settings
 from app.core.cookies import REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH
 from app.core.middleware import limiter
@@ -47,7 +48,7 @@ def _set_refresh_cookie(response: Response, raw_token: str) -> None:
 
 
 def _client_ip(request: Request) -> str | None:
-    return request.client.host if request.client else None
+    return get_client_ip(request)
 
 
 @router.post("/signup", response_model=SignupResponse, status_code=201)

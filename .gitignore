@@ -35,3 +35,6 @@ Thumbs.db
 
 # Docs
 docs/
+
+# Runtime/dev server logs (can contain OTP codes and reset tokens)
+*.log

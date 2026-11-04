@@ -80,6 +80,12 @@ export function getProperty(id: string): Promise<PropertyRead> {
   return apiRequest<PropertyRead>(`/properties/${id}`);
 }
 
+// Logs one detail-page view for the broker Analytics page. Called once the
+// page has rendered, so crawlers and link previews are never counted.
+export function recordPropertyView(id: string, visitorId?: string): Promise<void> {
+  return apiRequest<void>(`/properties/${id}/view`, { method: "POST", body: visitorId ? { visitor_id: visitorId } : undefined });
+}
+
 export type PropertySort = "newest" | "price_asc" | "price_desc";
 
 export type PropertyListItem = {

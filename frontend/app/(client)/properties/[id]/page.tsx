@@ -6,6 +6,7 @@
 
 "use client";
 
+import { useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 
@@ -20,8 +21,9 @@ import { PropertyContactCard } from "@/features/properties/PropertyContactCard";
 import { PropertyLoanCalculator } from "@/features/properties/PropertyLoanCalculator";
 import { PropertyDetailsSkeleton } from "@/features/properties/PropertyDetailsSkeleton";
 import { ApiError } from "@/lib/api/client";
-import { getProperty } from "@/lib/api/endpoints/properties";
+import { getProperty, recordPropertyView } from "@/lib/api/endpoints/properties";
 import { ListingType } from "@/lib/enums";
+import { getVisitorId } from "@/lib/visitorId";
 
 export default function PropertyDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -30,6 +32,13 @@ export default function PropertyDetailsPage() {
     queryFn: () => getProperty(params.id),
     retry: (failureCount, err) => err instanceof ApiError && err.status === 404 ? false : failureCount < 2,
   });
+
+  const propertyId = property?.id;
+  useEffect(() => {
+    if (!propertyId) return;
+    // Fire-and-forget: a failed analytics ping must never affect the page.
+    recordPropertyView(propertyId, getVisitorId()).catch(() => {});
+  }, [propertyId]);
 
   if (isLoading) {
     return <PropertyDetailsSkeleton />;

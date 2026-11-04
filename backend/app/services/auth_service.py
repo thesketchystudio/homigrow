@@ -51,7 +51,9 @@ from app.core.security import (
 )
 from app.models.broker_profile import BrokerProfile
 from app.models.enums import OTPPurpose, UserRole
+from app.models.lead import Lead
 from app.models.otp_code import OTPCode
+from app.models.property import Property
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
 from app.services import email_service
@@ -70,6 +72,9 @@ SAME_PASSWORD = ValidationFailed(
     "SAME_PASSWORD",
     "New password must be different from your current password.",
     {"new_password": "New password must be different from your current password."},
+)
+EMAIL_NOT_VERIFIED = ForbiddenError(
+    "EMAIL_NOT_VERIFIED", "Please verify your email. We have sent you a new verification code."
 )
 OTP_INVALID = AuthError("OTP_INVALID", "Incorrect verification code.")
 OTP_EXPIRED = ExpiredError("OTP_EXPIRED", "This code has expired. Request a new one.")
@@ -227,6 +232,31 @@ def verify_otp(
     return session
 
 
+def _revoke_all_sessions(db: Session, user_id: UUID) -> None:
+    """Revokes every active refresh token for a user."""
+    db.query(RefreshToken).filter(
+        RefreshToken.user_id == user_id,
+        RefreshToken.revoked_at.is_(None),
+    ).update({"revoked_at": datetime.now(timezone.utc)}, synchronize_session=False)
+
+
+def _is_claimable(db: Session, user: User) -> bool:
+    """
+    True when an account can be safely taken over by a fresh signup: its
+    email was never verified and it owns no listings or leads. The data
+    check protects accounts created before login required a verified
+    email, which may hold real data. Google accounts are verified on
+    creation, so they never qualify.
+    """
+    if user.is_email_verified:
+        return False
+    if db.query(Property.id).filter(Property.broker_id == user.id).first() is not None:
+        return False
+    if db.query(Lead.id).filter((Lead.broker_id == user.id) | (Lead.client_id == user.id)).first() is not None:
+        return False
+    return True
+
+
 def signup(
     db: Session,
     phone: str,
@@ -244,8 +274,11 @@ def signup(
     Creates a user (and a broker_profile row when role=broker), then
     issues a signup-verification OTP by email. Raises 409 PHONE_TAKEN if
     the phone is already registered, 409 EMAIL_TAKEN on a duplicate email,
-    409 RERA_TAKEN when a broker reuses an existing RERA number.
-    Both checks run before any insert: `db.flush()` below executes the
+    409 RERA_TAKEN when a broker reuses an existing RERA number. A phone or
+    email that belongs only to an unverified, data-free account is not
+    "taken": that account is reset to the new details and password and a
+    fresh OTP is sent, so an abandoned or squatted registration can't
+    block the real owner. All checks run before any insert: `db.flush()` below executes the
     pending INSERT immediately (needed to assign user.id for the
     broker_profile FK), so a unique-constraint violation would otherwise
     surface at flush time, outside any try/except around db.commit().
@@ -262,21 +295,33 @@ def signup(
     edit (P4) — as a one-item list; there's no dedicated single-city
     column since Figma's one field is just this list's first entry.
     """
-    if db.query(User).filter(User.phone == phone).first() is not None:
-        raise ConflictError("PHONE_TAKEN", "This phone number is already registered.")
+    phone_owner = db.query(User).filter(User.phone == phone).first()
+    email_owner = db.query(User).filter(User.email == email).first()
 
-    if db.query(User).filter(User.email == email).first() is not None:
+    # A signup may take over an existing account only when every account it
+    # collides with is an unverified, data-free one (see _is_claimable) and
+    # they are the same account. Otherwise an unverified registration would
+    # let someone squat on another person's email or phone, and a later
+    # Google sign-in for that email would land in an account whose password
+    # the squatter chose.
+    if phone_owner is not None and not _is_claimable(db, phone_owner):
+        raise ConflictError("PHONE_TAKEN", "This phone number is already registered.")
+    if email_owner is not None and not _is_claimable(db, email_owner):
         raise ConflictError("EMAIL_TAKEN", "This email is already registered.")
+    if phone_owner is not None and email_owner is not None and phone_owner.id != email_owner.id:
+        raise ConflictError("PHONE_TAKEN", "This phone number is already registered.")
+    claimed = email_owner or phone_owner
 
     # broker_profiles.rera_number is unique; checked up front for the same
     # reason as phone/email, so a reused RERA number is a clean 409 instead
-    # of an IntegrityError at flush time.
-    if (
-        role == UserRole.broker
-        and rera_number
-        and db.query(BrokerProfile).filter(BrokerProfile.rera_number == rera_number).first() is not None
-    ):
-        raise ConflictError("RERA_TAKEN", "This RERA number is already registered.")
+    # of an IntegrityError at flush time. The claimed account's own profile
+    # is excluded because it is about to be overwritten.
+    if role == UserRole.broker and rera_number:
+        rera_query = db.query(BrokerProfile).filter(BrokerProfile.rera_number == rera_number)
+        if claimed is not None:
+            rera_query = rera_query.filter(BrokerProfile.user_id != claimed.id)
+        if rera_query.first() is not None:
+            raise ConflictError("RERA_TAKEN", "This RERA number is already registered.")
 
     preferences = {}
     if city:
@@ -284,26 +329,50 @@ def signup(
     if state:
         preferences["state"] = state
 
-    user = User(
-        phone=phone,
-        email=email,
-        full_name=full_name,
-        password_hash=hash_password(password) if password else None,
-        role=role,
-        **({"preferences": preferences} if preferences else {}),
-    )
-    db.add(user)
-    db.flush()  # assigns user.id for the broker_profile FK below
-
-    if role == UserRole.broker:
-        db.add(
-            BrokerProfile(
-                user_id=user.id,
-                company_name=company_name,
-                rera_number=rera_number,
-                **({"service_areas": [service_area]} if service_area else {}),
-            )
+    if claimed is not None:
+        user = claimed
+        user.phone = phone
+        user.email = email
+        user.full_name = full_name
+        user.password_hash = hash_password(password) if password else None
+        user.role = role
+        user.preferences = preferences
+        user.is_active = True
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        _revoke_all_sessions(db, user.id)
+        if role == UserRole.broker:
+            profile = user.broker_profile
+            if profile is None:
+                profile = BrokerProfile(user_id=user.id)
+                db.add(profile)
+            profile.company_name = company_name
+            profile.rera_number = rera_number
+            profile.service_areas = [service_area] if service_area else []
+        elif user.broker_profile is not None:
+            db.delete(user.broker_profile)
+        db.flush()
+    else:
+        user = User(
+            phone=phone,
+            email=email,
+            full_name=full_name,
+            password_hash=hash_password(password) if password else None,
+            role=role,
+            **({"preferences": preferences} if preferences else {}),
         )
+        db.add(user)
+        db.flush()  # assigns user.id for the broker_profile FK below
+
+        if role == UserRole.broker:
+            db.add(
+                BrokerProfile(
+                    user_id=user.id,
+                    company_name=company_name,
+                    rera_number=rera_number,
+                    **({"service_areas": [service_area]} if service_area else {}),
+                )
+            )
 
     _issue_otp(db, email, OTPPurpose.signup)
     db.commit()
@@ -323,7 +392,8 @@ def login(
     failures locks the account for 15 minutes, reset on success.
     Returns an access token, a raw refresh token, and the authenticated
     user. Rejects a soft-deactivated account (is_active=false) so login
-    can't silently undo a deactivation.
+    can't silently undo a deactivation, and an account whose email was
+    never verified (403 EMAIL_NOT_VERIFIED, after re-sending the code).
     """
     bad_credentials = AuthError("BAD_CREDENTIALS", "Invalid phone/email or password.")
 
@@ -351,6 +421,15 @@ def login(
 
     user.failed_login_attempts = 0
     user.locked_until = None
+
+    # Checked only after the password is proven correct, so this response
+    # never reveals whether an arbitrary email is registered. A fresh code
+    # is sent so the client can go straight to the verification screen.
+    if not user.is_email_verified:
+        if user.email:
+            _issue_otp(db, user.email, OTPPurpose.signup)
+        db.commit()
+        raise EMAIL_NOT_VERIFIED
 
     access_token, refresh_token = _issue_session(db, user, user_agent, ip)
     db.commit()
@@ -408,6 +487,14 @@ def google_auth(
             db.add(BrokerProfile(user_id=user.id))
     elif not user.is_active:
         raise ForbiddenError("ACCOUNT_DEACTIVATED", "This account has been deactivated.")
+    elif not user.is_email_verified:
+        # The account was registered with this email but never verified, so
+        # whoever set its password may not own the mailbox. Google has just
+        # proven the real owner does: hand the account to them by dropping
+        # the unproven password and ending any existing sessions.
+        user.is_email_verified = True
+        user.password_hash = None
+        _revoke_all_sessions(db, user.id)
 
     access_token, refresh_token = _issue_session(db, user, user_agent, ip)
     db.commit()
@@ -549,10 +636,10 @@ def reset_password(db: Session, token: str, new_password: str) -> None:
         raise SAME_PASSWORD
 
     user.password_hash = hash_password(new_password)
+    # The reset link was delivered to the account's email, so using it
+    # proves control of that mailbox.
+    user.is_email_verified = True
 
-    db.query(RefreshToken).filter(
-        RefreshToken.user_id == user.id,
-        RefreshToken.revoked_at.is_(None),
-    ).update({"revoked_at": datetime.now(timezone.utc)}, synchronize_session=False)
+    _revoke_all_sessions(db, user.id)
 
     db.commit()

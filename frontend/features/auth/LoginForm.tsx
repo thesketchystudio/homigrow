@@ -6,7 +6,9 @@
 // no build ever needed one, so none exists here. Google sign-in (Figma's
 // "OR CONTINUE WITH" row) sends no role — an unmatched email means no
 // account exists yet, so it's rejected rather than silently signing
-// someone up from the login screen.
+// someone up from the login screen. An account that never finished email
+// verification gets the OTP step in place of the form: the backend refuses
+// its login with EMAIL_NOT_VERIFIED and has already sent a fresh code.
 
 "use client";
 
@@ -24,6 +26,7 @@ import { AuthTextField } from "@/components/forms/AuthTextField";
 import { AuthPasswordField } from "@/components/forms/AuthPasswordField";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GoogleSignInButton } from "@/features/auth/GoogleSignInButton";
+import { OtpVerifyStep } from "@/features/auth/OtpVerifyStep";
 import { loginFormSchema, type LoginFormValues } from "@/lib/validation/auth";
 
 export function LoginForm() {
@@ -31,6 +34,7 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const setAuth = useAuthStore((state) => state.setAuth);
   const [rememberMe, setRememberMe] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
 
   const handleAuthenticated = (session: TokenResponse) => {
     setAuth(session.user, session.access_token);
@@ -50,7 +54,11 @@ export function LoginForm() {
   const loginMutation = useMutation({
     mutationFn: (values: LoginFormValues) => login({ phone_or_email: values.email, password: values.password }),
     onSuccess: handleAuthenticated,
-    onError: (error: ApiError) => {
+    onError: (error: ApiError, values) => {
+      if (error.code === "EMAIL_NOT_VERIFIED") {
+        setUnverifiedEmail(values.email);
+        return;
+      }
       if (error.fields) {
         for (const [field, message] of Object.entries(error.fields)) {
           setError(field as keyof LoginFormValues, { message });
@@ -60,6 +68,10 @@ export function LoginForm() {
   });
 
   const onSubmit = handleSubmit((values) => loginMutation.mutate(values));
+
+  if (unverifiedEmail) {
+    return <OtpVerifyStep email={unverifiedEmail} onVerified={handleAuthenticated} showProgress={false} />;
+  }
 
   return (
     <form onSubmit={onSubmit} className="flex w-full flex-col gap-6">

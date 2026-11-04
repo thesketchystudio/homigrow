@@ -74,6 +74,16 @@ class Settings(BaseSettings):
     # listing photos must be publicly viewable on the client site.
     SUPABASE_S3_BUCKET_PROPERTY_MEDIA: str = "property-media"
 
+    # Header carrying the real visitor IP when the API sits behind a proxy
+    # or CDN (e.g. "CF-Connecting-IP" for Cloudflare, "X-Forwarded-For" for
+    # most load balancers). Leave empty for direct access and local dev.
+    # Set it only if the API is reachable exclusively through that proxy,
+    # since any client could otherwise forge the header and dodge rate
+    # limits. TRUSTED_PROXY_HOPS applies to X-Forwarded-For only: how many
+    # of our own proxies append to it.
+    CLIENT_IP_HEADER: str = ""
+    TRUSTED_PROXY_HOPS: int = 1
+
     @computed_field
     @property
     def DATABASE_URL(self) -> str:

@@ -9,13 +9,24 @@ product route.
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.core.exceptions import ConflictError, install_exception_handlers
 
 
 class _Body(BaseModel):
     name: str
+
+
+class _CheckedBody(BaseModel):
+    code: str
+
+    @field_validator("code")
+    @classmethod
+    def _must_be_upper(cls, value: str) -> str:
+        if value != value.upper():
+            raise ValueError("Code must be upper case.")
+        return value
 
 
 def _make_app() -> FastAPI:
@@ -35,6 +46,10 @@ def _make_app() -> FastAPI:
     @app.post("/validate")
     def _validate(body: _Body):
         return {"name": body.name}
+
+    @app.post("/validate-checked")
+    def _validate_checked(body: _CheckedBody):
+        return {"code": body.code}
 
     @app.get("/boom")
     def _boom():
@@ -74,6 +89,13 @@ class TestExceptionEnvelopes:
         body = response.json()
         assert body["error"]["code"] == "VALIDATION_FAILED"
         assert "name" in body["error"]["fields"]
+
+    def test_custom_validator_message_has_no_pydantic_prefix(self):
+        client = TestClient(_make_app(), raise_server_exceptions=False)
+        response = client.post("/validate-checked", json={"code": "abc"})
+
+        assert response.status_code == 422
+        assert response.json()["error"]["fields"]["code"] == "Code must be upper case."
 
     def test_unhandled_exception_returns_a_generic_500(self):
         client = TestClient(_make_app(), raise_server_exceptions=False)

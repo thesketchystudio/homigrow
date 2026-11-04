@@ -6,8 +6,10 @@ rules, response shape) and GET /api/v1/properties (search grid —
 filters, sort, pagination), through the TestClient.
 """
 
+import datetime
 import uuid
 
+from app.core.config import settings
 from app.core.security import create_access_token
 from app.models.broker_profile import BrokerProfile
 from app.models.enums import (
@@ -119,38 +121,130 @@ class TestGetProperty:
         assert response.status_code == 404
         assert response.json()["error"]["code"] == "PROPERTY_NOT_FOUND"
 
-    def test_anonymous_views_each_log_their_own_row(self, client, db_session):
+    def test_get_detail_does_not_log_a_view(self, client, db_session):
         property_ = _make_property(db_session)
 
         client.get(f"/api/v1/properties/{property_.id}")
-        client.get(f"/api/v1/properties/{property_.id}")
 
-        rows = db_session.query(PropertyView).filter(PropertyView.property_id == property_.id).all()
-        assert len(rows) == 2
-        assert all(row.viewer_id is None for row in rows)
+        assert db_session.query(PropertyView).filter(PropertyView.property_id == property_.id).count() == 0
+
+
+class TestRecordPropertyView:
+    BROWSER = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36"}
+
+    def _post(self, client, property_id, *, headers=None, visitor_id=None):
+        merged = {**self.BROWSER, **(headers or {})}
+        body = {"visitor_id": visitor_id} if visitor_id else None
+        return client.post(f"/api/v1/properties/{property_id}/view", json=body, headers=merged)
+
+    def _rows(self, db_session, property_id):
+        return db_session.query(PropertyView).filter(PropertyView.property_id == property_id).all()
+
+    def test_anonymous_view_is_logged_with_a_hash_and_no_viewer(self, client, db_session):
+        property_ = _make_property(db_session)
+
+        response = self._post(client, property_.id, visitor_id="visitor-abc-123")
+
+        assert response.status_code == 204
+        rows = self._rows(db_session, property_.id)
+        assert len(rows) == 1
+        assert rows[0].viewer_id is None
+        assert rows[0].visitor_hash and "visitor-abc-123" not in rows[0].visitor_hash
+
+    def test_repeat_anonymous_view_within_the_window_is_not_logged_again(self, client, db_session):
+        property_ = _make_property(db_session)
+
+        for _ in range(3):
+            self._post(client, property_.id, visitor_id="visitor-abc-123")
+
+        assert len(self._rows(db_session, property_.id)) == 1
+
+    def test_same_visitor_counts_again_after_the_window(self, client, db_session):
+        property_ = _make_property(db_session)
+        self._post(client, property_.id, visitor_id="visitor-abc-123")
+        row = self._rows(db_session, property_.id)[0]
+        row.viewed_at = row.viewed_at - datetime.timedelta(hours=2)
+        db_session.flush()
+
+        self._post(client, property_.id, visitor_id="visitor-abc-123")
+
+        assert len(self._rows(db_session, property_.id)) == 2
+
+    def test_different_visitors_each_count(self, client, db_session):
+        property_ = _make_property(db_session)
+
+        self._post(client, property_.id, visitor_id="visitor-abc-123")
+        self._post(client, property_.id, visitor_id="visitor-xyz-789")
+
+        assert len(self._rows(db_session, property_.id)) == 2
+
+    def test_without_a_visitor_id_it_falls_back_to_ip_and_user_agent(self, client, db_session):
+        property_ = _make_property(db_session)
+
+        self._post(client, property_.id)
+        self._post(client, property_.id)
+        self._post(client, property_.id, headers={"User-Agent": "Mozilla/5.0 (Macintosh) Safari/605.1"})
+
+        assert len(self._rows(db_session, property_.id)) == 2
+
+    def test_bot_user_agents_get_204_but_are_not_logged(self, client, db_session):
+        property_ = _make_property(db_session)
+
+        for agent in ("Googlebot/2.1", "WhatsApp/2.23", "curl/8.4.0", "python-requests/2.34"):
+            response = client.post(f"/api/v1/properties/{property_.id}/view", headers={"User-Agent": agent})
+            assert response.status_code == 204
+
+        assert self._rows(db_session, property_.id) == []
 
     def test_logged_in_viewer_is_deduped_across_repeat_views(self, client, db_session):
         property_ = _make_property(db_session)
         viewer = make_user(db_session, phone="+919876590001", role=UserRole.client)
         headers = {"Authorization": f"Bearer {create_access_token(viewer.id, viewer.role.value)}"}
 
-        client.get(f"/api/v1/properties/{property_.id}", headers=headers)
-        client.get(f"/api/v1/properties/{property_.id}", headers=headers)
+        self._post(client, property_.id, headers=headers)
+        self._post(client, property_.id, headers=headers)
 
-        rows = db_session.query(PropertyView).filter(PropertyView.property_id == property_.id).all()
+        rows = self._rows(db_session, property_.id)
         assert len(rows) == 1
         assert rows[0].viewer_id == viewer.id
+        assert rows[0].visitor_hash is None
 
     def test_different_logged_in_viewers_each_count(self, client, db_session):
         property_ = _make_property(db_session)
         first = make_user(db_session, phone="+919876590002", role=UserRole.client)
         second = make_user(db_session, phone="+919876590003", role=UserRole.client)
 
-        client.get(f"/api/v1/properties/{property_.id}", headers={"Authorization": f"Bearer {create_access_token(first.id, first.role.value)}"})
-        client.get(f"/api/v1/properties/{property_.id}", headers={"Authorization": f"Bearer {create_access_token(second.id, second.role.value)}"})
+        self._post(client, property_.id, headers={"Authorization": f"Bearer {create_access_token(first.id, first.role.value)}"})
+        self._post(client, property_.id, headers={"Authorization": f"Bearer {create_access_token(second.id, second.role.value)}"})
 
-        rows = db_session.query(PropertyView).filter(PropertyView.property_id == property_.id).all()
-        assert len(rows) == 2
+        assert len(self._rows(db_session, property_.id)) == 2
+
+    def test_non_active_property_returns_404_and_logs_nothing(self, client, db_session):
+        property_ = _make_property(db_session, status=PropertyStatus.pending)
+
+        response = self._post(client, property_.id, visitor_id="visitor-abc-123")
+
+        assert response.status_code == 404
+        assert self._rows(db_session, property_.id) == []
+
+    def test_rejects_an_oversized_visitor_id(self, client, db_session):
+        property_ = _make_property(db_session)
+
+        response = self._post(client, property_.id, visitor_id="x" * 200)
+
+        assert response.status_code == 422
+
+    def test_is_rate_limited_per_ip(self, client, db_session, monkeypatch):
+        monkeypatch.setattr(settings, "CLIENT_IP_HEADER", "X-Forwarded-For")
+        monkeypatch.setattr(settings, "TRUSTED_PROXY_HOPS", 1)
+        property_ = _make_property(db_session)
+        flooder = {"X-Forwarded-For": "198.51.100.77"}
+
+        statuses = [self._post(client, property_.id, headers=flooder).status_code for _ in range(121)]
+
+        assert statuses[:120] == [204] * 120
+        assert statuses[120] == 429
+        assert self._post(client, property_.id, headers={"X-Forwarded-For": "198.51.100.78"}).status_code == 204
 
 
 def _unique_city() -> str:
@@ -440,6 +534,60 @@ class TestListProperties:
         response = client.get("/api/v1/properties", params={"page_size": 100})
 
         assert response.status_code == 422
+
+
+class TestPublicSearchLimits:
+    def test_percent_and_underscore_in_search_match_literally(self, client, db_session):
+        city = _unique_city()
+        _make_property(db_session, title="Plain Villa", city=city)
+        _make_property(db_session, title="100% Sea View", city=city)
+        _make_property(db_session, title="Sea_View Cottage", city=city)
+
+        percent = client.get("/api/v1/properties", params={"city": city, "search": "%"}).json()
+        underscore = client.get("/api/v1/properties", params={"city": city, "search": "_"}).json()
+
+        assert [item["title"] for item in percent["items"]] == ["100% Sea View"]
+        assert [item["title"] for item in underscore["items"]] == ["Sea_View Cottage"]
+
+    def test_over_long_text_filters_are_rejected(self, client):
+        too_long = "x" * 101
+
+        for param in ("search", "city", "locality"):
+            assert client.get("/api/v1/properties", params={param: too_long}).status_code == 422, param
+
+    def test_too_many_or_too_long_amenity_filters_are_rejected(self, client):
+        assert client.get("/api/v1/properties", params={"amenities": [f"a{i}" for i in range(21)]}).status_code == 422
+        assert client.get("/api/v1/properties", params={"amenities": ["y" * 51]}).status_code == 422
+        assert client.get("/api/v1/properties", params={"amenities": [f"a{i}" for i in range(20)]}).status_code == 200
+
+    def test_page_number_is_capped(self, client):
+        assert client.get("/api/v1/properties", params={"page": 501}).status_code == 422
+        assert client.get("/api/v1/properties", params={"page": 500}).status_code == 200
+
+    def test_search_is_rate_limited_per_ip(self, client, monkeypatch):
+        monkeypatch.setattr(settings, "CLIENT_IP_HEADER", "X-Forwarded-For")
+        monkeypatch.setattr(settings, "TRUSTED_PROXY_HOPS", 1)
+        scraper = {"X-Forwarded-For": "198.51.100.90"}
+
+        statuses = [client.get("/api/v1/properties", params={"page_size": 1}, headers=scraper).status_code for _ in range(61)]
+
+        assert statuses[:60] == [200] * 60
+        assert statuses[60] == 429
+        assert client.get("/api/v1/properties", headers={"X-Forwarded-For": "198.51.100.91"}).status_code == 200
+
+    def test_detail_compare_and_neighborhoods_are_rate_limited(self, client, db_session, monkeypatch):
+        monkeypatch.setattr(settings, "CLIENT_IP_HEADER", "X-Forwarded-For")
+        monkeypatch.setattr(settings, "TRUSTED_PROXY_HOPS", 1)
+        headers = {"X-Forwarded-For": "198.51.100.92"}
+        missing = uuid.uuid4()
+
+        neighborhoods = [client.get("/api/v1/properties/neighborhoods", headers=headers).status_code for _ in range(61)]
+        compare = [client.get(f"/api/v1/properties/compare?ids={missing}", headers=headers).status_code for _ in range(61)]
+        detail = [client.get(f"/api/v1/properties/{missing}", headers=headers).status_code for _ in range(121)]
+
+        assert neighborhoods[-1] == 429 and neighborhoods[0] == 200
+        assert compare[-1] == 429 and compare[0] != 429
+        assert detail[-1] == 429 and detail[0] == 404
 
 
 class TestListNeighborhoods:

@@ -5,14 +5,18 @@ Public property-listing endpoints. No auth required — these serve the
 public Property Details and Listings screens.
 """
 
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Response
+from pydantic import StringConstraints
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import OptionalCurrentUser
+from app.core.client_ip import get_client_ip
 from app.core.exceptions import ValidationFailed
 from app.core.middleware import limiter
+from app.core.visitor import is_bot_user_agent, visitor_fingerprint
 from app.db.session import get_db
 from app.models.enums import ListingType, PropertyType
 from app.schemas.leads import EnquireRequest, EnquireResponse
@@ -21,11 +25,20 @@ from app.schemas.properties import (
     PropertyCompareResponse,
     PropertyListResponse,
     PropertyRead,
+    PropertyViewRequest,
 )
 from app.services import lead_service, property_service
 from app.services.property_service import MAX_COMPARE_IDS, SortOption
 
 router = APIRouter(prefix="/properties", tags=["properties"])
+
+# Upper bounds on public search inputs: every filter value is compared
+# against rows on each call, so unbounded text or list sizes let one request
+# do arbitrary amounts of work.
+MAX_FILTER_TEXT_LENGTH = 100
+MAX_AMENITY_FILTERS = 20
+MAX_AMENITY_LENGTH = 50
+MAX_PAGE = 500
 
 
 def _parse_compare_ids(raw: str) -> list[UUID]:
@@ -48,19 +61,21 @@ def _parse_compare_ids(raw: str) -> list[UUID]:
 
 
 @router.get("", response_model=PropertyListResponse)
+@limiter.limit("60/minute")
 def list_properties(
+    request: Request,
     db: Session = Depends(get_db),
-    city: str | None = None,
-    locality: str | None = None,
-    search: str | None = None,
+    city: str | None = Query(default=None, max_length=MAX_FILTER_TEXT_LENGTH),
+    locality: str | None = Query(default=None, max_length=MAX_FILTER_TEXT_LENGTH),
+    search: str | None = Query(default=None, max_length=MAX_FILTER_TEXT_LENGTH),
     listing_type: ListingType | None = None,
     property_type: list[PropertyType] = Query(default=[]),
     price_min: float | None = Query(default=None, ge=0),
     price_max: float | None = Query(default=None, ge=0),
     bhk_min: int | None = Query(default=None, ge=1),
-    amenities: list[str] = Query(default=[]),
+    amenities: Annotated[list[Annotated[str, StringConstraints(max_length=MAX_AMENITY_LENGTH)]], Query(max_length=MAX_AMENITY_FILTERS)] = [],
     sort: SortOption = "newest",
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=MAX_PAGE),
     page_size: int = Query(default=20, ge=1, le=50),
 ) -> PropertyListResponse:
     """The search/listings grid endpoint. Filters are typed query params; unknown `sort` values 422 automatically via the Literal type."""
@@ -83,7 +98,9 @@ def list_properties(
 
 
 @router.get("/neighborhoods", response_model=list[NeighborhoodSummary])
+@limiter.limit("60/minute")
 def list_neighborhoods(
+    request: Request,
     limit: int = Query(default=4, ge=1, le=12),
     db: Session = Depends(get_db),
 ) -> list[NeighborhoodSummary]:
@@ -92,7 +109,9 @@ def list_neighborhoods(
 
 
 @router.get("/compare", response_model=PropertyCompareResponse)
+@limiter.limit("60/minute")
 def compare_properties(
+    request: Request,
     ids: str = Query(..., description=f"Comma-separated property ids, max {MAX_COMPARE_IDS}"),
     db: Session = Depends(get_db),
 ) -> PropertyCompareResponse:
@@ -103,15 +122,36 @@ def compare_properties(
 
 
 @router.get("/{property_id}", response_model=PropertyRead)
-def get_property(property_id: UUID, requester: OptionalCurrentUser, db: Session = Depends(get_db)) -> PropertyRead:
-    """Returns an active property's full detail; 404 if missing or not active. Logs a view for the broker Analytics page."""
-    property_ = property_service.get_property_detail(db, property_id)
-    property_service.record_view(db, property_id, requester.id if requester else None)
-    return PropertyRead.model_validate(property_)
+@limiter.limit("120/minute")
+def get_property(property_id: UUID, request: Request, db: Session = Depends(get_db)) -> PropertyRead:
+    """Returns an active property's full detail; 404 if missing or not active. Read-only —
+    views are logged by POST /{property_id}/view so crawlers and link previews are not counted."""
+    return PropertyRead.model_validate(property_service.get_property_detail(db, property_id))
+
+
+@router.post("/{property_id}/view", status_code=204)
+@limiter.limit("120/minute")
+def record_property_view(
+    property_id: UUID,
+    request: Request,
+    requester: OptionalCurrentUser,
+    payload: PropertyViewRequest | None = None,
+    db: Session = Depends(get_db),
+) -> Response:
+    """Logs one detail-page view for the broker Analytics page. Called by the browser once the
+    page has rendered, which is why crawlers and link-preview fetchers (that never run the page)
+    are not counted. Requests from recognisable bots get the same 204 without a row being written."""
+    user_agent = request.headers.get("user-agent", "")
+    if not is_bot_user_agent(user_agent):
+        visitor_hash = None
+        if requester is None:
+            visitor_hash = visitor_fingerprint(get_client_ip(request), user_agent, payload.visitor_id if payload else None)
+        property_service.record_view(db, property_id, requester.id if requester else None, visitor_hash)
+    return Response(status_code=204)
 
 
 @router.post("/{property_id}/enquire", response_model=EnquireResponse, status_code=201)
-@limiter.limit("5/minute")
+@limiter.limit("5/minute;30/day")
 def enquire_property(
     property_id: UUID,
     payload: EnquireRequest,
@@ -120,13 +160,14 @@ def enquire_property(
     db: Session = Depends(get_db),
 ) -> EnquireResponse:
     """Creates a Lead from the Property Details contact card's two CTAs — works for both
-    anonymous and logged-in visitors. On success reveals the broker's phone number, which
-    GET /{property_id} never exposes."""
+    anonymous and logged-in visitors. Logged-in requesters get the broker's phone number in the
+    response (GET /{property_id} never exposes it); anonymous visitors get a null number and are
+    asked to log in, so numbers cannot be harvested without a verified account."""
     property_ = property_service.get_property_detail(db, property_id)
     lead = lead_service.create_enquiry(db, property_, requester, payload)
     return EnquireResponse(
         id=lead.id,
         status=lead.status,
         broker_name=property_.broker.full_name,
-        broker_phone=property_.broker.phone,
+        broker_phone=property_.broker.phone if requester else None,
     )

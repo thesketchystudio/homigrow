@@ -19,9 +19,12 @@ type OtpVerifyStepProps = {
   email: string;
   onVerified: (session: TokenResponse) => void;
   totalSteps?: number;
+  // The signup wizard shows its progress bar; the login screen reuses this
+  // step for accounts that never finished verifying and has no such bar.
+  showProgress?: boolean;
 };
 
-export function OtpVerifyStep({ email, onVerified, totalSteps = 3 }: OtpVerifyStepProps) {
+export function OtpVerifyStep({ email, onVerified, totalSteps = 3, showProgress = true }: OtpVerifyStepProps) {
   const [code, setCode] = useState("");
 
   const verifyMutation = useMutation({
@@ -47,7 +50,7 @@ export function OtpVerifyStep({ email, onVerified, totalSteps = 3 }: OtpVerifySt
 
   return (
     <div className="flex w-full flex-col gap-8">
-      <AuthProgressBar step={3} totalSteps={totalSteps} phase="onboarding" />
+      {showProgress && <AuthProgressBar step={3} totalSteps={totalSteps} phase="onboarding" />}
 
       <div className="flex flex-col items-center gap-6 text-center">
         <div className="flex flex-col items-center gap-0">
