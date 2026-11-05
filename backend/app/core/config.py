@@ -7,8 +7,11 @@ DATABASE_URL via a computed field, so no other code ever hardcodes or
 flattens the connection string.
 """
 
-from pydantic import computed_field, model_validator
+from pydantic import computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+MIN_JWT_SECRET_LENGTH = 32
 
 
 class Settings(BaseSettings):
@@ -97,6 +100,14 @@ class Settings(BaseSettings):
     # are shipped to hosting dashboards and Sentry, so this is off by default,
     # must stay off on any deployed environment, and is refused in production.
     DEBUG_LOG_SECRETS: bool = False
+
+    @field_validator("JWT_SECRET")
+    @classmethod
+    def _require_strong_jwt_secret(cls, value: str) -> str:
+        """Rejects a JWT signing secret shorter than 32 characters, since HS256 tokens signed with a short secret can be brute-forced offline."""
+        if len(value) < MIN_JWT_SECRET_LENGTH:
+            raise ValueError(f"JWT_SECRET must be at least {MIN_JWT_SECRET_LENGTH} characters long")
+        return value
 
     @model_validator(mode="after")
     def _forbid_secret_logging_in_production(self) -> "Settings":

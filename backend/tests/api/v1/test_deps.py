@@ -17,7 +17,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from app.api.v1.deps import get_current_user, require_role
 from app.core.config import settings
 from app.core.exceptions import AppError
-from app.core.security import JWT_ALGORITHM, create_access_token
+from app.core.security import ACCESS_TOKEN_AUDIENCE, JWT_ALGORITHM, JWT_ISSUER, create_access_token
 from app.models.enums import UserRole
 from tests.conftest import make_user
 
@@ -54,6 +54,8 @@ class TestGetCurrentUser:
         expired_payload = {
             "sub": str(user.id),
             "role": user.role.value,
+            "iss": JWT_ISSUER,
+            "aud": ACCESS_TOKEN_AUDIENCE,
             "iat": datetime.now(timezone.utc) - timedelta(minutes=30),
             "exp": datetime.now(timezone.utc) - timedelta(minutes=15),
             "jti": str(uuid4()),

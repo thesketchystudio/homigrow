@@ -16,6 +16,8 @@ from app.core.config import settings
 from app.core.exceptions import AppError
 from app.core.security import (
     JWT_ALGORITHM,
+    JWT_ISSUER,
+    RESET_TOKEN_AUDIENCE,
     create_password_reset_token,
     hash_refresh_token,
     password_fingerprint,
@@ -316,6 +318,8 @@ class TestResetPassword:
         user = make_user(db_session, phone="+919876543243", password="old-password-123")
         expired_payload = {
             "sub": str(user.id),
+            "iss": JWT_ISSUER,
+            "aud": RESET_TOKEN_AUDIENCE,
             "purpose": "password_reset",
             "pwd_fp": password_fingerprint(user.password_hash),
             "iat": datetime.now(timezone.utc) - timedelta(minutes=60),
