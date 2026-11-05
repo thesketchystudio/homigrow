@@ -14,6 +14,7 @@ import pytest
 from app.core.exceptions import AppError
 from app.models.enums import BrokerDocumentType
 from app.services import storage_service
+from tests.conftest import SAMPLE_JPEG, SAMPLE_PDF, SAMPLE_PNG
 
 
 class TestUploadBrokerDocument:
@@ -27,10 +28,10 @@ class TestUploadBrokerDocument:
     def test_accepts_jpg_and_png(self):
         user_id = uuid.uuid4()
         jpg_key = storage_service.upload_broker_document(
-            user_id, BrokerDocumentType.government_id, b"fake jpg bytes", "image/jpeg"
+            user_id, BrokerDocumentType.government_id, SAMPLE_JPEG, "image/jpeg"
         )
         png_key = storage_service.upload_broker_document(
-            user_id, BrokerDocumentType.government_id, b"fake png bytes", "image/png"
+            user_id, BrokerDocumentType.government_id, SAMPLE_PNG, "image/png"
         )
         assert jpg_key.endswith(".jpg")
         assert png_key.endswith(".png")
@@ -55,6 +56,6 @@ class TestUploadBrokerDocument:
     def test_object_key_is_scoped_by_user_and_doc_type(self):
         user_id = uuid.uuid4()
         key = storage_service.upload_broker_document(
-            user_id, BrokerDocumentType.rera_certificate, b"fake", "application/pdf"
+            user_id, BrokerDocumentType.rera_certificate, SAMPLE_PDF, "application/pdf"
         )
         assert key.startswith(f"{user_id}/{BrokerDocumentType.rera_certificate.value}/")

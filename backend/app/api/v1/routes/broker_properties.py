@@ -24,7 +24,8 @@ from app.schemas.properties import (
     PropertyRead,
     PropertyUpdateRequest,
 )
-from app.services import broker_property_service
+from app.services import broker_property_service, storage_service
+from app.services.upload_validation import read_limited
 
 router = APIRouter(prefix="/properties", tags=["properties", "broker"])
 
@@ -119,7 +120,7 @@ def upload_property_media(
     db: Session = Depends(get_db),
 ) -> list[PropertyMediaRead]:
     """Uploads one or more listing photos; 403 if the property isn't owned by the caller."""
-    uploads = [(image.file.read(), image.content_type) for image in images]
+    uploads = [(read_limited(image.file, storage_service.MAX_IMAGE_SIZE_BYTES), image.content_type) for image in images]
     media = broker_property_service.add_media(db, user, property_id, uploads)
     return [PropertyMediaRead.model_validate(item) for item in media]
 
@@ -132,7 +133,7 @@ def upload_property_video(
     db: Session = Depends(get_db),
 ) -> PropertyMediaRead:
     """Uploads a property walkthrough or drone video; 403 if the property isn't owned by the caller."""
-    media = broker_property_service.add_video(db, user, property_id, video.file.read(), video.content_type)
+    media = broker_property_service.add_video(db, user, property_id, read_limited(video.file, storage_service.MAX_VIDEO_SIZE_BYTES), video.content_type)
     return PropertyMediaRead.model_validate(media)
 
 
@@ -144,7 +145,7 @@ def upload_jv_agreement(
     db: Session = Depends(get_db),
 ) -> PropertyRead:
     """Uploads the JV agreement document; 422 if the property isn't flagged as a JV property."""
-    property_ = broker_property_service.upload_jv_agreement(db, user, property_id, document.file.read(), document.content_type)
+    property_ = broker_property_service.upload_jv_agreement(db, user, property_id, read_limited(document.file, storage_service.MAX_PROPERTY_DOCUMENT_SIZE_BYTES), document.content_type)
     return PropertyRead.model_validate(property_)
 
 

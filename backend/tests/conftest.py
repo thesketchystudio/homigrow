@@ -53,10 +53,18 @@ def _mock_s3_client(monkeypatch):
     """
 
     class _FakeS3Client:
+        def __init__(self):
+            self.deleted_keys: list[str] = []
+
         def put_object(self, **kwargs):
             return None
 
-    monkeypatch.setattr("app.services.storage_service._get_client", lambda: _FakeS3Client())
+        def delete_object(self, **kwargs):
+            self.deleted_keys.append(kwargs["Key"])
+
+    fake_client = _FakeS3Client()
+    monkeypatch.setattr("app.services.storage_service._get_client", lambda: fake_client)
+    return fake_client
 
 
 @pytest.fixture()
@@ -109,3 +117,12 @@ def make_user(
     db_session.add(user)
     db_session.flush()
     return user
+
+
+# Minimal byte strings carrying each file type's real leading signature, so
+# upload tests exercise the signature check without needing real media files.
+SAMPLE_JPEG = b"\xff\xd8\xff\xe0" + b"0" * 16
+SAMPLE_PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 16
+SAMPLE_WEBP = b"RIFF\x00\x00\x00\x00WEBP" + b"0" * 16
+SAMPLE_PDF = b"%PDF-1.4 sample"
+SAMPLE_MP4 = b"\x00\x00\x00\x18ftypmp42" + b"0" * 16

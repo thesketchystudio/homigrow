@@ -13,9 +13,10 @@ from app.models.broker_profile import BrokerProfile
 from app.models.enums import UserRole, VerificationStatus
 from app.services import broker_service
 from tests.conftest import make_user
+from tests.conftest import SAMPLE_JPEG, SAMPLE_PDF, SAMPLE_PNG
 
-_RERA_BYTES = b"%PDF-1.4 fake rera cert"
-_GOV_ID_BYTES = b"fake gov id bytes"
+_RERA_BYTES = SAMPLE_PDF
+_GOV_ID_BYTES = SAMPLE_JPEG
 
 
 def _make_broker(db_session, **kwargs) -> "tuple":
@@ -60,7 +61,7 @@ class TestSubmitVerificationDocuments:
             user,
             rera_certificate=_RERA_BYTES,
             rera_certificate_content_type="application/pdf",
-            government_id=_GOV_ID_BYTES,
+            government_id=SAMPLE_PNG,
             government_id_content_type="image/png",
         )
 
