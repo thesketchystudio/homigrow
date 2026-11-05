@@ -9,6 +9,7 @@ services/routes.
 """
 
 import hashlib
+import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -35,6 +36,28 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, password_hash: str) -> bool:
     """Checks a plaintext password against a stored bcrypt hash."""
     return _pwd_context.verify(password, password_hash)
+
+
+def _otp_key() -> bytes:
+    """Derives a dedicated HMAC key for OTP codes from JWT_SECRET, so OTP digests share no key material with token signing."""
+    return hashlib.sha256(b"otp-code:" + settings.JWT_SECRET.encode()).digest()
+
+
+def hash_otp(code: str, email: str) -> str:
+    """
+    Digests a 6-digit OTP with HMAC-SHA256 keyed by a server secret. The
+    code space is only a million values, so a slow hash adds little: it
+    can be brute-forced offline if the table leaks, and it makes every
+    legitimate check cost CPU. A keyed digest is cheap to verify and
+    useless to an attacker without the secret. The email is mixed in so
+    the same code never produces the same digest for two addresses.
+    """
+    return hmac.new(_otp_key(), f"{email}:{code}".encode(), hashlib.sha256).hexdigest()
+
+
+def verify_otp_hash(code: str, email: str, expected_hash: str) -> bool:
+    """Constant-time check of a submitted OTP against its stored digest."""
+    return hmac.compare_digest(hash_otp(code, email), expected_hash)
 
 
 def validate_password_strength(password: str) -> None:

@@ -127,3 +127,15 @@ SAMPLE_PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 16
 SAMPLE_WEBP = b"RIFF\x00\x00\x00\x00WEBP" + b"0" * 16
 SAMPLE_PDF = b"%PDF-1.4 sample"
 SAMPLE_MP4 = b"\x00\x00\x00\x18ftypmp42" + b"0" * 16
+
+
+def age_otp_codes(db, email: str, seconds: int = 120) -> None:
+    """Backdates every OTP row for an email so the per-email resend cooldown has elapsed, letting a test request another code."""
+    from datetime import datetime, timedelta, timezone
+
+    from app.models.otp_code import OTPCode
+
+    db.query(OTPCode).filter(OTPCode.email == email).update(
+        {"created_at": datetime.now(timezone.utc) - timedelta(seconds=seconds)}, synchronize_session=False
+    )
+    db.flush()

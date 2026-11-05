@@ -12,14 +12,14 @@ pre-registration account-takeover path.
 import pytest
 
 from app.core.exceptions import AppError
-from app.core.security import hash_password, verify_password
+from app.core.security import hash_otp, verify_password
 from app.models.enums import OTPPurpose, UserRole
 from app.models.lead import Lead
 from app.models.otp_code import OTPCode
 from app.models.property import Property
 from app.models.refresh_token import RefreshToken
 from app.services import auth_service
-from tests.conftest import make_user
+from tests.conftest import age_otp_codes, make_user
 
 PASSWORD = "correct-horse-battery-staple"
 
@@ -77,7 +77,7 @@ class TestLoginRequiresVerifiedEmail:
             auth_service.login(db_session, "later@example.com", PASSWORD)
 
         row = db_session.query(OTPCode).filter(OTPCode.email == "later@example.com").one()
-        row.code_hash = hash_password("123456")
+        row.code_hash = hash_otp("123456", "later@example.com")
         auth_service.verify_otp(db_session, "later@example.com", "123456", OTPPurpose.signup)
 
         access_token, _, user = auth_service.login(db_session, "later@example.com", PASSWORD)
@@ -148,6 +148,7 @@ class TestSignupTakesOverUnverifiedAccounts:
         first = _signup(db_session, phone="+919876547019", email="switch@example.com", role=UserRole.broker, rera_number="RERA-12345")
         assert first.broker_profile is not None
 
+        age_otp_codes(db_session, "switch@example.com")
         second = _signup(db_session, phone="+919876547019", email="switch@example.com", role=UserRole.client)
 
         assert second.id == first.id

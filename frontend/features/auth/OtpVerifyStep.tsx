@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { AlertCircle, RotateCcw } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
@@ -14,6 +14,10 @@ import { requestOtp, verifyOtp, type TokenResponse } from "@/lib/api/endpoints/a
 import { OTPPurpose } from "@/lib/enums";
 import { AuthProgressBar } from "@/features/auth/AuthProgressBar";
 import { cn } from "@/lib/utils";
+
+// Matches the backend's per-email resend cooldown (OTP_RESEND_COOLDOWN_SECONDS);
+// the button counts it down so users aren't left clicking into a 429.
+const RESEND_COOLDOWN_SECONDS = 60;
 
 type OtpVerifyStepProps = {
   email: string;
@@ -26,6 +30,14 @@ type OtpVerifyStepProps = {
 
 export function OtpVerifyStep({ email, onVerified, totalSteps = 3, showProgress = true }: OtpVerifyStepProps) {
   const [code, setCode] = useState("");
+  // A code was just sent when this step mounted (signup or login redirect).
+  const [secondsLeft, setSecondsLeft] = useState(RESEND_COOLDOWN_SECONDS);
+
+  useEffect(() => {
+    if (secondsLeft <= 0) return;
+    const timer = setTimeout(() => setSecondsLeft((current) => current - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [secondsLeft]);
 
   const verifyMutation = useMutation({
     mutationFn: () => verifyOtp({ email, code, purpose: OTPPurpose.signup }),
@@ -37,16 +49,21 @@ export function OtpVerifyStep({ email, onVerified, totalSteps = 3, showProgress 
 
   const resendMutation = useMutation({
     mutationFn: () => requestOtp({ email, purpose: OTPPurpose.signup }),
-    onSuccess: () => setCode(""),
+    onSuccess: () => {
+      setCode("");
+      setSecondsLeft(RESEND_COOLDOWN_SECONDS);
+    },
   });
+  const resendError = resendMutation.error as ApiError | null;
 
   const error = verifyMutation.error as ApiError | undefined;
   const errorMessage =
-    error?.status === 410
+    resendError?.message ??
+    (error?.status === 410
       ? "This OTP has expired. Request a new one below."
       : error?.status === 401
         ? "Incorrect OTP. Please try again."
-        : error?.message;
+        : error?.message);
 
   return (
     <div className="flex w-full flex-col gap-8">
@@ -89,7 +106,10 @@ export function OtpVerifyStep({ email, onVerified, totalSteps = 3, showProgress 
 
         <button
           type="button"
-          onClick={() => verifyMutation.mutate()}
+          onClick={() => {
+            resendMutation.reset();
+            verifyMutation.mutate();
+          }}
           disabled={code.length !== 6 || verifyMutation.isPending}
           className="flex w-full max-w-[420px] items-center justify-center rounded bg-gradient-to-r from-black to-[#131b2e] py-4 font-heading text-[16px] font-bold text-background disabled:opacity-60"
         >
@@ -98,12 +118,15 @@ export function OtpVerifyStep({ email, onVerified, totalSteps = 3, showProgress 
 
         <button
           type="button"
-          onClick={() => resendMutation.mutate()}
-          disabled={resendMutation.isPending}
+          onClick={() => {
+            verifyMutation.reset();
+            resendMutation.mutate();
+          }}
+          disabled={resendMutation.isPending || secondsLeft > 0}
           className="flex items-center gap-2 font-heading text-[13px] font-semibold text-brand-primary-700 disabled:opacity-60"
         >
           <RotateCcw size={14} />
-          {resendMutation.isPending ? "Sending…" : "Resend OTP"}
+          {resendMutation.isPending ? "Sending…" : secondsLeft > 0 ? `Resend OTP in ${secondsLeft}s` : "Resend OTP"}
         </button>
       </div>
     </div>
