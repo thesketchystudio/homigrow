@@ -89,7 +89,8 @@ def client(db_session):
         yield db_session
 
     app.dependency_overrides[get_db] = _get_db_override
-    yield TestClient(app)
+    # localhost matches the default ALLOWED_HOSTS; TestClient's own default host would be rejected.
+    yield TestClient(app, base_url="http://localhost")
     app.dependency_overrides.clear()
 
 
