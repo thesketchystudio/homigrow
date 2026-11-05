@@ -308,10 +308,10 @@ to know what's really been built.
   `status=active` listing. **Closed a gap that made this meaningful:**
   `login()` never checked `is_active`, so a deactivated account could
   just log back in; added a `403 ACCOUNT_DEACTIVATED` check ahead of
-  the lockout check. `get_current_user` deliberately still doesn't
-  check `is_active` per request — `14_Security.md` already accepts
-  suspension taking effect within the ≤15-min access-token TTL, not
-  instantly · P2-T31 password strength + closed a real CSRF gap:
+  the lockout check. `get_current_user` originally didn't check
+  `is_active` per request (suspension lagged by up to the 15-min
+  access-token TTL); it now does, and `refresh()` refuses inactive
+  accounts too, so a suspension is immediate · P2-T31 password strength + closed a real CSRF gap:
   every password (signup/reset/change) is now scored with `zxcvbn`,
   rejected below score 3/4 server-side, wired as a pydantic
   field_validator so it folds into the existing 422 envelope with no

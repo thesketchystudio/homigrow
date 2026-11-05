@@ -30,7 +30,14 @@ def get_current_user(
     credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(_bearer_scheme)],
     db: Session = Depends(get_db),
 ) -> User:
-    """Decodes the Authorization: Bearer access JWT and loads the corresponding user; 401 on any failure."""
+    """
+    Decodes the Authorization: Bearer access JWT and loads the corresponding user; 401 on any failure.
+    A deactivated or suspended account is rejected on every request rather
+    than only at its next login, so an ops suspension takes effect at once
+    instead of lingering until the access token expires. It is a 401 so the
+    frontend's refresh-and-retry path runs, fails (refresh refuses inactive
+    accounts too) and signs the user out cleanly.
+    """
     if credentials is None:
         raise _AUTH_REQUIRED
 
@@ -45,6 +52,8 @@ def get_current_user(
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise _AUTH_REQUIRED
+    if not user.is_active:
+        raise AuthError("ACCOUNT_DEACTIVATED", "This account has been deactivated.")
     return user
 
 
@@ -65,7 +74,8 @@ def get_current_user_optional(
         user_id = UUID(payload["sub"])
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, KeyError, ValueError):
         return None
-    return db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == user_id).first()
+    return user if user is not None and user.is_active else None
 
 
 OptionalCurrentUser = Annotated[Optional[User], Depends(get_current_user_optional)]

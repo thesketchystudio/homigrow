@@ -598,7 +598,7 @@ def refresh(
         raise REFRESH_INVALID
 
     user = db.query(User).filter(User.id == row.user_id).first()
-    if user is None:
+    if user is None or not user.is_active:
         raise REFRESH_INVALID
 
     row.revoked_at = now
