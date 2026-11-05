@@ -190,7 +190,7 @@ def _issue_otp(db: Session, email: str, purpose: OTPPurpose) -> None:
         )
     )
 
-    if settings.ENVIRONMENT != "production":
+    if settings.DEBUG_LOG_SECRETS:
         logger.info("OTP for %s (%s): %s", email, purpose.value, code)
 
     try:
@@ -643,7 +643,7 @@ def forgot_password(db: Session, email: str) -> None:
 
     token = create_password_reset_token(user.id, user.password_hash, PASSWORD_RESET_TTL_MINUTES)
 
-    if settings.ENVIRONMENT != "production":
+    if settings.DEBUG_LOG_SECRETS:
         logger.info("Password reset token for %s: %s", email, token)
 
     reset_url = f"{settings.FRONTEND_ORIGIN}/reset-password?token={token}"

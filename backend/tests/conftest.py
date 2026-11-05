@@ -38,6 +38,12 @@ def _mock_send_otp_email(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _enable_secret_logging(monkeypatch):
+    """Many tests read the one-time code or reset token back out of the log (caplog), so secret logging is on for the suite; the default-off behaviour has its own test."""
+    monkeypatch.setattr("app.core.config.settings.DEBUG_LOG_SECRETS", True)
+
+
+@pytest.fixture(autouse=True)
 def _mock_send_password_reset_email(monkeypatch):
     """Prevents tests from making real Resend API calls — auth_service.forgot_password sends via httpx."""
     monkeypatch.setattr("app.services.email_service.send_password_reset_email", lambda *args, **kwargs: None)

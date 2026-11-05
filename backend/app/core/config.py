@@ -91,6 +91,20 @@ class Settings(BaseSettings):
     # to the real API hostname(s).
     ALLOWED_HOSTS: str = "localhost,127.0.0.1"
 
+    # Local-development convenience: when true, one-time codes and password
+    # reset tokens are written to the application log so flows can be tested
+    # without opening an inbox. Those values grant account access, and logs
+    # are shipped to hosting dashboards and Sentry, so this is off by default,
+    # must stay off on any deployed environment, and is refused in production.
+    DEBUG_LOG_SECRETS: bool = False
+
+    @model_validator(mode="after")
+    def _forbid_secret_logging_in_production(self) -> "Settings":
+        """Fails startup if DEBUG_LOG_SECRETS is enabled with ENVIRONMENT=production."""
+        if self.ENVIRONMENT == "production" and self.DEBUG_LOG_SECRETS:
+            raise ValueError("DEBUG_LOG_SECRETS must not be enabled when ENVIRONMENT=production")
+        return self
+
     @model_validator(mode="after")
     def _require_explicit_hosts_in_production(self) -> "Settings":
         """Fails startup in production if ALLOWED_HOSTS was left at the local-only default, since the API would then reject every real request."""

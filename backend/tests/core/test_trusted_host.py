@@ -29,8 +29,8 @@ class TestAllowedHostsSetting:
 
     def test_production_with_default_hosts_fails_startup(self):
         with pytest.raises(ValueError, match="ALLOWED_HOSTS"):
-            Settings(ENVIRONMENT="production")
+            Settings(ENVIRONMENT="production", DEBUG_LOG_SECRETS=False)
 
     def test_production_with_explicit_hosts_is_accepted(self):
-        settings = Settings(ENVIRONMENT="production", ALLOWED_HOSTS="api.homigrow.com")
+        settings = Settings(ENVIRONMENT="production", ALLOWED_HOSTS="api.homigrow.com", DEBUG_LOG_SECRETS=False)
         assert settings.allowed_hosts_list == ["api.homigrow.com"]
