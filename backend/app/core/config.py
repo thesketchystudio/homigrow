@@ -7,7 +7,7 @@ DATABASE_URL via a computed field, so no other code ever hardcodes or
 flattens the connection string.
 """
 
-from pydantic import computed_field, field_validator, model_validator
+from pydantic import Field, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     DB_PASSWORD: str
     ENVIRONMENT: str = "dev"
     SENTRY_DSN: str = ""
+    # Share of requests that get a performance trace (errors are always
+    # reported regardless). Tracing every request is costly at production
+    # volume, so the default samples one in ten; raise it temporarily when
+    # investigating latency.
+    SENTRY_TRACES_SAMPLE_RATE: float = Field(default=0.1, ge=0, le=1)
 
     # Secret, so no default — fails fast at startup if missing rather
     # than silently signing tokens with a predictable value.

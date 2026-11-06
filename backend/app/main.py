@@ -27,12 +27,24 @@ from app.core.middleware import limiter
 # plain-in-dev half.
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
+
+
+def sentry_options() -> dict:
+    """
+    Sentry client settings. Personal data (cookies, auth headers, client
+    IPs) is never attached to events, and only a fraction of requests are
+    traced, so neither cost nor exposure grows with traffic.
+    """
+    return {
+        "dsn": settings.SENTRY_DSN,
+        "environment": settings.ENVIRONMENT,
+        "traces_sample_rate": settings.SENTRY_TRACES_SAMPLE_RATE,
+        "send_default_pii": False,
+    }
+
+
 if settings.SENTRY_DSN:
-    sentry_sdk.init(
-        dsn=settings.SENTRY_DSN,
-        environment=settings.ENVIRONMENT,
-        traces_sample_rate=1.0,
-    )
+    sentry_sdk.init(**sentry_options())
 
 # Exactly what the frontend sends: the HTTP verbs its API client uses and
 # the two custom request headers (bearer token, JSON body). Anything else is
