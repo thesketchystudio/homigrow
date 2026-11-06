@@ -30,6 +30,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.phone import normalize_indian_mobile
 from app.core.exceptions import (
     AuthError,
     ConflictError,
@@ -439,9 +440,14 @@ def login(
     """
     bad_credentials = AuthError("BAD_CREDENTIALS", "Invalid phone/email or password.")
 
+    identifier = phone_or_email.strip()
+    if "@" not in identifier:
+        # Phones are stored in canonical +91 form, so a number typed any
+        # other way ("98765 43210", "09876543210") must be canonicalised to match.
+        identifier = normalize_indian_mobile(identifier) or identifier
     user = (
         db.query(User)
-        .filter(or_(User.phone == phone_or_email, User.email == phone_or_email))
+        .filter(or_(User.phone == identifier, User.email == identifier))
         .first()
     )
     if user is None or user.password_hash is None:

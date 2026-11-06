@@ -23,9 +23,12 @@ from app.models.enums import (
     VerificationStatus,
 )
 from app.schemas._pagination import PaginatedResponse
+from app.schemas._validators import AmenityList, HttpUrlString
 
 
 DESCRIPTION_MAX_WORDS = 250
+# The word cap alone lets one enormous "word" through, so total size is bounded too.
+DESCRIPTION_MAX_CHARS = 5000
 
 
 def _validate_description_length(value: Optional[str]) -> Optional[str]:
@@ -42,6 +45,8 @@ def _validate_description_length(value: Optional[str]) -> Optional[str]:
         return None
     if len(value.split()) > DESCRIPTION_MAX_WORDS:
         raise ValueError(f"Description must be {DESCRIPTION_MAX_WORDS} words or fewer")
+    if len(value) > DESCRIPTION_MAX_CHARS:
+        raise ValueError(f"Description must be {DESCRIPTION_MAX_CHARS} characters or fewer")
     return value
 
 
@@ -146,7 +151,7 @@ class PGDetails(BaseModel):
 
     # Shared across both Rent sub-forms.
     meals_included: Optional[bool] = None
-    amenities: list[str] = []
+    amenities: AmenityList = []
 
 
 class PropertyBrokerVerification(BaseModel):
@@ -334,13 +339,13 @@ class PropertyCreateRequest(BaseModel):
     facing: Optional[str] = Field(default=None, max_length=20)
     furnishing: Optional[Furnishing] = None
     built_year: Optional[int] = None
-    amenities: list[str] = []
+    amenities: AmenityList = []
     plot_details: Optional[PlotDetails] = None
     land_details: Optional[LandDetails] = None
     pg_details: Optional[PGDetails] = None
     is_jv_property: bool = False
     jv_details: Optional[JVDetails] = None
-    virtual_tour_url: Optional[str] = Field(default=None, max_length=500)
+    virtual_tour_url: Optional[HttpUrlString] = None
     address_line: str = Field(min_length=1, max_length=255)
     locality: str = Field(min_length=1, max_length=100)
     city: str = Field(min_length=1, max_length=100)
@@ -388,13 +393,13 @@ class PropertyUpdateRequest(BaseModel):
     furnishing: Optional[Furnishing] = None
     built_year: Optional[int] = None
     parking_slots: Optional[int] = None
-    amenities: Optional[list[str]] = None
+    amenities: Optional[AmenityList] = None
     plot_details: Optional[PlotDetails] = None
     land_details: Optional[LandDetails] = None
     pg_details: Optional[PGDetails] = None
     is_jv_property: Optional[bool] = None
     jv_details: Optional[JVDetails] = None
-    virtual_tour_url: Optional[str] = Field(default=None, max_length=500)
+    virtual_tour_url: Optional[HttpUrlString] = None
     ownership_type: Optional[OwnershipType] = None
     available_from: Optional[date] = None
     address_line: Optional[str] = Field(default=None, min_length=1, max_length=255)
