@@ -9,6 +9,7 @@ services/routes.
 """
 
 import hashlib
+import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -23,6 +24,13 @@ from app.core.config import settings
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 JWT_ALGORITHM = "HS256"
+# Issuer and per-token-type audiences. Decoding requires them, so a token
+# minted for one purpose (or by anything other than this API) is rejected
+# by every other decoder even though they share one signing key.
+JWT_ISSUER = "homigrow-api"
+ACCESS_TOKEN_AUDIENCE = "homigrow:access"
+RESET_TOKEN_AUDIENCE = "homigrow:password-reset"
+_REQUIRED_CLAIMS = ["exp", "iat", "iss", "aud", "sub"]
 PASSWORD_RESET_PURPOSE = "password_reset"
 MIN_PASSWORD_STRENGTH_SCORE = 3
 
@@ -35,6 +43,28 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, password_hash: str) -> bool:
     """Checks a plaintext password against a stored bcrypt hash."""
     return _pwd_context.verify(password, password_hash)
+
+
+def _otp_key() -> bytes:
+    """Derives a dedicated HMAC key for OTP codes from JWT_SECRET, so OTP digests share no key material with token signing."""
+    return hashlib.sha256(b"otp-code:" + settings.JWT_SECRET.encode()).digest()
+
+
+def hash_otp(code: str, email: str) -> str:
+    """
+    Digests a 6-digit OTP with HMAC-SHA256 keyed by a server secret. The
+    code space is only a million values, so a slow hash adds little: it
+    can be brute-forced offline if the table leaks, and it makes every
+    legitimate check cost CPU. A keyed digest is cheap to verify and
+    useless to an attacker without the secret. The email is mixed in so
+    the same code never produces the same digest for two addresses.
+    """
+    return hmac.new(_otp_key(), f"{email}:{code}".encode(), hashlib.sha256).hexdigest()
+
+
+def verify_otp_hash(code: str, email: str, expected_hash: str) -> bool:
+    """Constant-time check of a submitted OTP against its stored digest."""
+    return hmac.compare_digest(hash_otp(code, email), expected_hash)
 
 
 def validate_password_strength(password: str) -> None:
@@ -60,6 +90,8 @@ def create_access_token(user_id: UUID, role: str) -> str:
     payload = {
         "sub": str(user_id),
         "role": role,
+        "iss": JWT_ISSUER,
+        "aud": ACCESS_TOKEN_AUDIENCE,
         "iat": now,
         "exp": now + timedelta(minutes=settings.JWT_ACCESS_TTL_MIN),
         "jti": str(uuid4()),
@@ -69,7 +101,14 @@ def create_access_token(user_id: UUID, role: str) -> str:
 
 def decode_access_token(token: str) -> dict:
     """Verifies and decodes an access JWT. Raises a jwt exception on invalid/expired tokens."""
-    return jwt.decode(token, settings.JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    return jwt.decode(
+        token,
+        settings.JWT_SECRET,
+        algorithms=[JWT_ALGORITHM],
+        audience=ACCESS_TOKEN_AUDIENCE,
+        issuer=JWT_ISSUER,
+        options={"require": _REQUIRED_CLAIMS},
+    )
 
 
 def create_refresh_token() -> str:
@@ -103,6 +142,8 @@ def create_password_reset_token(user_id: UUID, password_hash: Optional[str], ttl
     now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
+        "iss": JWT_ISSUER,
+        "aud": RESET_TOKEN_AUDIENCE,
         "purpose": PASSWORD_RESET_PURPOSE,
         "pwd_fp": password_fingerprint(password_hash),
         "iat": now,
@@ -117,7 +158,14 @@ def decode_password_reset_token(token: str) -> dict:
     on invalid/expired tokens, or if the token's purpose claim doesn't
     match — an access token can never be replayed as a reset token.
     """
-    payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    payload = jwt.decode(
+        token,
+        settings.JWT_SECRET,
+        algorithms=[JWT_ALGORITHM],
+        audience=RESET_TOKEN_AUDIENCE,
+        issuer=JWT_ISSUER,
+        options={"require": _REQUIRED_CLAIMS},
+    )
     if payload.get("purpose") != PASSWORD_RESET_PURPOSE:
         raise jwt.InvalidTokenError("Not a password-reset token.")
     return payload

@@ -10,10 +10,11 @@ from app.core.security import create_access_token
 from app.models.broker_profile import BrokerProfile
 from app.models.enums import UserRole
 from tests.conftest import make_user
+from tests.conftest import SAMPLE_JPEG, SAMPLE_PDF
 
 _FILES = {
-    "rera_certificate": ("rera.pdf", b"%PDF-1.4 fake", "application/pdf"),
-    "government_id": ("id.jpg", b"fake jpg bytes", "image/jpeg"),
+    "rera_certificate": ("rera.pdf", SAMPLE_PDF, "application/pdf"),
+    "government_id": ("id.jpg", SAMPLE_JPEG, "image/jpeg"),
 }
 
 
@@ -60,7 +61,7 @@ class TestSubmitVerificationDocuments:
         broker = _make_broker(db_session, phone="+919876545003")
         bad_files = {
             "rera_certificate": ("rera.zip", b"fake zip", "application/zip"),
-            "government_id": ("id.jpg", b"fake jpg bytes", "image/jpeg"),
+            "government_id": ("id.jpg", SAMPLE_JPEG, "image/jpeg"),
         }
 
         response = client.post(

@@ -38,6 +38,11 @@ from app.services.property_lifecycle import transition_property_status
 # for a handful of rows, not the full pipeline), not a pagination limit.
 RECENT_LEADS_LIMIT = 4
 
+# Upload caps: per request bounds a single call's work, per listing bounds
+# how much one listing can accumulate in the public bucket (photos + videos).
+MAX_MEDIA_PER_REQUEST = 10
+MAX_MEDIA_PER_PROPERTY = 30
+
 
 def _auto_approve(property_: Property) -> None:
     """
@@ -256,14 +261,28 @@ def update_property(db: Session, broker: User, property_id: UUID, data: Property
     return property_
 
 
+def _ensure_media_capacity(property_: Property, incoming: int) -> None:
+    """
+    Rejects an upload that would push a listing past the per-request or
+    per-listing media limits, so a single account can't fill the public
+    bucket with unbounded files for one listing.
+    """
+    if incoming > MAX_MEDIA_PER_REQUEST:
+        message = f"Upload at most {MAX_MEDIA_PER_REQUEST} files at a time."
+        raise ValidationFailed("TOO_MANY_FILES", message, {"images": message})
+    if len(property_.media) + incoming > MAX_MEDIA_PER_PROPERTY:
+        message = f"A listing can have at most {MAX_MEDIA_PER_PROPERTY} photos and videos."
+        raise ValidationFailed("MEDIA_LIMIT_REACHED", message, {"images": message})
+
+
 def delete_media(db: Session, broker: User, property_id: UUID, media_id: UUID) -> None:
     """
     Removes one photo/video from a listing's gallery — the Edit Listing
     form's photo grid delete action. If the removed item was the cover
     image, promotes the next-lowest-position remaining item so the listing
-    is never left without one. Does not delete the underlying storage
-    object; PropertyMedia rows are the source of truth for what's shown,
-    and this codebase doesn't clean up orphaned storage objects elsewhere.
+    is never left without one. Also removes the underlying storage object
+    after the database change commits (best-effort, so a storage failure
+    can't block the delete and an orphan is the worst case).
     """
     property_ = _get_owned_property(db, broker, property_id)
     media = db.query(PropertyMedia).filter(PropertyMedia.id == media_id, PropertyMedia.property_id == property_.id).first()
@@ -271,6 +290,7 @@ def delete_media(db: Session, broker: User, property_id: UUID, media_id: UUID) -
         raise NotFoundError("MEDIA_NOT_FOUND", "This media item was not found on this property.")
 
     was_cover = media.is_cover
+    stored_url = media.url
     db.delete(media)
     db.flush()
 
@@ -285,6 +305,7 @@ def delete_media(db: Session, broker: User, property_id: UUID, media_id: UUID) -
             next_cover.is_cover = True
 
     db.commit()
+    storage_service.delete_public_media(stored_url)
 
 
 def add_media(db: Session, broker: User, property_id: UUID, uploads: list[tuple[bytes, str]]) -> list[PropertyMedia]:
@@ -294,6 +315,7 @@ def add_media(db: Session, broker: User, property_id: UUID, uploads: list[tuple[
     property becomes its cover image.
     """
     property_ = _get_owned_property(db, broker, property_id)
+    _ensure_media_capacity(property_, len(uploads))
     next_position = len(property_.media)
     has_cover = any(media.is_cover for media in property_.media)
 
@@ -323,6 +345,7 @@ def add_video(db: Session, broker: User, property_id: UUID, content: bytes, cont
     treated as the cover image — cover selection stays photo-only.
     """
     property_ = _get_owned_property(db, broker, property_id)
+    _ensure_media_capacity(property_, 1)
     url = storage_service.upload_property_video(property_.id, content, content_type)
     media = PropertyMedia(
         property_id=property_.id,

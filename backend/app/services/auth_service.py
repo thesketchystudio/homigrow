@@ -26,10 +26,11 @@ import jwt
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.phone import normalize_indian_mobile
 from app.core.exceptions import (
     AuthError,
     ConflictError,
@@ -37,6 +38,7 @@ from app.core.exceptions import (
     ForbiddenError,
     LockedError,
     NotFoundError,
+    RateLimited,
     ValidationFailed,
 )
 from app.core.security import (
@@ -44,9 +46,11 @@ from app.core.security import (
     create_password_reset_token,
     create_refresh_token,
     decode_password_reset_token,
+    hash_otp,
     hash_password,
     hash_refresh_token,
     password_fingerprint,
+    verify_otp_hash,
     verify_password,
 )
 from app.models.broker_profile import BrokerProfile
@@ -62,6 +66,11 @@ logger = logging.getLogger(__name__)
 
 OTP_EXPIRE_MINUTES = 10
 OTP_MAX_ATTEMPTS = 5
+# Per-email abuse limits, counted across every code and purpose issued to the
+# address so neither a resend nor switching purpose resets them.
+OTP_RESEND_COOLDOWN_SECONDS = 60
+OTP_MAX_CODES_PER_DAY = 10
+OTP_MAX_FAILED_ATTEMPTS_PER_HOUR = 10
 LOCKOUT_THRESHOLD = 5
 LOCKOUT_MINUTES = 15
 PASSWORD_RESET_TTL_MINUTES = 30
@@ -130,6 +139,28 @@ def _issue_session(
     return access_token, refresh_token
 
 
+def _enforce_otp_issue_limits(db: Session, email: str) -> None:
+    """
+    Raises 429 if this email was sent a code under a minute ago or has
+    already been sent the daily maximum. Limits are per email rather than
+    per IP, because an IP limit does nothing against someone rotating IPs
+    to spam one victim's inbox, burn the email quota, or keep earning fresh
+    guess attempts.
+    """
+    now = datetime.now(timezone.utc)
+    latest = db.query(func.max(OTPCode.created_at)).filter(OTPCode.email == email).scalar()
+    if latest is not None and (now - latest).total_seconds() < OTP_RESEND_COOLDOWN_SECONDS:
+        raise RateLimited("OTP_RESEND_COOLDOWN", "Please wait a minute before requesting another code.")
+
+    issued_today = (
+        db.query(func.count(OTPCode.id))
+        .filter(OTPCode.email == email, OTPCode.created_at > now - timedelta(hours=24))
+        .scalar()
+    )
+    if issued_today >= OTP_MAX_CODES_PER_DAY:
+        raise RateLimited("OTP_DAILY_LIMIT", "Too many verification codes requested today. Please try again tomorrow.")
+
+
 def _issue_otp(db: Session, email: str, purpose: OTPPurpose) -> None:
     """
     Generates, hashes, and stores a 6-digit OTP, then delivers it by
@@ -142,6 +173,8 @@ def _issue_otp(db: Session, email: str, purpose: OTPPurpose) -> None:
     addresses) — a Resend failure here is swallowed, not raised, since
     signup/resend should still succeed even if the email didn't land.
     """
+    _enforce_otp_issue_limits(db, email)
+
     db.query(OTPCode).filter(
         OTPCode.email == email,
         OTPCode.purpose == purpose,
@@ -152,13 +185,13 @@ def _issue_otp(db: Session, email: str, purpose: OTPPurpose) -> None:
     db.add(
         OTPCode(
             email=email,
-            code_hash=hash_password(code),
+            code_hash=hash_otp(code, email),
             purpose=purpose,
             expires_at=datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRE_MINUTES),
         )
     )
 
-    if settings.ENVIRONMENT != "production":
+    if settings.DEBUG_LOG_SECRETS:
         logger.info("OTP for %s (%s): %s", email, purpose.value, code)
 
     try:
@@ -197,17 +230,27 @@ def verify_otp(
     them to /login to re-enter the password a moment later would just
     be friction. Every other purpose returns None (no session change).
     """
+    now = datetime.now(timezone.utc)
+    failed_this_hour = (
+        db.query(func.coalesce(func.sum(OTPCode.attempts), 0))
+        .filter(OTPCode.email == email, OTPCode.created_at > now - timedelta(hours=1))
+        .scalar()
+    )
+    if failed_this_hour >= OTP_MAX_FAILED_ATTEMPTS_PER_HOUR:
+        raise RateLimited(
+            "OTP_ATTEMPTS_EXCEEDED", "Too many incorrect codes. Please wait an hour before trying again."
+        )
+
     row = (
         db.query(OTPCode)
         .filter(OTPCode.email == email, OTPCode.purpose == purpose, OTPCode.consumed_at.is_(None))
         .order_by(OTPCode.created_at.desc())
         .first()
     )
-    now = datetime.now(timezone.utc)
     if row is None or row.expires_at <= now or row.attempts >= OTP_MAX_ATTEMPTS:
         raise OTP_EXPIRED
 
-    if not verify_password(code, row.code_hash):
+    if not verify_otp_hash(code, email, row.code_hash):
         row.attempts += 1
         db.commit()
         raise OTP_INVALID
@@ -397,9 +440,14 @@ def login(
     """
     bad_credentials = AuthError("BAD_CREDENTIALS", "Invalid phone/email or password.")
 
+    identifier = phone_or_email.strip()
+    if "@" not in identifier:
+        # Phones are stored in canonical +91 form, so a number typed any
+        # other way ("98765 43210", "09876543210") must be canonicalised to match.
+        identifier = normalize_indian_mobile(identifier) or identifier
     user = (
         db.query(User)
-        .filter(or_(User.phone == phone_or_email, User.email == phone_or_email))
+        .filter(or_(User.phone == identifier, User.email == identifier))
         .first()
     )
     if user is None or user.password_hash is None:
@@ -427,7 +475,12 @@ def login(
     # is sent so the client can go straight to the verification screen.
     if not user.is_email_verified:
         if user.email:
-            _issue_otp(db, user.email, OTPPurpose.signup)
+            try:
+                _issue_otp(db, user.email, OTPPurpose.signup)
+            except RateLimited:
+                # A code was sent recently (or the daily cap is hit); the
+                # client still goes to the verification screen either way.
+                pass
         db.commit()
         raise EMAIL_NOT_VERIFIED
 
@@ -551,7 +604,7 @@ def refresh(
         raise REFRESH_INVALID
 
     user = db.query(User).filter(User.id == row.user_id).first()
-    if user is None:
+    if user is None or not user.is_active:
         raise REFRESH_INVALID
 
     row.revoked_at = now
@@ -596,7 +649,7 @@ def forgot_password(db: Session, email: str) -> None:
 
     token = create_password_reset_token(user.id, user.password_hash, PASSWORD_RESET_TTL_MINUTES)
 
-    if settings.ENVIRONMENT != "production":
+    if settings.DEBUG_LOG_SECRETS:
         logger.info("Password reset token for %s: %s", email, token)
 
     reset_url = f"{settings.FRONTEND_ORIGIN}/reset-password?token={token}"

@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.core.security import validate_password_strength
 from app.models.enums import OTPPurpose, UserRole
+from app.schemas._validators import EmailAddress, IndianMobile
 
 
 class SignupRequest(BaseModel):
@@ -22,10 +23,10 @@ class SignupRequest(BaseModel):
     design collects it alongside phone at signup, not later.
     """
 
-    phone: str
+    phone: IndianMobile
     role: UserRole
     full_name: Optional[str] = None
-    email: str
+    email: EmailAddress
     password: Optional[str] = None
     city: Optional[str] = None
     state: Optional[str] = None
@@ -123,7 +124,7 @@ class TokenResponse(BaseModel):
 
 
 class ForgotPasswordRequest(BaseModel):
-    email: str
+    email: EmailAddress
 
 
 class ResetPasswordRequest(BaseModel):
@@ -140,11 +141,11 @@ class ResetPasswordRequest(BaseModel):
 class OTPRequestRequest(BaseModel):
     """Powers signup verification's 'Resend OTP' action — reissues a code for (email, purpose)."""
 
-    email: str
+    email: EmailAddress
     purpose: OTPPurpose
 
 
 class OTPVerifyRequest(BaseModel):
-    email: str
+    email: EmailAddress
     code: str
     purpose: OTPPurpose

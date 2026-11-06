@@ -11,7 +11,7 @@ import re
 from app.core.config import settings
 from app.core.security import create_password_reset_token
 from app.models.user import User
-from tests.conftest import make_user
+from tests.conftest import age_otp_codes, make_user
 
 
 def _extract_otp_code(caplog, email: str) -> str:
@@ -173,6 +173,7 @@ class TestOtpRoutes:
                     "password": "s3cure-pass",
                 },
             )
+            age_otp_codes(db_session, "brokerverifyroute@example.com")
             client.post(
                 "/api/v1/auth/otp/request",
                 json={"email": "brokerverifyroute@example.com", "purpose": "broker_verification"},
@@ -451,3 +452,14 @@ class TestAuthRateLimiting:
 
         assert sixth.status_code == 429
         assert sixth.json()["error"]["code"] == "RATE_LIMITED"
+
+
+class TestOtpAbuseLimitsRoute:
+    def test_resend_inside_the_cooldown_returns_429_with_a_specific_code(self, client):
+        payload = {"email": "cooldownroute@example.com", "purpose": "signup"}
+        assert client.post("/api/v1/auth/otp/request", json=payload).status_code == 204
+
+        response = client.post("/api/v1/auth/otp/request", json=payload)
+
+        assert response.status_code == 429
+        assert response.json()["error"]["code"] == "OTP_RESEND_COOLDOWN"

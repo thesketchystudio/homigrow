@@ -16,6 +16,8 @@ from app.core.config import settings
 from app.core.exceptions import AppError
 from app.core.security import (
     JWT_ALGORITHM,
+    JWT_ISSUER,
+    RESET_TOKEN_AUDIENCE,
     create_password_reset_token,
     hash_refresh_token,
     password_fingerprint,
@@ -149,6 +151,18 @@ class TestRefresh:
         )
         assert new_row is not None
         assert new_row.revoked_at is None
+
+    def test_deactivated_account_cannot_refresh(self, db_session):
+        user = make_user(db_session, phone="+919876543231", password="correct-horse-battery-staple")
+        _, raw_refresh_token, _ = auth_service.login(db_session, "+919876543231", "correct-horse-battery-staple")
+        user.is_active = False
+        db_session.flush()
+
+        with pytest.raises(AppError) as exc_info:
+            auth_service.refresh(db_session, raw_refresh_token)
+
+        assert exc_info.value.status_code == 401
+        assert exc_info.value.code == "REFRESH_INVALID"
 
     def test_missing_token_raises_401(self, db_session):
         with pytest.raises(AppError) as exc_info:
@@ -316,6 +330,8 @@ class TestResetPassword:
         user = make_user(db_session, phone="+919876543243", password="old-password-123")
         expired_payload = {
             "sub": str(user.id),
+            "iss": JWT_ISSUER,
+            "aud": RESET_TOKEN_AUDIENCE,
             "purpose": "password_reset",
             "pwd_fp": password_fingerprint(user.password_hash),
             "iat": datetime.now(timezone.utc) - timedelta(minutes=60),

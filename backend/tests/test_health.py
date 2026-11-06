@@ -7,8 +7,8 @@ the health endpoint responds as expected.
 
 
 def test_health_check(client):
-    """The health endpoint returns 200 with the current environment."""
+    """The health endpoint returns 200 and exposes nothing about the environment."""
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "environment": "dev"}
+    assert response.json() == {"status": "ok"}

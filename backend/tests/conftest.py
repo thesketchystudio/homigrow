@@ -38,6 +38,12 @@ def _mock_send_otp_email(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _enable_secret_logging(monkeypatch):
+    """Many tests read the one-time code or reset token back out of the log (caplog), so secret logging is on for the suite; the default-off behaviour has its own test."""
+    monkeypatch.setattr("app.core.config.settings.DEBUG_LOG_SECRETS", True)
+
+
+@pytest.fixture(autouse=True)
 def _mock_send_password_reset_email(monkeypatch):
     """Prevents tests from making real Resend API calls — auth_service.forgot_password sends via httpx."""
     monkeypatch.setattr("app.services.email_service.send_password_reset_email", lambda *args, **kwargs: None)
@@ -53,10 +59,18 @@ def _mock_s3_client(monkeypatch):
     """
 
     class _FakeS3Client:
+        def __init__(self):
+            self.deleted_keys: list[str] = []
+
         def put_object(self, **kwargs):
             return None
 
-    monkeypatch.setattr("app.services.storage_service._get_client", lambda: _FakeS3Client())
+        def delete_object(self, **kwargs):
+            self.deleted_keys.append(kwargs["Key"])
+
+    fake_client = _FakeS3Client()
+    monkeypatch.setattr("app.services.storage_service._get_client", lambda: fake_client)
+    return fake_client
 
 
 @pytest.fixture()
@@ -81,7 +95,8 @@ def client(db_session):
         yield db_session
 
     app.dependency_overrides[get_db] = _get_db_override
-    yield TestClient(app)
+    # localhost matches the default ALLOWED_HOSTS; TestClient's own default host would be rejected.
+    yield TestClient(app, base_url="http://localhost")
     app.dependency_overrides.clear()
 
 
@@ -109,3 +124,24 @@ def make_user(
     db_session.add(user)
     db_session.flush()
     return user
+
+
+# Minimal byte strings carrying each file type's real leading signature, so
+# upload tests exercise the signature check without needing real media files.
+SAMPLE_JPEG = b"\xff\xd8\xff\xe0" + b"0" * 16
+SAMPLE_PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 16
+SAMPLE_WEBP = b"RIFF\x00\x00\x00\x00WEBP" + b"0" * 16
+SAMPLE_PDF = b"%PDF-1.4 sample"
+SAMPLE_MP4 = b"\x00\x00\x00\x18ftypmp42" + b"0" * 16
+
+
+def age_otp_codes(db, email: str, seconds: int = 120) -> None:
+    """Backdates every OTP row for an email so the per-email resend cooldown has elapsed, letting a test request another code."""
+    from datetime import datetime, timedelta, timezone
+
+    from app.models.otp_code import OTPCode
+
+    db.query(OTPCode).filter(OTPCode.email == email).update(
+        {"created_at": datetime.now(timezone.utc) - timedelta(seconds=seconds)}, synchronize_session=False
+    )
+    db.flush()

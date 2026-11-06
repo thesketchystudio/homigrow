@@ -16,7 +16,7 @@ from app.models.broker_profile import BrokerProfile
 from app.models.enums import OTPPurpose, UserRole
 from app.models.otp_code import OTPCode
 from app.services import auth_service
-from tests.conftest import make_user
+from tests.conftest import age_otp_codes, make_user
 
 
 def _extract_otp_code(caplog, email: str) -> str:
@@ -177,6 +177,7 @@ class TestRequestOtp:
             .first()
         )
 
+        age_otp_codes(db_session, "otpreq2@example.com")
         auth_service.request_otp(db_session, "otpreq2@example.com", OTPPurpose.signup)
 
         db_session.refresh(first)
@@ -306,6 +307,7 @@ class TestVerifyOtp:
                 password=None,
             )
             old_code = _extract_otp_code(caplog, "resendcode@example.com")
+            age_otp_codes(db_session, "resendcode@example.com")
             auth_service.request_otp(db_session, "resendcode@example.com", OTPPurpose.signup)
 
         old_otp_row = (

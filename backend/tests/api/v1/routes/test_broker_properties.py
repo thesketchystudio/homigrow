@@ -20,7 +20,9 @@ from app.models.lead import Lead
 from app.models.property import Property
 from app.models.property_view import PropertyView
 from app.models.saved_property import SavedProperty
+from app.services import storage_service
 from tests.conftest import make_user
+from tests.conftest import SAMPLE_JPEG, SAMPLE_MP4, SAMPLE_PDF
 
 _VALID_PAYLOAD = {
     "title": "2 BHK Luxury Flat",
@@ -38,9 +40,9 @@ _VALID_PAYLOAD = {
     "price": 15000000,
 }
 
-_IMAGE_FILES = [("images", ("hero.jpg", b"fake jpg bytes", "image/jpeg"))]
-_VIDEO_FILE = ("video", ("walkthrough.mp4", b"fake mp4 bytes", "video/mp4"))
-_AGREEMENT_FILE = ("document", ("jv-agreement.pdf", b"fake pdf bytes", "application/pdf"))
+_IMAGE_FILES = [("images", ("hero.jpg", SAMPLE_JPEG, "image/jpeg"))]
+_VIDEO_FILE = ("video", ("walkthrough.mp4", SAMPLE_MP4, "video/mp4"))
+_AGREEMENT_FILE = ("document", ("jv-agreement.pdf", SAMPLE_PDF, "application/pdf"))
 
 
 def _auth_headers(user) -> dict:
@@ -749,7 +751,7 @@ class TestDeletePropertyMedia:
         media = client.post(
             f"/api/v1/properties/{property_id}/media",
             headers=_auth_headers(broker),
-            files=[("images", ("interior.jpg", b"more fake jpg bytes", "image/jpeg"))],
+            files=[("images", ("interior.jpg", SAMPLE_JPEG, "image/jpeg"))],
         ).json()
         second_media_id = media[0]["id"]
 
@@ -769,7 +771,7 @@ class TestDeletePropertyMedia:
         client.post(
             f"/api/v1/properties/{property_id}/media",
             headers=_auth_headers(broker),
-            files=[("images", ("interior.jpg", b"more fake jpg bytes", "image/jpeg"))],
+            files=[("images", ("interior.jpg", SAMPLE_JPEG, "image/jpeg"))],
         )
         cover_media_id = first_media[0]["id"]
 
@@ -855,3 +857,76 @@ class TestReopenProperty:
         response = client.post(f"/api/v1/properties/{property_id}/reopen", headers=_auth_headers(other))
 
         assert response.status_code == 403
+
+
+class TestUploadHardening:
+    def _create_property(self, client, broker):
+        return client.post("/api/v1/properties", headers=_auth_headers(broker), json=_VALID_PAYLOAD).json()["id"]
+
+    def test_html_disguised_as_jpeg_is_rejected(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546101")
+        property_id = self._create_property(client, broker)
+
+        response = client.post(
+            f"/api/v1/properties/{property_id}/media",
+            headers=_auth_headers(broker),
+            files=[("images", ("x.jpg", b"<html><script>alert(1)</script></html>", "image/jpeg"))],
+        )
+
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "FILE_CONTENT_MISMATCH"
+
+    def test_too_many_files_in_one_request_is_rejected(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546102")
+        property_id = self._create_property(client, broker)
+        files = [("images", (f"{i}.jpg", SAMPLE_JPEG, "image/jpeg")) for i in range(11)]
+
+        response = client.post(f"/api/v1/properties/{property_id}/media", headers=_auth_headers(broker), files=files)
+
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "TOO_MANY_FILES"
+
+    def test_per_listing_media_limit_is_enforced(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546103")
+        property_id = self._create_property(client, broker)
+        batch = [("images", (f"{i}.jpg", SAMPLE_JPEG, "image/jpeg")) for i in range(10)]
+        for _ in range(3):
+            assert client.post(
+                f"/api/v1/properties/{property_id}/media", headers=_auth_headers(broker), files=batch
+            ).status_code == 200
+
+        response = client.post(f"/api/v1/properties/{property_id}/media", headers=_auth_headers(broker), files=_IMAGE_FILES)
+
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "MEDIA_LIMIT_REACHED"
+
+    def test_deleting_media_removes_the_storage_object(self, client, db_session, _mock_s3_client):
+        broker = _make_broker(db_session, phone="+919876546104")
+        property_id = self._create_property(client, broker)
+        client.post(f"/api/v1/properties/{property_id}/media", headers=_auth_headers(broker), files=_IMAGE_FILES)
+        second = client.post(
+            f"/api/v1/properties/{property_id}/media", headers=_auth_headers(broker), files=_IMAGE_FILES
+        ).json()[0]
+
+        response = client.delete(f"/api/v1/properties/{property_id}/media/{second['id']}", headers=_auth_headers(broker))
+
+        assert response.status_code == 204
+        assert len(_mock_s3_client.deleted_keys) == 1
+        assert second["url"].endswith(_mock_s3_client.deleted_keys[0])
+
+    def test_storage_failure_does_not_block_media_delete(self, client, db_session, monkeypatch):
+        broker = _make_broker(db_session, phone="+919876546105")
+        property_id = self._create_property(client, broker)
+        client.post(f"/api/v1/properties/{property_id}/media", headers=_auth_headers(broker), files=_IMAGE_FILES)
+        second = client.post(
+            f"/api/v1/properties/{property_id}/media", headers=_auth_headers(broker), files=_IMAGE_FILES
+        ).json()[0]
+
+        def _boom(**kwargs):
+            raise RuntimeError("storage down")
+
+        monkeypatch.setattr(storage_service._get_client(), "delete_object", _boom)
+
+        response = client.delete(f"/api/v1/properties/{property_id}/media/{second['id']}", headers=_auth_headers(broker))
+
+        assert response.status_code == 204

@@ -19,6 +19,7 @@ publicly viewable on the client site with no auth, so that path returns
 a real public URL instead.
 """
 
+import logging
 from uuid import UUID, uuid4
 
 import boto3
@@ -27,6 +28,7 @@ from botocore.config import Config
 from app.core.config import settings
 from app.core.exceptions import ValidationFailed
 from app.models.enums import BrokerDocumentType
+from app.services.upload_validation import verify_signature
 
 ALLOWED_CONTENT_TYPES = {"application/pdf", "image/jpeg", "image/png"}
 MAX_DOCUMENT_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB, matches the Figma upload copy
@@ -69,6 +71,10 @@ _VIDEO_EXTENSION_BY_CONTENT_TYPE = {
     "video/mp4": ".mp4",
     "video/quicktime": ".mov",
 }
+
+logger = logging.getLogger(__name__)
+
+_PUBLIC_MEDIA_URL_PREFIX = f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.SUPABASE_S3_BUCKET_PROPERTY_MEDIA}/"
 
 _client = None
 
@@ -117,6 +123,8 @@ def upload_broker_document(
             {"file": "File must be 5 MB or smaller."},
         )
 
+    verify_signature(content, content_type)
+
     extension = _EXTENSION_BY_CONTENT_TYPE[content_type]
     object_key = f"{user_id}/{doc_type.value}/{uuid4().hex}{extension}"
 
@@ -154,6 +162,8 @@ def upload_property_image(
             {"file": "File must be 10 MB or smaller."},
         )
 
+    verify_signature(content, content_type)
+
     extension = _IMAGE_EXTENSION_BY_CONTENT_TYPE[content_type]
     object_key = f"{property_id}/{uuid4().hex}{extension}"
 
@@ -163,7 +173,7 @@ def upload_property_image(
         Body=content,
         ContentType=content_type,
     )
-    return f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.SUPABASE_S3_BUCKET_PROPERTY_MEDIA}/{object_key}"
+    return f"{_PUBLIC_MEDIA_URL_PREFIX}{object_key}"
 
 
 def upload_property_video(
@@ -191,6 +201,8 @@ def upload_property_video(
             {"file": "File must be 100 MB or smaller."},
         )
 
+    verify_signature(content, content_type)
+
     extension = _VIDEO_EXTENSION_BY_CONTENT_TYPE[content_type]
     object_key = f"{property_id}/{uuid4().hex}{extension}"
 
@@ -200,7 +212,7 @@ def upload_property_video(
         Body=content,
         ContentType=content_type,
     )
-    return f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.SUPABASE_S3_BUCKET_PROPERTY_MEDIA}/{object_key}"
+    return f"{_PUBLIC_MEDIA_URL_PREFIX}{object_key}"
 
 
 def upload_property_document(
@@ -228,6 +240,8 @@ def upload_property_document(
             {"file": "File must be 10 MB or smaller."},
         )
 
+    verify_signature(content, content_type)
+
     extension = _EXTENSION_BY_CONTENT_TYPE[content_type]
     object_key = f"properties/{property_id}/documents/{uuid4().hex}{extension}"
 
@@ -238,3 +252,20 @@ def upload_property_document(
         ContentType=content_type,
     )
     return object_key
+
+
+def delete_public_media(url: str) -> None:
+    """
+    Removes a property photo/video from the public bucket given the public
+    URL stored on its PropertyMedia row. Best-effort by design: the
+    database row is the source of truth for what a listing shows, so a
+    storage failure is logged and swallowed rather than blocking the
+    delete. URLs that don't belong to this bucket are ignored.
+    """
+    if not url.startswith(_PUBLIC_MEDIA_URL_PREFIX):
+        return
+    object_key = url[len(_PUBLIC_MEDIA_URL_PREFIX) :]
+    try:
+        _get_client().delete_object(Bucket=settings.SUPABASE_S3_BUCKET_PROPERTY_MEDIA, Key=object_key)
+    except Exception:
+        logger.warning("Failed to delete storage object %s", object_key, exc_info=True)

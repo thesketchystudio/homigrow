@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.core.security import validate_password_strength
 from app.models.enums import UserRole, VerificationStatus
+from app.schemas._validators import EmailAddress
 
 
 class BrokerProfileOut(BaseModel):
@@ -72,7 +73,7 @@ class UserUpdateRequest(BaseModel):
     """
 
     full_name: Optional[str] = None
-    email: Optional[str] = None
+    email: Optional[EmailAddress] = None
     avatar_url: Optional[str] = None
     preferences: Optional[dict] = None
     # Only applied when the caller's role is broker and a broker_profile

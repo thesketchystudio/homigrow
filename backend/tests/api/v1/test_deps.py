@@ -14,10 +14,10 @@ import jwt
 import pytest
 from fastapi.security import HTTPAuthorizationCredentials
 
-from app.api.v1.deps import get_current_user, require_role
+from app.api.v1.deps import get_current_user, get_current_user_optional, require_role
 from app.core.config import settings
 from app.core.exceptions import AppError
-from app.core.security import JWT_ALGORITHM, create_access_token
+from app.core.security import ACCESS_TOKEN_AUDIENCE, JWT_ALGORITHM, JWT_ISSUER, create_access_token
 from app.models.enums import UserRole
 from tests.conftest import make_user
 
@@ -54,6 +54,8 @@ class TestGetCurrentUser:
         expired_payload = {
             "sub": str(user.id),
             "role": user.role.value,
+            "iss": JWT_ISSUER,
+            "aud": ACCESS_TOKEN_AUDIENCE,
             "iat": datetime.now(timezone.utc) - timedelta(minutes=30),
             "exp": datetime.now(timezone.utc) - timedelta(minutes=15),
             "jti": str(uuid4()),
@@ -74,6 +76,32 @@ class TestGetCurrentUser:
 
         assert exc_info.value.status_code == 401
         assert exc_info.value.code == "AUTH_REQUIRED"
+
+
+class TestInactiveAccounts:
+    def test_deactivated_user_with_a_valid_token_is_rejected(self, db_session):
+        user = make_user(db_session, phone="+919876550091")
+        token = create_access_token(user.id, user.role.value)
+        user.is_active = False
+        db_session.flush()
+
+        with pytest.raises(AppError) as exc_info:
+            get_current_user(_bearer(token), db_session)
+
+        assert exc_info.value.status_code == 401
+        assert exc_info.value.code == "ACCOUNT_DEACTIVATED"
+
+    def test_optional_dependency_treats_a_deactivated_user_as_anonymous(self, db_session):
+        user = make_user(db_session, phone="+919876550092", is_active=False)
+        token = create_access_token(user.id, user.role.value)
+
+        assert get_current_user_optional(_bearer(token), db_session) is None
+
+    def test_optional_dependency_still_resolves_an_active_user(self, db_session):
+        user = make_user(db_session, phone="+919876550093")
+        token = create_access_token(user.id, user.role.value)
+
+        assert get_current_user_optional(_bearer(token), db_session).id == user.id
 
 
 class TestRequireRole:
