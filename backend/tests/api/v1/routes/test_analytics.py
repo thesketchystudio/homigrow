@@ -230,3 +230,14 @@ class TestGetBrokerAnalytics:
 
         assert response.status_code == 200
         assert len(response.json()["trend"]) == 6
+
+
+class TestAnalyticsRateLimit:
+    def test_excessive_requests_are_throttled(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876590199")
+        headers = _auth_headers(broker)
+
+        statuses = [client.get("/api/v1/analytics/broker?range=7d", headers=headers).status_code for _ in range(61)]
+
+        assert statuses[:60] == [200] * 60
+        assert statuses[60] == 429

@@ -12,6 +12,7 @@ from app.core.security import create_access_token
 from app.models.enums import ListingType, PropertyStatus, PropertyType, UserRole
 from app.models.property import Property
 from app.models.saved_property import SavedProperty
+from app.services import saved_property_service
 from tests.conftest import make_user
 
 
@@ -225,3 +226,58 @@ class TestUnsaveProperty:
         response = client.delete(f"/api/v1/saved-properties/{property_.id}", headers=_auth_headers(user))
 
         assert response.status_code == 204
+
+
+class TestSaveOnlyPubliclyListedProperties:
+    def test_unpublished_listings_get_the_same_404_as_missing_ones(self, client, db_session):
+        user = make_user(db_session, phone="+919876580040")
+        for status in (PropertyStatus.draft, PropertyStatus.pending, PropertyStatus.rejected):
+            property_ = _make_property(db_session, status=status)
+
+            response = client.put(f"/api/v1/saved-properties/{property_.id}", headers=_auth_headers(user))
+
+            assert response.status_code == 404
+            assert response.json()["error"]["code"] == "PROPERTY_NOT_FOUND"
+        assert db_session.query(SavedProperty).filter(SavedProperty.user_id == user.id).count() == 0
+
+    def test_an_already_saved_listing_stays_savable_after_it_goes_off_market(self, client, db_session):
+        user = make_user(db_session, phone="+919876580041")
+        property_ = _make_property(db_session)
+        assert client.put(f"/api/v1/saved-properties/{property_.id}", headers=_auth_headers(user)).status_code == 204
+        property_.status = PropertyStatus.sold
+        db_session.flush()
+
+        again = client.put(f"/api/v1/saved-properties/{property_.id}", headers=_auth_headers(user))
+
+        assert again.status_code == 204
+        assert db_session.query(SavedProperty).filter(SavedProperty.user_id == user.id).count() == 1
+
+
+class TestSavedLimit:
+    def test_the_watchlist_is_capped(self, client, db_session):
+        user = make_user(db_session, phone="+919876580042")
+        broker = make_user(db_session, phone="+919876580043", role=UserRole.broker)
+        for _ in range(saved_property_service.MAX_SAVED_PROPERTIES):
+            db_session.add(SavedProperty(user_id=user.id, property_id=_make_property(db_session, broker=broker).id))
+        db_session.flush()
+        extra = _make_property(db_session, broker=broker)
+
+        response = client.put(f"/api/v1/saved-properties/{extra.id}", headers=_auth_headers(user))
+
+        assert response.status_code == 409
+        assert response.json()["error"]["code"] == "SAVED_LIMIT_REACHED"
+
+    def test_removing_one_makes_room(self, client, db_session):
+        user = make_user(db_session, phone="+919876580044")
+        broker = make_user(db_session, phone="+919876580045", role=UserRole.broker)
+        first = _make_property(db_session, broker=broker)
+        db_session.add(SavedProperty(user_id=user.id, property_id=first.id))
+        for _ in range(saved_property_service.MAX_SAVED_PROPERTIES - 1):
+            db_session.add(SavedProperty(user_id=user.id, property_id=_make_property(db_session, broker=broker).id))
+        db_session.flush()
+        extra = _make_property(db_session, broker=broker)
+        assert client.put(f"/api/v1/saved-properties/{extra.id}", headers=_auth_headers(user)).status_code == 409
+
+        client.delete(f"/api/v1/saved-properties/{first.id}", headers=_auth_headers(user))
+
+        assert client.put(f"/api/v1/saved-properties/{extra.id}", headers=_auth_headers(user)).status_code == 204

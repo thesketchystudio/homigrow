@@ -10,6 +10,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { ApiError } from "@/lib/api/client";
 import { listSavedProperties, saveProperty, unsaveProperty } from "@/lib/api/endpoints/savedProperties";
 import { useAuthStore } from "@/lib/stores/auth";
 import { toast } from "@/lib/toast";
@@ -47,9 +48,15 @@ export function useSavedPropertyToggle() {
       queryClient.setQueryData(SAVED_IDS_QUERY_KEY, next);
       return { previous };
     },
-    onError: (_error, _variables, context) => {
+    onError: (error, _variables, context) => {
       queryClient.setQueryData(SAVED_IDS_QUERY_KEY, context?.previous);
-      toast.error("Couldn't update your saved properties.");
+      // The server's own wording explains the watchlist limit; anything else
+      // stays generic.
+      const message =
+        error instanceof ApiError && error.code === "SAVED_LIMIT_REACHED"
+          ? error.message
+          : "Couldn't update your saved properties.";
+      toast.error(message);
     },
   });
 
