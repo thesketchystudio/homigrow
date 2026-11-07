@@ -87,8 +87,24 @@ function boundedSignal(externalSignal: AbortSignal | undefined, timeoutMs: numbe
   return externalSignal ? AbortSignal.any([externalSignal, timeoutSignal]) : timeoutSignal;
 }
 
+// fetch rejects (instead of returning a response) when the device is offline,
+// the server is unreachable or the request times out. The browser's own text
+// for those ("Failed to fetch", "The operation was aborted due to timeout")
+// means nothing to a user, so they become an ApiError with a plain message
+// that every screen already knows how to show.
+async function guardedFetch(request: () => Promise<Response>): Promise<Response> {
+  try {
+    return await request();
+  } catch (error) {
+    if (error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      throw new ApiError(0, "REQUEST_TIMEOUT", "The request took too long. Please check your connection and try again.");
+    }
+    throw new ApiError(0, "NETWORK_ERROR", "Can't reach the server. Please check your connection and try again.");
+  }
+}
+
 function rawFetch(path: string, options: RequestOptions, accessToken: string | null) {
-  return fetch(`${API_BASE_URL}${path}`, {
+  return guardedFetch(() => fetch(`${API_BASE_URL}${path}`, {
     method: options.method ?? "GET",
     headers: {
       "Content-Type": "application/json",
@@ -97,7 +113,7 @@ function rawFetch(path: string, options: RequestOptions, accessToken: string | n
     credentials: "include",
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     signal: boundedSignal(options.signal, DEFAULT_REQUEST_TIMEOUT_MS),
-  });
+  }));
 }
 
 // No Content-Type header here — the browser sets multipart/form-data with
@@ -105,13 +121,13 @@ function rawFetch(path: string, options: RequestOptions, accessToken: string | n
 // it manually strips that boundary and the server can't parse the request.
 // A longer timeout than rawFetch's default since these are file uploads.
 function rawFetchMultipart(path: string, formData: FormData, accessToken: string | null) {
-  return fetch(`${API_BASE_URL}${path}`, {
+  return guardedFetch(() => fetch(`${API_BASE_URL}${path}`, {
     method: "POST",
     headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
     credentials: "include",
     body: formData,
     signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
-  });
+  }));
 }
 
 let refreshPromise: Promise<string | null> | null = null;
@@ -196,6 +212,12 @@ async function processResponse<T>(response: Response): Promise<T> {
   }
 
   const data = await response.json().catch(() => null);
+
+  // A proxy or the hosting layer can refuse an oversized upload before the
+  // API sees it; that reply is not in the API's JSON format.
+  if (response.status === 413 && !data?.error) {
+    throw new ApiError(413, "PAYLOAD_TOO_LARGE", "That upload is too large. Choose a smaller file and try again.");
+  }
 
   if (!response.ok) {
     const error = data?.error;

@@ -76,7 +76,7 @@ export function BrokerDocumentUploadStep({ onSubmitted, onExit }: BrokerDocument
         />
       </div>
 
-      {(fileError || (apiError && !apiError.fields)) && (
+      {(fileError || apiError) && (
         <p className="text-[14px] text-destructive">{fileError ?? apiError?.message}</p>
       )}
 

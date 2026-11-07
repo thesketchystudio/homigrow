@@ -73,6 +73,12 @@ class RateLimited(AppError):
     status_code = 429
 
 
+class ServiceUnavailable(AppError):
+    """503: a dependency the request needs (file storage) failed; the request is safe to retry."""
+
+    status_code = 503
+
+
 def _error_response(status_code: int, code: str, message: str, fields: Optional[dict] = None) -> JSONResponse:
     body = {"code": code, "message": message}
     if fields:
