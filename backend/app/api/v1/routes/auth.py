@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.client_ip import get_client_ip
 from app.core.config import settings
-from app.core.cookies import REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH
+from app.core.cookies import REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH, set_refresh_cookie
 from app.core.middleware import limiter
 from app.db.session import get_db
 from app.schemas.auth import (
@@ -32,19 +32,6 @@ from app.schemas.auth import (
 from app.services import auth_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-
-def _set_refresh_cookie(response: Response, raw_token: str) -> None:
-    """Sets the rotating refresh-token cookie: httpOnly, Secure in production, SameSite=Lax, scoped to the auth path."""
-    response.set_cookie(
-        key=REFRESH_COOKIE_NAME,
-        value=raw_token,
-        max_age=settings.JWT_REFRESH_TTL_DAYS * 24 * 3600,
-        httponly=True,
-        secure=settings.ENVIRONMENT == "production",
-        samesite="lax",
-        path=REFRESH_COOKIE_PATH,
-    )
 
 
 def _client_ip(request: Request) -> str | None:
@@ -100,7 +87,7 @@ def verify_otp(payload: OTPVerifyRequest, request: Request, response: Response, 
         return Response(status_code=204)
 
     access_token, refresh_token, user = session
-    _set_refresh_cookie(response, refresh_token)
+    set_refresh_cookie(response, refresh_token)
     return TokenResponse(
         access_token=access_token,
         expires_in=settings.JWT_ACCESS_TTL_MIN * 60,
@@ -119,7 +106,7 @@ def login(payload: LoginRequest, request: Request, response: Response, db: Sessi
         user_agent=request.headers.get("user-agent"),
         ip=_client_ip(request),
     )
-    _set_refresh_cookie(response, refresh_token)
+    set_refresh_cookie(response, refresh_token)
     return TokenResponse(
         access_token=access_token,
         expires_in=settings.JWT_ACCESS_TTL_MIN * 60,
@@ -144,7 +131,7 @@ def google_auth(payload: GoogleAuthRequest, request: Request, response: Response
         user_agent=request.headers.get("user-agent"),
         ip=_client_ip(request),
     )
-    _set_refresh_cookie(response, refresh_token)
+    set_refresh_cookie(response, refresh_token)
     return TokenResponse(
         access_token=access_token,
         expires_in=settings.JWT_ACCESS_TTL_MIN * 60,
@@ -167,7 +154,7 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
         user_agent=request.headers.get("user-agent"),
         ip=_client_ip(request),
     )
-    _set_refresh_cookie(response, new_refresh_token)
+    set_refresh_cookie(response, new_refresh_token)
     return TokenResponse(
         access_token=access_token,
         expires_in=settings.JWT_ACCESS_TTL_MIN * 60,

@@ -14,6 +14,7 @@ export const OTPPurpose = {
   login: "login",
   signup: "signup",
   broker_verification: "broker_verification",
+  email_change: "email_change",
 } as const;
 export type OTPPurpose = (typeof OTPPurpose)[keyof typeof OTPPurpose];
 

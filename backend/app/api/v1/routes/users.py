@@ -12,13 +12,24 @@ deactivation eligibility, etc.) live in user_service.py.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import CurrentUser
-from app.core.cookies import REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH
+from app.core.client_ip import get_client_ip
+from app.core.config import settings
+from app.core.cookies import REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH, set_refresh_cookie
+from app.core.middleware import limiter
 from app.db.session import get_db
-from app.schemas.users import PasswordChangeRequest, SessionRead, UserRead, UserUpdateRequest
+from app.schemas.auth import TokenResponse, UserOut
+from app.schemas.users import (
+    EmailChangeConfirmRequest,
+    EmailChangeRequest,
+    PasswordChangeRequest,
+    SessionRead,
+    UserRead,
+    UserUpdateRequest,
+)
 from app.services import user_service
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -34,12 +45,11 @@ def get_me(user: CurrentUser) -> UserRead:
 def update_me(
     payload: UserUpdateRequest, user: CurrentUser, db: Session = Depends(get_db)
 ) -> UserRead:
-    """Applies only the supplied fields; changing email re-triggers verification."""
+    """Applies only the supplied fields. Email is changed through /me/email-change, not here."""
     updated = user_service.update_me(
         db,
         user,
         full_name=payload.full_name,
-        email=payload.email,
         avatar_url=payload.avatar_url,
         preferences=payload.preferences,
         broker_profile=payload.broker_profile.model_dump(exclude_unset=True) if payload.broker_profile is not None else None,
@@ -47,12 +57,53 @@ def update_me(
     return UserRead.model_validate(updated)
 
 
-@router.patch("/me/password", status_code=204)
+@router.patch("/me/password", response_model=TokenResponse)
+@limiter.limit("5/minute")
 def change_password(
-    payload: PasswordChangeRequest, user: CurrentUser, db: Session = Depends(get_db)
+    payload: PasswordChangeRequest,
+    request: Request,
+    response: Response,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    """
+    Verifies current_password before setting new_password (401 on mismatch,
+    423 while locked). Every session is revoked, and the caller gets a fresh
+    access token and refresh cookie so they stay signed in on this device.
+    """
+    access_token, refresh_token = user_service.change_password(
+        db,
+        user,
+        payload.current_password,
+        payload.new_password,
+        user_agent=request.headers.get("user-agent"),
+        ip=get_client_ip(request),
+    )
+    set_refresh_cookie(response, refresh_token)
+    return TokenResponse(
+        access_token=access_token,
+        expires_in=settings.JWT_ACCESS_TTL_MIN * 60,
+        user=UserOut.model_validate(user),
+    )
+
+
+@router.post("/me/email-change", status_code=204)
+@limiter.limit("5/minute")
+def request_email_change(
+    payload: EmailChangeRequest, request: Request, user: CurrentUser, db: Session = Depends(get_db)
 ) -> None:
-    """Verifies current_password before setting new_password; 401 on mismatch."""
-    user_service.change_password(db, user, payload.current_password, payload.new_password)
+    """Re-authenticates the caller and emails a verification code to the new address."""
+    user_service.request_email_change(db, user, payload.new_email, payload.current_password)
+
+
+@router.post("/me/email-change/confirm", response_model=UserRead)
+@limiter.limit("5/minute")
+def confirm_email_change(
+    payload: EmailChangeConfirmRequest, request: Request, user: CurrentUser, db: Session = Depends(get_db)
+) -> UserRead:
+    """Swaps the account's email once the verification code(s) are confirmed."""
+    updated = user_service.confirm_email_change(db, user, payload.new_email, payload.code, payload.current_email_code)
+    return UserRead.model_validate(updated)
 
 
 @router.get("/me/sessions", response_model=list[SessionRead])

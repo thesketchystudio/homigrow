@@ -2,6 +2,7 @@
 // Typed functions for the /users/me resource.
 
 import { apiRequest } from "@/lib/api/client";
+import type { TokenResponse } from "@/lib/api/endpoints/auth";
 import type { UserRole, VerificationStatus } from "@/lib/enums";
 
 export type BrokerProfileOut = {
@@ -26,6 +27,9 @@ export type UserRead = {
   role: UserRole;
   is_phone_verified: boolean;
   is_email_verified: boolean;
+  // False for Google sign-in accounts, which re-confirm sensitive changes by
+  // email code instead of a password.
+  has_password: boolean;
   preferences: Record<string, unknown>;
   created_at: string;
   broker_profile?: BrokerProfileOut;
@@ -45,7 +49,6 @@ export type BrokerProfileUpdatePayload = {
 
 export type UserUpdatePayload = {
   full_name?: string;
-  email?: string;
   avatar_url?: string;
   preferences?: Record<string, unknown>;
   broker_profile?: BrokerProfileUpdatePayload;
@@ -60,6 +63,29 @@ export type PasswordChangePayload = {
   new_password: string;
 };
 
-export function changePassword(payload: PasswordChangePayload): Promise<void> {
-  return apiRequest<void>("/users/me/password", { method: "PATCH", body: payload });
+// Every other session is signed out on a password change, so the response is
+// a fresh session (new access token; the refresh cookie is replaced too).
+export function changePassword(payload: PasswordChangePayload): Promise<TokenResponse> {
+  return apiRequest<TokenResponse>("/users/me/password", { method: "PATCH", body: payload });
+}
+
+export type EmailChangeRequestPayload = {
+  new_email: string;
+  // Required when the account has a password.
+  current_password?: string;
+};
+
+export function requestEmailChange(payload: EmailChangeRequestPayload): Promise<void> {
+  return apiRequest<void>("/users/me/email-change", { method: "POST", body: payload });
+}
+
+export type EmailChangeConfirmPayload = {
+  new_email: string;
+  code: string;
+  // Required when the account has no password.
+  current_email_code?: string;
+};
+
+export function confirmEmailChange(payload: EmailChangeConfirmPayload): Promise<UserRead> {
+  return apiRequest<UserRead>("/users/me/email-change/confirm", { method: "POST", body: payload });
 }

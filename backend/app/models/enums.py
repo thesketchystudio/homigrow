@@ -147,6 +147,7 @@ class OTPPurpose(str, Enum):
     login = "login"
     signup = "signup"
     broker_verification = "broker_verification"
+    email_change = "email_change"
 
 
 class OwnershipType(str, Enum):

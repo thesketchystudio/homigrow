@@ -42,6 +42,7 @@ class UserRead(BaseModel):
     role: UserRole
     is_phone_verified: bool
     is_email_verified: bool
+    has_password: bool
     preferences: dict
     created_at: datetime
     broker_profile: Optional[BrokerProfileOut] = None
@@ -73,7 +74,6 @@ class UserUpdateRequest(BaseModel):
     """
 
     full_name: Optional[str] = None
-    email: Optional[EmailAddress] = None
     avatar_url: Optional[str] = None
     preferences: Optional[dict] = None
     # Only applied when the caller's role is broker and a broker_profile
@@ -102,3 +102,22 @@ class SessionRead(BaseModel):
     ip: Optional[str] = None
     created_at: datetime
     expires_at: datetime
+
+
+class EmailChangeRequest(BaseModel):
+    """
+    Starts an email change. current_password is required for accounts that
+    have a password; accounts without one (Google sign-in) instead confirm
+    with a code sent to their current address.
+    """
+
+    new_email: EmailAddress
+    current_password: Optional[str] = None
+
+
+class EmailChangeConfirmRequest(BaseModel):
+    """Completes an email change with the code sent to the new address (and, for accounts without a password, the one sent to the current address)."""
+
+    new_email: EmailAddress
+    code: str
+    current_email_code: Optional[str] = None

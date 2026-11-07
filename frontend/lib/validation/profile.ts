@@ -7,7 +7,6 @@ import { z } from "zod";
 
 export const accountFormSchema = z.object({
   full_name: z.string().trim().min(1, "Full name is required"),
-  email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
 });
 export type AccountFormValues = z.infer<typeof accountFormSchema>;
 
@@ -49,3 +48,15 @@ export const changePasswordSchema = z
     path: ["confirm_password"],
   });
 export type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
+
+export const changeEmailRequestSchema = z.object({
+  new_email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
+  current_password: z.string(),
+});
+export type ChangeEmailRequestValues = z.infer<typeof changeEmailRequestSchema>;
+
+export const changeEmailConfirmSchema = z.object({
+  code: z.string().length(6, "Enter the 6-digit code"),
+  current_email_code: z.string(),
+});
+export type ChangeEmailConfirmValues = z.infer<typeof changeEmailConfirmSchema>;

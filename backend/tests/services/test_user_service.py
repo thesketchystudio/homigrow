@@ -66,7 +66,7 @@ class TestUpdateMe:
         user = make_user(db_session, phone="+919876560001", full_name="Original Name")
 
         updated = user_service.update_me(
-            db_session, user, full_name="New Name", email=None, avatar_url=None, preferences=None
+            db_session, user, full_name="New Name", avatar_url=None, preferences=None
         )
 
         assert updated.full_name == "New Name"
@@ -79,7 +79,6 @@ class TestUpdateMe:
             db_session,
             broker,
             full_name=None,
-            email=None,
             avatar_url=None,
             preferences=None,
             broker_profile={"bio": "New bio", "specializations": ["Residential", "Commercial"]},
@@ -99,7 +98,6 @@ class TestUpdateMe:
             db_session,
             client,
             full_name=None,
-            email=None,
             avatar_url=None,
             preferences=None,
             broker_profile={"bio": "Should be ignored"},
@@ -107,37 +105,11 @@ class TestUpdateMe:
 
         assert updated.broker_profile is None
 
-    def test_changing_email_resets_verification_and_logs(self, db_session, caplog):
-        user = make_user(db_session, phone="+919876560002", email="old@example.com")
-        user.is_email_verified = True
-        db_session.flush()
-
-        with caplog.at_level("INFO"):
-            updated = user_service.update_me(
-                db_session, user, full_name=None, email="new@example.com", avatar_url=None, preferences=None
-            )
-
-        assert updated.email == "new@example.com"
-        assert updated.is_email_verified is False
-        assert any("Email verification needed" in r.message for r in caplog.records)
-
-    def test_duplicate_email_raises_409(self, db_session):
-        make_user(db_session, phone="+919876560003", email="taken@example.com")
-        user = make_user(db_session, phone="+919876560004", email="mine@example.com")
-
-        with pytest.raises(AppError) as exc_info:
-            user_service.update_me(
-                db_session, user, full_name=None, email="taken@example.com", avatar_url=None, preferences=None
-            )
-
-        assert exc_info.value.status_code == 409
-        assert exc_info.value.code == "EMAIL_TAKEN"
-
     def test_preferences_dict_is_stored(self, db_session):
         user = make_user(db_session, phone="+919876560005")
 
         updated = user_service.update_me(
-            db_session, user, full_name=None, email=None, avatar_url=None, preferences={"theme": "dark"}
+            db_session, user, full_name=None, avatar_url=None, preferences={"theme": "dark"}
         )
 
         assert updated.preferences == {"theme": "dark"}
