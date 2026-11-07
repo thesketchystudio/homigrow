@@ -11,6 +11,7 @@ import { useMutation } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api/client";
 import { resetPassword } from "@/lib/api/endpoints/auth";
 import { toast } from "@/lib/toast";
+import { applyServerErrors } from "@/lib/forms/applyServerErrors";
 import { AuthPasswordField } from "@/components/forms/AuthPasswordField";
 import { resetPasswordSchema, type ResetPasswordValues } from "@/lib/validation/auth";
 
@@ -33,11 +34,7 @@ export function ResetPasswordForm() {
       router.push("/login");
     },
     onError: (error: ApiError) => {
-      if (error.fields) {
-        for (const [field, message] of Object.entries(error.fields)) {
-          setError(field as keyof ResetPasswordValues, { message });
-        }
-      }
+      if (error.fields) applyServerErrors(error, setError, ["new_password", "confirm_password"]);
     },
   });
 

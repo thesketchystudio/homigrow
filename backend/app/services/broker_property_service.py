@@ -151,7 +151,7 @@ def close_property(db: Session, broker: User, property_id: UUID) -> Property:
     if not transition_property_status(property_.status, target_status):
         raise ValidationFailed(
             "INVALID_STATUS_TRANSITION",
-            f"Cannot mark a listing in '{property_.status.value}' status as {target_status.value}.",
+            f"A {property_.status.value} listing can't be marked as {target_status.value}.",
         )
     property_.status = target_status
     db.commit()
@@ -170,7 +170,7 @@ def reopen_property(db: Session, broker: User, property_id: UUID) -> Property:
     if not transition_property_status(property_.status, PropertyStatus.active):
         raise ValidationFailed(
             "INVALID_STATUS_TRANSITION",
-            f"Cannot reopen a listing in '{property_.status.value}' status.",
+            f"A {property_.status.value} listing can't be reopened.",
         )
     property_.status = PropertyStatus.active
     db.commit()
@@ -407,7 +407,7 @@ def submit_property(db: Session, broker: User, property_id: UUID) -> Property:
     if not transition_property_status(property_.status, PropertyStatus.pending):
         raise ValidationFailed(
             "INVALID_STATUS_TRANSITION",
-            f"Cannot submit a listing in '{property_.status.value}' status.",
+            f"A {property_.status.value} listing can't be submitted for review.",
         )
     property_.status = PropertyStatus.pending
     _auto_approve(property_)

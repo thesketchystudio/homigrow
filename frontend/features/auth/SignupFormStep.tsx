@@ -9,6 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api/client";
+import { applyServerErrors } from "@/lib/forms/applyServerErrors";
 import { signup, type TokenResponse } from "@/lib/api/endpoints/auth";
 import { UserRole } from "@/lib/enums";
 import { AuthTextField } from "@/components/forms/AuthTextField";
@@ -61,9 +62,10 @@ export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onBack }:
     onSuccess: (_data, variables) => onSuccess(variables.email),
     onError: (error: ApiError) => {
       if (error.fields) {
-        for (const [field, message] of Object.entries(error.fields)) {
-          setError(field as keyof SignupFormValues, { message });
-        }
+        applyServerErrors(error, setError, [
+          "full_name", "email", "phone", "city", "state", "password", "confirm_password",
+          "company_name", "rera_number", "service_area",
+        ]);
       }
     },
   });

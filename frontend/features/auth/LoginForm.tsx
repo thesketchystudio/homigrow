@@ -22,6 +22,7 @@ import { login, type TokenResponse } from "@/lib/api/endpoints/auth";
 import { getRoleHomePath } from "@/lib/auth/roleHome";
 import { useAuthStore } from "@/lib/stores/auth";
 import { toast } from "@/lib/toast";
+import { applyServerErrors } from "@/lib/forms/applyServerErrors";
 import { AuthTextField } from "@/components/forms/AuthTextField";
 import { AuthPasswordField } from "@/components/forms/AuthPasswordField";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -59,11 +60,7 @@ export function LoginForm() {
         setUnverifiedEmail(values.email);
         return;
       }
-      if (error.fields) {
-        for (const [field, message] of Object.entries(error.fields)) {
-          setError(field as keyof LoginFormValues, { message });
-        }
-      }
+      if (error.fields) applyServerErrors(error, setError, ["email", "password"]);
     },
   });
 

@@ -23,10 +23,12 @@ import logging
 from uuid import UUID, uuid4
 
 import boto3
+import sentry_sdk
 from botocore.config import Config
+from botocore.exceptions import BotoCoreError, ClientError
 
 from app.core.config import settings
-from app.core.exceptions import ValidationFailed
+from app.core.exceptions import ServiceUnavailable, ValidationFailed
 from app.models.enums import BrokerDocumentType
 from app.services.upload_validation import verify_signature
 
@@ -98,6 +100,22 @@ def _get_client():
     return _client
 
 
+def _put_object(bucket: str, key: str, content: bytes, content_type: str) -> None:
+    """
+    Writes one object to storage. A failure at the storage provider (outage,
+    rejected request) is reported to Sentry and surfaced as a retryable 503
+    with a plain message, instead of an unexplained 500.
+    """
+    try:
+        _get_client().put_object(Bucket=bucket, Key=key, Body=content, ContentType=content_type)
+    except (ClientError, BotoCoreError) as exc:
+        logger.exception("Storage upload failed for %s/%s", bucket, key)
+        sentry_sdk.capture_exception(exc)
+        raise ServiceUnavailable(
+            "STORAGE_UNAVAILABLE", "We couldn't save that file right now. Please try again in a moment."
+        ) from exc
+
+
 def upload_broker_document(
     user_id: UUID,
     doc_type: BrokerDocumentType,
@@ -127,12 +145,7 @@ def upload_broker_document(
     extension = _EXTENSION_BY_CONTENT_TYPE[content_type]
     object_key = f"{user_id}/{doc_type.value}/{uuid4().hex}{extension}"
 
-    _get_client().put_object(
-        Bucket=settings.SUPABASE_S3_BUCKET,
-        Key=object_key,
-        Body=content,
-        ContentType=content_type,
-    )
+    _put_object(settings.SUPABASE_S3_BUCKET, object_key, content, content_type)
     return object_key
 
 
@@ -166,12 +179,7 @@ def upload_property_image(
     extension = _IMAGE_EXTENSION_BY_CONTENT_TYPE[content_type]
     object_key = f"{property_id}/{uuid4().hex}{extension}"
 
-    _get_client().put_object(
-        Bucket=settings.SUPABASE_S3_BUCKET_PROPERTY_MEDIA,
-        Key=object_key,
-        Body=content,
-        ContentType=content_type,
-    )
+    _put_object(settings.SUPABASE_S3_BUCKET_PROPERTY_MEDIA, object_key, content, content_type)
     return f"{_PUBLIC_MEDIA_URL_PREFIX}{object_key}"
 
 
@@ -205,12 +213,7 @@ def upload_property_video(
     extension = _VIDEO_EXTENSION_BY_CONTENT_TYPE[content_type]
     object_key = f"{property_id}/{uuid4().hex}{extension}"
 
-    _get_client().put_object(
-        Bucket=settings.SUPABASE_S3_BUCKET_PROPERTY_MEDIA,
-        Key=object_key,
-        Body=content,
-        ContentType=content_type,
-    )
+    _put_object(settings.SUPABASE_S3_BUCKET_PROPERTY_MEDIA, object_key, content, content_type)
     return f"{_PUBLIC_MEDIA_URL_PREFIX}{object_key}"
 
 
@@ -244,12 +247,7 @@ def upload_property_document(
     extension = _EXTENSION_BY_CONTENT_TYPE[content_type]
     object_key = f"properties/{property_id}/documents/{uuid4().hex}{extension}"
 
-    _get_client().put_object(
-        Bucket=settings.SUPABASE_S3_BUCKET,
-        Key=object_key,
-        Body=content,
-        ContentType=content_type,
-    )
+    _put_object(settings.SUPABASE_S3_BUCKET, object_key, content, content_type)
     return object_key
 
 

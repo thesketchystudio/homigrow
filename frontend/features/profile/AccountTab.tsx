@@ -46,6 +46,7 @@ import { useProfileHeaderActions } from "@/features/profile/ProfileHeaderActions
 import { ApiError } from "@/lib/api/client";
 import { getMe, updateMe, type UserRead } from "@/lib/api/endpoints/users";
 import { toast } from "@/lib/toast";
+import { applyServerErrors } from "@/lib/forms/applyServerErrors";
 import { cn } from "@/lib/utils";
 import { accountFormSchema, type AccountFormValues } from "@/lib/validation/profile";
 
@@ -96,9 +97,7 @@ function AccountForm({ user }: { user: UserRead }) {
     },
     onError: (error: ApiError) => {
       if (error.fields) {
-        for (const [field, message] of Object.entries(error.fields)) {
-          setError(field as keyof AccountFormValues, { message });
-        }
+        applyServerErrors(error, setError, ["full_name"]);
       } else {
         toast.error(error.message);
       }
