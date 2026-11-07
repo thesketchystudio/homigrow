@@ -207,6 +207,7 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
             <AuthTextField
               label="Built Year"
               placeholder="2020"
+              inputMode="numeric"
               register={register("built_year", { setValueAs: toOptionalNumber })}
               error={errors.built_year?.message}
               labelClassName={labelClassName}

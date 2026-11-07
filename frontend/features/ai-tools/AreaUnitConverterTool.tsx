@@ -11,6 +11,7 @@ import { useMemo, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AREA_UNITS, convertArea } from "@/lib/areaUnits";
 
+import { NumericInput } from "./NumericInput";
 import { ToolPageShell } from "./ToolPageShell";
 
 function formatValue(value: number): string {
@@ -45,10 +46,10 @@ export function AreaUnitConverterTool() {
                 ))}
               </SelectContent>
             </Select>
-            <input
-              type="number"
+            <NumericInput
+              allowDecimal
               value={value}
-              onChange={(e) => setValue(Number(e.target.value) || 0)}
+              onValueChange={setValue}
               className="mt-1 rounded-lg border border-brand-secondary-500 px-4 py-3 font-heading text-[14px] font-bold text-brand-primary-500"
             />
           </div>
