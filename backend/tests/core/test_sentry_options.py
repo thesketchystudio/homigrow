@@ -1,7 +1,7 @@
 """
 tests/core/test_sentry_options.py
 
-Covers the Sentry client settings: sampled tracing and no default PII.
+Covers the Sentry client settings: sampled tracing, no default PII and no trace headers on outgoing requests.
 """
 
 import pytest
@@ -16,6 +16,10 @@ def test_traces_are_sampled_not_exhaustive_by_default():
 
 def test_default_pii_is_never_sent():
     assert sentry_options()["send_default_pii"] is False
+
+
+def test_trace_headers_are_never_added_to_outgoing_requests():
+    assert sentry_options()["trace_propagation_targets"] == []
 
 
 def test_sample_rate_comes_from_settings(monkeypatch):

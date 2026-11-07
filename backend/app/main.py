@@ -33,13 +33,17 @@ def sentry_options() -> dict:
     """
     Sentry client settings. Personal data (cookies, auth headers, client
     IPs) is never attached to events, and only a fraction of requests are
-    traced, so neither cost nor exposure grows with traffic.
+    traced, so neither cost nor exposure grows with traffic. Trace headers
+    are never added to outgoing requests: this service only calls third
+    parties (storage, email, Google) that cannot use them, and the extra
+    headers invalidate the signed requests the storage endpoint expects.
     """
     return {
         "dsn": settings.SENTRY_DSN,
         "environment": settings.ENVIRONMENT,
         "traces_sample_rate": settings.SENTRY_TRACES_SAMPLE_RATE,
         "send_default_pii": False,
+        "trace_propagation_targets": [],
     }
 
 
