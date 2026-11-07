@@ -37,12 +37,11 @@ ALLOWED_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB, higher than docs since these are hero/interior photos
 
 ALLOWED_VIDEO_CONTENT_TYPES = {"video/mp4", "video/quicktime"}
-# Figma's Property Video / Drone Footage upload copy says "Max 500MB", but
-# that ceiling also depends on the Supabase project's own global upload-size
-# limit (configured in its dashboard, separate from this app). 100MB here is
-# a conservative starting cap for the Supabase-Storage-only path — raise
-# both together once Cloudflare Stream (or a higher Supabase limit) is wired up.
-MAX_VIDEO_SIZE_BYTES = 100 * 1024 * 1024
+# The storage project rejects any single object above its own global upload
+# limit (50 MB on the current plan), so the app limit matches it and an
+# oversize video gets a readable 422 instead of a storage error. Raise both
+# together when the plan or the video provider changes.
+MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024
 
 ALLOWED_DOCUMENT_CONTENT_TYPES = {
     "application/pdf",
@@ -197,8 +196,8 @@ def upload_property_video(
     if len(content) > MAX_VIDEO_SIZE_BYTES:
         raise ValidationFailed(
             "FILE_TOO_LARGE",
-            "File must be 100 MB or smaller.",
-            {"file": "File must be 100 MB or smaller."},
+            "Video must be 50 MB or smaller.",
+            {"file": "Video must be 50 MB or smaller."},
         )
 
     verify_signature(content, content_type)

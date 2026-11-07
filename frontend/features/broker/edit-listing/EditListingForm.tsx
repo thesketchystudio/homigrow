@@ -57,6 +57,7 @@ import {
 } from "@/lib/enums";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
+import { MAX_PHOTOS_PER_LISTING, oversizedPhotosMessage, splitOversizedPhotos } from "@/lib/property-media";
 
 const AMENITY_OPTIONS = [
   "Gym",
@@ -206,20 +207,45 @@ function EditListingFormBody({ property }: { property: BrokerPropertyDetailRead 
     onError: () => toast.error("Couldn't remove that photo. Please try again."),
   });
 
+  const photos = property.media.filter((item) => item.media_type === "image");
+
+  // The API accepts only http(s) links of up to 500 characters here, so a
+  // bad link is flagged beside the field and saving waits until it is fixed.
+  const tourLink = form.virtual_tour_url.trim();
+  const tourLinkError =
+    tourLink && (tourLink.length > 500 || !/^https?:\/\/\S+$/i.test(tourLink))
+      ? "Enter a link starting with http:// or https:// (up to 500 characters)."
+      : undefined;
+
   async function handleAddPhotos(files: FileList | null) {
     if (!files || files.length === 0) return;
+
+    // Files over the size limit or past the listing's photo limit are left
+    // out with a clear message, and the rest still upload.
+    const { accepted, oversized } = splitOversizedPhotos(Array.from(files));
+    if (oversized.length > 0) toast.error(oversizedPhotosMessage(oversized));
+    const room = Math.max(0, MAX_PHOTOS_PER_LISTING - photos.length);
+    if (accepted.length > room) {
+      toast.error(
+        room === 0
+          ? `This listing already has the maximum of ${MAX_PHOTOS_PER_LISTING} photos. Remove one to add another.`
+          : `Only ${room} more photo${room === 1 ? "" : "s"} fit in this listing (maximum ${MAX_PHOTOS_PER_LISTING}); the rest were not added.`,
+      );
+    }
+    const toUpload = accepted.slice(0, room);
+    if (toUpload.length === 0) return;
+
     setUploading(true);
     try {
-      await uploadPropertyMedia(property.id, Array.from(files));
-      invalidate();
-    } catch {
-      toast.error("Couldn't upload one or more photos. Please try again.");
+      await uploadPropertyMedia(property.id, toUpload);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Couldn't upload the photos. Please try again.");
     } finally {
+      // Some batches may have saved before a later one failed, so the grid is refreshed either way.
+      invalidate();
       setUploading(false);
     }
   }
-
-  const photos = property.media.filter((item) => item.media_type === "image");
 
   return (
     <div className="flex flex-col gap-6">
@@ -427,7 +453,7 @@ function EditListingFormBody({ property }: { property: BrokerPropertyDetailRead 
         >
           {uploading ? <Loader2 className="size-8 animate-spin text-muted-foreground" /> : <Upload className="size-8 text-muted-foreground" />}
           <p className="font-body text-[14px] font-medium text-foreground">Drag & drop photos here</p>
-          <p className="font-body text-[13px] text-muted-foreground">or click to browse (Max 20 photos, 5MB each)</p>
+          <p className="font-body text-[13px] text-muted-foreground">or click to browse (JPG, PNG or WEBP, max 10 MB each, up to 30 photos per listing)</p>
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"
@@ -452,7 +478,9 @@ function EditListingFormBody({ property }: { property: BrokerPropertyDetailRead 
             value={form.virtual_tour_url}
             onChange={(event) => patch({ virtual_tour_url: event.target.value })}
             placeholder="e.g., https://youtube.com/watch?v=..."
+            aria-invalid={Boolean(tourLinkError)}
           />
+          {tourLinkError && <p className="text-[12px] text-destructive">{tourLinkError}</p>}
         </div>
       </SectionCard>
 
@@ -469,12 +497,12 @@ function EditListingFormBody({ property }: { property: BrokerPropertyDetailRead 
         <Button variant="outline" asChild>
           <Link href={`/broker/listings/${property.id}`}>Cancel</Link>
         </Button>
-        <Button variant="outline" disabled={saveMutation.isPending} onClick={() => saveMutation.mutate(false)}>
+        <Button variant="outline" disabled={saveMutation.isPending || Boolean(tourLinkError)} onClick={() => saveMutation.mutate(false)}>
           Save as Draft
         </Button>
         <Button
           className="bg-brand-green-500 text-brand-primary-700 hover:opacity-90"
-          disabled={saveMutation.isPending}
+          disabled={saveMutation.isPending || Boolean(tourLinkError)}
           onClick={() => saveMutation.mutate(true)}
         >
           {property.status === PropertyStatus.draft ? "Publish Listing" : "Save Changes"}

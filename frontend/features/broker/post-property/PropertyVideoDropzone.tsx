@@ -11,6 +11,7 @@
 import { useRef, useState } from "react";
 import { CircleCheck, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MAX_VIDEO_BYTES } from "@/lib/property-media";
 
 type PropertyVideoDropzoneProps = {
   file: File | null;
@@ -21,9 +22,18 @@ type PropertyVideoDropzoneProps = {
 export function PropertyVideoDropzone({ file, onChange, error }: PropertyVideoDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [sizeError, setSizeError] = useState<string | undefined>(undefined);
 
+  // A video over the limit is refused here with a clear message, rather than
+  // after the rest of the listing has already been saved.
   const selectFile = (selected: File | undefined) => {
-    if (selected) onChange(selected);
+    if (!selected) return;
+    if (selected.size > MAX_VIDEO_BYTES) {
+      setSizeError(`${selected.name} is over 50 MB. Choose a shorter or compressed video.`);
+      return;
+    }
+    setSizeError(undefined);
+    onChange(selected);
   };
 
   return (
@@ -69,7 +79,7 @@ export function PropertyVideoDropzone({ file, onChange, error }: PropertyVideoDr
             <Upload size={24} className="text-brand-primary-100" />
             <div className="flex flex-col gap-2">
               <p className="font-heading text-[14px] font-bold uppercase tracking-[1.4px] text-brand-secondary-900">Upload Property Video</p>
-              <p className="font-body text-[12px] text-brand-primary-300">Drag & drop or browse — MP4 or MOV, max 100MB</p>
+              <p className="font-body text-[12px] text-brand-primary-300">Drag & drop or browse — MP4 or MOV, max 50 MB</p>
             </div>
           </>
         )}
@@ -84,7 +94,7 @@ export function PropertyVideoDropzone({ file, onChange, error }: PropertyVideoDr
           event.target.value = "";
         }}
       />
-      {error && <p className="text-[12px] text-destructive">{error}</p>}
+      {(error ?? sizeError) && <p className="text-[12px] text-destructive">{error ?? sizeError}</p>}
     </div>
   );
 }
