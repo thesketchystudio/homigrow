@@ -32,10 +32,29 @@ function SelectValue({
   return <SelectPrimitive.Value data-slot="select-value" {...props} />;
 }
 
+// Room (px) a list needs below its field to show several options without
+// shrinking to a sliver.
+const MIN_ROOM_BELOW_PX = 300;
+// Keeps the field itself clear of the sticky top navigation after scrolling.
+const TOP_CLEARANCE_PX = 96;
+
+// The list always opens below its field (see SelectContent), so when the field
+// sits near the bottom of the viewport the page is scrolled just enough to give
+// the list room, instead of letting it flip above or collapse.
+function scrollToMakeRoomBelow(trigger: HTMLElement) {
+  const rect = trigger.getBoundingClientRect();
+  const missing = rect.bottom + MIN_ROOM_BELOW_PX - window.innerHeight;
+  if (missing <= 0) return;
+  const scrollBy = Math.min(missing, Math.max(0, rect.top - TOP_CLEARANCE_PX));
+  if (scrollBy > 0) window.scrollBy(0, scrollBy);
+}
+
 function SelectTrigger({
   className,
   size = "default",
   children,
+  onPointerDown,
+  onKeyDown,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Trigger> & {
   size?: "sm" | "default";
@@ -44,6 +63,16 @@ function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       data-size={size}
+      onPointerDown={(event) => {
+        scrollToMakeRoomBelow(event.currentTarget);
+        onPointerDown?.(event);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " " || event.key === "ArrowDown" || event.key === "ArrowUp") {
+          scrollToMakeRoomBelow(event.currentTarget);
+        }
+        onKeyDown?.(event);
+      }}
       className={cn(
         "border-input data-[placeholder]:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 dark:hover:bg-input/50 flex w-full items-center justify-between gap-2 rounded-md border bg-input-background px-3 py-2 text-sm whitespace-nowrap transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
@@ -75,6 +104,12 @@ function SelectContent({
           className,
         )}
         position={position}
+        // Always open below the field. With collision avoidance on, Radix flips
+        // the list above the trigger whenever the field sits in the lower half
+        // of the viewport; here the list is instead capped to the space below
+        // (max-h uses --radix-select-content-available-height) and scrolls.
+        side="bottom"
+        avoidCollisions={false}
         {...props}
       >
         <SelectScrollUpButton />
