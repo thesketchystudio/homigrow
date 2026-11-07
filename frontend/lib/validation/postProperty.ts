@@ -154,7 +154,12 @@ export const propertyInfoSchema = z.object({
     .optional()
     .refine((value) => countWords(value) <= DESCRIPTION_MAX_WORDS, `Description must be ${DESCRIPTION_MAX_WORDS} words or fewer`),
   property_type: z.enum(POSTABLE_PROPERTY_TYPES, { error: "Select a property type" }),
-  built_year: z.number().int().min(1900).max(new Date().getFullYear()).optional(),
+  built_year: z
+    .number({ error: "Enter a valid year, e.g. 2020" })
+    .int("Enter a valid year, e.g. 2020")
+    .min(1900, `Year must be between 1900 and ${new Date().getFullYear()}`)
+    .max(new Date().getFullYear(), `Year must be between 1900 and ${new Date().getFullYear()}`)
+    .optional(),
   bhk: z.number().int().min(1).max(20).optional(),
   bathrooms: z.number().int().min(1).max(20).optional(),
   area_sqft: z.number().positive().optional(),

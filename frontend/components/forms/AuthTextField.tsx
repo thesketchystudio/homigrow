@@ -11,6 +11,9 @@ type AuthTextFieldProps = {
   label: string;
   placeholder?: string;
   type?: "text" | "email";
+  // Hints mobile keyboards (e.g. "numeric" for a year) without changing the
+  // input type, so react-hook-form's text-based parsing keeps working.
+  inputMode?: "numeric" | "decimal" | "tel" | "email" | "text";
   error?: string;
   register: UseFormRegisterReturn;
   className?: string;
@@ -19,7 +22,7 @@ type AuthTextFieldProps = {
   labelClassName?: string;
 };
 
-export function AuthTextField({ label, placeholder, type = "text", error, register, className, labelClassName }: AuthTextFieldProps) {
+export function AuthTextField({ label, placeholder, type = "text", inputMode, error, register, className, labelClassName }: AuthTextFieldProps) {
   return (
     <div className={cn("flex flex-col gap-3 w-full", className)}>
       <label htmlFor={register.name} className={cn("font-body font-bold text-[12px] leading-[18px] text-brand-primary-100", labelClassName)}>
@@ -28,6 +31,7 @@ export function AuthTextField({ label, placeholder, type = "text", error, regist
       <input
         id={register.name}
         type={type}
+        inputMode={inputMode}
         placeholder={placeholder}
         aria-invalid={Boolean(error)}
         className={cn(
