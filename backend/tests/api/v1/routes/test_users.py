@@ -6,6 +6,8 @@ TestClient — auth wiring and response shape; business-rule edge cases
 live in tests/services/test_user_service.py.
 """
 
+import pytest
+
 from app.core.security import create_access_token
 from app.models.broker_profile import BrokerProfile
 from app.models.enums import UserRole
@@ -251,3 +253,99 @@ class TestPasswordChangeSessions:
         client.cookies.set("refresh_token", stolen_cookie, path="/api/v1/auth")
         replay = client.post("/api/v1/auth/refresh")
         assert replay.status_code == 401
+
+
+class TestProfileInputLimits:
+    def _patch(self, client, user, body):
+        return client.patch("/api/v1/users/me", headers=_auth_headers(user), json=body)
+
+    def test_overlong_full_name_is_a_422_not_a_database_error(self, client, db_session):
+        user = make_user(db_session, phone="+919876570201")
+
+        response = self._patch(client, user, {"full_name": "x" * 101})
+
+        assert response.status_code == 422
+        assert "full_name" in response.json()["error"]["fields"]
+
+    def test_empty_full_name_is_rejected(self, client, db_session):
+        user = make_user(db_session, phone="+919876570202")
+        assert self._patch(client, user, {"full_name": ""}).status_code == 422
+
+    @pytest.mark.parametrize("url", ["javascript:alert(1)", "data:text/html,x", "ftp://x.test/a.png", "x" * 501])
+    def test_unsafe_or_overlong_avatar_urls_are_rejected(self, client, db_session, url):
+        user = make_user(db_session, phone="+919876570203")
+        assert self._patch(client, user, {"avatar_url": url}).status_code == 422
+
+    def test_https_avatar_url_is_accepted(self, client, db_session):
+        user = make_user(db_session, phone="+919876570204")
+
+        response = self._patch(client, user, {"avatar_url": "https://example.com/me.png"})
+
+        assert response.status_code == 200
+        assert response.json()["avatar_url"] == "https://example.com/me.png"
+
+    def test_oversized_preferences_are_rejected(self, client, db_session):
+        user = make_user(db_session, phone="+919876570205")
+
+        response = self._patch(client, user, {"preferences": {"blob": "x" * 17000}})
+
+        assert response.status_code == 422
+        assert "preferences" in response.json()["error"]["fields"]
+
+    def test_normal_preferences_are_accepted(self, client, db_session):
+        user = make_user(db_session, phone="+919876570206")
+        prefs = {"city": "Bengaluru", "buyer_preferences": {"budget": [50, 200], "types": ["villa", "apartment"]}}
+
+        response = self._patch(client, user, {"preferences": prefs})
+
+        assert response.status_code == 200
+        assert response.json()["preferences"] == prefs
+
+    @pytest.mark.parametrize(
+        "profile",
+        [
+            {"bio": "x" * 1001},
+            {"company_name": "x" * 151},
+            {"experience_years": -1},
+            {"experience_years": 81},
+            {"experience_years": 99999999},
+            {"specializations": ["x"] * 21},
+            {"specializations": ["x" * 101]},
+            {"service_areas": [""]},
+        ],
+    )
+    def test_broker_profile_limits(self, client, db_session, profile):
+        broker = make_user(db_session, phone="+919876570207", role=UserRole.broker)
+        db_session.add(BrokerProfile(user_id=broker.id))
+        db_session.flush()
+
+        assert self._patch(client, broker, {"broker_profile": profile}).status_code == 422
+
+    def test_broker_profile_at_the_limits_is_accepted(self, client, db_session):
+        broker = make_user(db_session, phone="+919876570208", role=UserRole.broker)
+        db_session.add(BrokerProfile(user_id=broker.id))
+        db_session.flush()
+        profile = {
+            "bio": "x" * 1000,
+            "company_name": "x" * 150,
+            "experience_years": 80,
+            "specializations": ["x" * 100] * 20,
+            "service_areas": ["y"] * 20,
+        }
+
+        assert self._patch(client, broker, {"broker_profile": profile}).status_code == 200
+
+    def test_overlong_signup_full_name_is_rejected(self, client):
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={
+                "phone": "9876570209",
+                "role": "client",
+                "email": "longname@example.com",
+                "password": "s3cure-horse-battery-9",
+                "full_name": "x" * 101,
+            },
+        )
+
+        assert response.status_code == 422
+        assert "full_name" in response.json()["error"]["fields"]
