@@ -1,7 +1,8 @@
 // features/profile/ChangePasswordDialog.tsx
 // "Change Password" action from the Account tab (Figma node 145:4840).
 // Verifies the current password server-side before setting a new one
-// (PATCH /users/me/password) — does not touch other active sessions.
+// (PATCH /users/me/password). Every other session is signed out by the
+// server, and this device receives a fresh session in the response.
 
 "use client";
 
@@ -18,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import Modal from "@/components/shared/Modal";
 import { ApiError } from "@/lib/api/client";
 import { changePassword } from "@/lib/api/endpoints/users";
+import { useAuthStore } from "@/lib/stores/auth";
 import { toast } from "@/lib/toast";
 import { changePasswordSchema, type ChangePasswordValues } from "@/lib/validation/profile";
 
@@ -35,13 +37,16 @@ export function ChangePasswordDialog({ open, onClose }: { open: boolean; onClose
 
   const mutation = useMutation({
     mutationFn: changePassword,
-    onSuccess: () => {
-      toast.success("Password updated.");
+    onSuccess: (session) => {
+      // The old access token still decodes, but its refresh session is gone;
+      // swap in the fresh one so this device stays signed in.
+      useAuthStore.getState().setAuth(session.user, session.access_token);
+      toast.success("Password updated. Other devices have been signed out.");
       reset();
       onClose();
     },
     onError: (error: ApiError) => {
-      if (error.code === "BAD_CURRENT_PASSWORD") {
+      if (error.code === "BAD_CURRENT_PASSWORD" || error.code === "ACCOUNT_LOCKED") {
         setError("current_password", { message: error.message });
       } else if (error.fields) {
         for (const [field, message] of Object.entries(error.fields)) {
@@ -91,7 +96,7 @@ export function ChangePasswordDialog({ open, onClose }: { open: boolean; onClose
   );
 }
 
-function PasswordField({
+export function PasswordField({
   label,
   register,
   error,

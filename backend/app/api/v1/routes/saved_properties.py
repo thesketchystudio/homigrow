@@ -39,7 +39,7 @@ def list_saved_properties(
 
 @router.put("/{property_id}", status_code=204)
 def save_property(property_id: UUID, user: CurrentUser, db: Session = Depends(get_db)) -> None:
-    """Idempotent save; 404 if the property doesn't exist."""
+    """Idempotent save; 404 if the property is missing or not publicly listed, 409 once the watchlist is full."""
     saved_property_service.save_property(db, user.id, property_id)
 
 

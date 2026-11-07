@@ -40,6 +40,7 @@ import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { ChangeEmailDialog } from "@/features/profile/ChangeEmailDialog";
 import { ChangePasswordDialog } from "@/features/profile/ChangePasswordDialog";
 import { useProfileHeaderActions } from "@/features/profile/ProfileHeaderActions";
 import { ApiError } from "@/lib/api/client";
@@ -51,7 +52,6 @@ import { accountFormSchema, type AccountFormValues } from "@/lib/validation/prof
 function toFormValues(user: UserRead): AccountFormValues {
   return {
     full_name: user.full_name ?? "",
-    email: user.email ?? "",
   };
 }
 
@@ -74,6 +74,7 @@ export function AccountTab() {
 function AccountForm({ user }: { user: UserRead }) {
   const queryClient = useQueryClient();
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
 
   const {
     register,
@@ -88,18 +89,13 @@ function AccountForm({ user }: { user: UserRead }) {
 
   const mutation = useMutation({
     mutationFn: updateMe,
-    onSuccess: (updated, variables) => {
+    onSuccess: (updated) => {
       queryClient.setQueryData(["me"], updated);
       reset(toFormValues(updated));
       toast.success("Profile updated.");
-      if (user.is_email_verified && variables.email !== user.email) {
-        toast.info("Your new email needs to be verified.");
-      }
     },
     onError: (error: ApiError) => {
-      if (error.code === "EMAIL_TAKEN") {
-        setError("email", { message: error.message });
-      } else if (error.fields) {
+      if (error.fields) {
         for (const [field, message] of Object.entries(error.fields)) {
           setError(field as keyof AccountFormValues, { message });
         }
@@ -110,10 +106,7 @@ function AccountForm({ user }: { user: UserRead }) {
   });
 
   const onSubmit = (values: AccountFormValues) => {
-    mutation.mutate({
-      full_name: values.full_name,
-      email: values.email,
-    });
+    mutation.mutate({ full_name: values.full_name });
   };
 
   const city = typeof user.preferences?.city === "string" ? user.preferences.city : "";
@@ -154,13 +147,28 @@ function AccountForm({ user }: { user: UserRead }) {
             register={register("full_name")}
             error={errors.full_name?.message}
           />
-          <UnderlineField
-            label="Email Address"
-            id="email"
-            type="email"
-            register={register("email")}
-            error={errors.email?.message}
-          />
+          <div className="flex flex-col gap-2">
+            <label htmlFor="email" className="font-heading text-brand-primary-400 text-[12px] font-bold tracking-[1.2px] uppercase">
+              Email Address
+            </label>
+            <div className="flex items-center gap-3 border-b-[0.8px] border-[rgba(38,38,38,0.5)]">
+              <input
+                id="email"
+                value={user.email ?? ""}
+                placeholder="Not provided"
+                disabled
+                readOnly
+                className="font-body text-brand-primary-400/50 min-w-0 flex-1 bg-transparent px-4 py-3 text-[16px] leading-[26px] outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setEmailDialogOpen(true)}
+                className="font-heading text-brand-primary-600 shrink-0 pr-2 text-[14px] font-bold"
+              >
+                Change
+              </button>
+            </div>
+          </div>
           <div className="flex flex-col gap-2">
             <label htmlFor="phone" className="font-heading text-brand-primary-400 text-[12px] font-bold tracking-[1.2px] uppercase">
               Phone Number
@@ -210,6 +218,7 @@ function AccountForm({ user }: { user: UserRead }) {
       </section>
 
       <ChangePasswordDialog open={passwordDialogOpen} onClose={() => setPasswordDialogOpen(false)} />
+      <ChangeEmailDialog open={emailDialogOpen} onClose={() => setEmailDialogOpen(false)} user={user} />
     </form>
   );
 }

@@ -9,7 +9,7 @@ the same object.
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.security import validate_password_strength
 from app.models.enums import OTPPurpose, UserRole
@@ -25,7 +25,7 @@ class SignupRequest(BaseModel):
 
     phone: IndianMobile
     role: UserRole
-    full_name: Optional[str] = None
+    full_name: Optional[str] = Field(default=None, max_length=100)
     email: EmailAddress
     password: Optional[str] = None
     city: Optional[str] = None

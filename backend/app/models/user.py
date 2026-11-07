@@ -83,3 +83,8 @@ class User(Base, TimestampMixin):
         Index("ix_users_phone_unique", "phone", unique=True, postgresql_where=text("phone IS NOT NULL")),
         Index("ix_users_role", "role"),
     )
+
+    @property
+    def has_password(self) -> bool:
+        """True when the account can sign in with a password; Google-only accounts have none, which decides how sensitive actions are re-confirmed."""
+        return self.password_hash is not None

@@ -130,13 +130,32 @@ def _issue_refresh_token(
     return raw_token
 
 
-def _issue_session(
+def issue_session(
     db: Session, user: User, user_agent: Optional[str], ip: Optional[str]
 ) -> tuple[str, str]:
     """Mints an access token + refresh token pair for an already-authenticated user (login, and signup-verify)."""
     access_token = create_access_token(user.id, user.role.value)
     refresh_token = _issue_refresh_token(db, user, user_agent, ip)
     return access_token, refresh_token
+
+
+def ensure_not_locked(user: User) -> None:
+    """Raises 423 while the account's password-attempt lockout is still in force."""
+    if user.locked_until is not None and user.locked_until > datetime.now(timezone.utc):
+        raise LockedError("ACCOUNT_LOCKED", "Account temporarily locked due to repeated failed attempts.")
+
+
+def record_failed_password(db: Session, user: User) -> None:
+    """
+    Counts one wrong password toward the lockout and commits the count
+    immediately, so the attempt survives the error the caller is about to
+    raise. Shared by login and the authenticated password checks so every
+    place that tests a password feeds the same limit.
+    """
+    user.failed_login_attempts += 1
+    if user.failed_login_attempts >= LOCKOUT_THRESHOLD:
+        user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)
+    db.commit()
 
 
 def _enforce_otp_issue_limits(db: Session, email: str) -> None:
@@ -206,29 +225,15 @@ def request_otp(db: Session, email: str, purpose: OTPPurpose) -> None:
     db.commit()
 
 
-def verify_otp(
-    db: Session,
-    email: str,
-    code: str,
-    purpose: OTPPurpose,
-    user_agent: Optional[str] = None,
-    ip: Optional[str] = None,
-) -> Optional[tuple[str, str, User]]:
+def check_otp(db: Session, email: str, code: str, purpose: OTPPurpose) -> OTPCode:
     """
-    Verifies a submitted OTP against the latest unconsumed code issued
-    for (email, purpose). A wrong code counts toward the 5-attempt cap
-    and raises 401 OTP_INVALID; once no valid code remains — none ever
-    issued, expired, or the attempt cap reached — raises 410 OTP_EXPIRED
-    (matches the Figma design's "request a new one" recovery path for
-    all three cases, rather than a distinct error per case). On success
-    for a verifying purpose, flips the matching user's is_email_verified.
-
-    For OTPPurpose.signup specifically, also mints a full session
-    (access + refresh token), returned so the route can log the user
-    straight in — they already proved both their password (at signup)
-    and control of their email (this code) in the same flow, so sending
-    them to /login to re-enter the password a moment later would just
-    be friction. Every other purpose returns None (no session change).
+    Checks a submitted code against the latest unconsumed one issued for
+    (email, purpose), enforcing the per-email hourly failed-attempt limit
+    and the per-code attempt cap, and returns the matching row without
+    consuming it. Raises 429 OTP_ATTEMPTS_EXCEEDED, 410 OTP_EXPIRED or 401
+    OTP_INVALID. Consuming is left to the caller so a flow that needs two
+    codes can check both before spending either; a failed attempt is
+    committed here so it counts even though an error follows.
     """
     now = datetime.now(timezone.utc)
     failed_this_hour = (
@@ -255,7 +260,34 @@ def verify_otp(
         db.commit()
         raise OTP_INVALID
 
-    row.consumed_at = now
+    return row
+
+
+def verify_otp(
+    db: Session,
+    email: str,
+    code: str,
+    purpose: OTPPurpose,
+    user_agent: Optional[str] = None,
+    ip: Optional[str] = None,
+) -> Optional[tuple[str, str, User]]:
+    """
+    Verifies a submitted OTP against the latest unconsumed code issued
+    for (email, purpose). A wrong code counts toward the 5-attempt cap
+    and raises 401 OTP_INVALID; once no valid code remains — none ever
+    issued, expired, or the attempt cap reached — raises 410 OTP_EXPIRED
+    (matches the Figma design's "request a new one" recovery path for
+    all three cases, rather than a distinct error per case). On success
+    for a verifying purpose, flips the matching user's is_email_verified.
+
+    For OTPPurpose.signup specifically, also mints a full session
+    (access + refresh token), returned so the route can log the user
+    straight in — they already proved both their password (at signup)
+    and control of their email (this code) in the same flow, so sending
+    them to /login to re-enter the password a moment later would just
+    be friction. Every other purpose returns None (no session change).
+    """
+    check_otp(db, email, code, purpose).consumed_at = datetime.now(timezone.utc)
 
     user = None
     if purpose in _EMAIL_VERIFYING_PURPOSES:
@@ -265,7 +297,7 @@ def verify_otp(
 
     session = None
     if purpose == OTPPurpose.signup and user is not None:
-        access_token, refresh_token = _issue_session(db, user, user_agent, ip)
+        access_token, refresh_token = issue_session(db, user, user_agent, ip)
         session = (access_token, refresh_token, user)
 
     db.commit()
@@ -275,7 +307,7 @@ def verify_otp(
     return session
 
 
-def _revoke_all_sessions(db: Session, user_id: UUID) -> None:
+def revoke_all_sessions(db: Session, user_id: UUID) -> None:
     """Revokes every active refresh token for a user."""
     db.query(RefreshToken).filter(
         RefreshToken.user_id == user_id,
@@ -383,7 +415,7 @@ def signup(
         user.is_active = True
         user.failed_login_attempts = 0
         user.locked_until = None
-        _revoke_all_sessions(db, user.id)
+        revoke_all_sessions(db, user.id)
         if role == UserRole.broker:
             profile = user.broker_profile
             if profile is None:
@@ -456,15 +488,10 @@ def login(
     if not user.is_active:
         raise ForbiddenError("ACCOUNT_DEACTIVATED", "This account has been deactivated.")
 
-    now = datetime.now(timezone.utc)
-    if user.locked_until is not None and user.locked_until > now:
-        raise LockedError("ACCOUNT_LOCKED", "Account temporarily locked due to repeated failed logins.")
+    ensure_not_locked(user)
 
     if not verify_password(password, user.password_hash):
-        user.failed_login_attempts += 1
-        if user.failed_login_attempts >= LOCKOUT_THRESHOLD:
-            user.locked_until = now + timedelta(minutes=LOCKOUT_MINUTES)
-        db.commit()
+        record_failed_password(db, user)
         raise bad_credentials
 
     user.failed_login_attempts = 0
@@ -484,7 +511,7 @@ def login(
         db.commit()
         raise EMAIL_NOT_VERIFIED
 
-    access_token, refresh_token = _issue_session(db, user, user_agent, ip)
+    access_token, refresh_token = issue_session(db, user, user_agent, ip)
     db.commit()
     db.refresh(user)
 
@@ -547,9 +574,9 @@ def google_auth(
         # the unproven password and ending any existing sessions.
         user.is_email_verified = True
         user.password_hash = None
-        _revoke_all_sessions(db, user.id)
+        revoke_all_sessions(db, user.id)
 
-    access_token, refresh_token = _issue_session(db, user, user_agent, ip)
+    access_token, refresh_token = issue_session(db, user, user_agent, ip)
     db.commit()
     db.refresh(user)
 
@@ -693,6 +720,6 @@ def reset_password(db: Session, token: str, new_password: str) -> None:
     # proves control of that mailbox.
     user.is_email_verified = True
 
-    _revoke_all_sessions(db, user.id)
+    revoke_all_sessions(db, user.id)
 
     db.commit()
