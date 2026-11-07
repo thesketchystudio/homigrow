@@ -8,12 +8,16 @@
 // earlier (Property.price is NOT NULL with a `price > 0` check).
 // virtual_tour_url is still never collected — unrelated to video upload,
 // which now goes through uploadPropertyVideo (see MediaStep).
+// The listing created on submit is remembered together with which uploads
+// already finished, so a retry after a failed upload continues on the same
+// draft instead of creating another one. Editing any step discards it, since
+// the saved listing would no longer match what the broker entered.
 // Step 1's "Save as Draft" is a lighter, browser-local stand-in for a real
 // resumable draft — see lib/postPropertyDraft.ts for why.
 
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api/client";
@@ -50,24 +54,34 @@ export function PostPropertyWizard() {
     if (STEP_ORDER.indexOf(target) < STEP_ORDER.indexOf(step)) setStep(target);
   };
 
+  const draftRef = useRef<{ id: string; photosUploaded: number; videoUploaded: boolean; jvUploaded: boolean } | null>(null);
+
   const postMutation = useMutation({
     mutationFn: async () => {
       if (!info || !pricing) throw new Error("Missing property info or pricing");
 
-      const property = await createProperty({ ...info, ...pricing });
+      if (!draftRef.current) {
+        const property = await createProperty({ ...info, ...pricing });
+        draftRef.current = { id: property.id, photosUploaded: 0, videoUploaded: false, jvUploaded: false };
+      }
+      const draft = draftRef.current;
 
-      const photos = [...heroImages, ...interiorImages, ...floorPlanImages];
+      const photos = [...heroImages, ...interiorImages, ...floorPlanImages].slice(draft.photosUploaded);
       if (photos.length > 0) {
-        await uploadPropertyMedia(property.id, photos);
+        await uploadPropertyMedia(draft.id, photos, (count) => {
+          draft.photosUploaded += count;
+        });
       }
-      if (videoFile) {
-        await uploadPropertyVideo(property.id, videoFile);
+      if (videoFile && !draft.videoUploaded) {
+        await uploadPropertyVideo(draft.id, videoFile);
+        draft.videoUploaded = true;
       }
-      if (info.is_jv_property && jvAgreementFile) {
-        await uploadJvAgreement(property.id, jvAgreementFile);
+      if (info.is_jv_property && jvAgreementFile && !draft.jvUploaded) {
+        await uploadJvAgreement(draft.id, jvAgreementFile);
+        draft.jvUploaded = true;
       }
 
-      return submitProperty(property.id);
+      return submitProperty(draft.id);
     },
     onSuccess: () => {
       clearInfoDraft();
@@ -86,6 +100,7 @@ export function PostPropertyWizard() {
         jvAgreementFile={jvAgreementFile}
         onJvAgreementFileChange={setJvAgreementFile}
         onContinue={(values) => {
+          draftRef.current = null;
           setInfo(values);
           setStep("media");
         }}
@@ -106,7 +121,10 @@ export function PostPropertyWizard() {
         videoFile={videoFile}
         onVideoFileChange={setVideoFile}
         onBack={() => setStep("info")}
-        onContinue={() => setStep("pricing")}
+        onContinue={() => {
+          draftRef.current = null;
+          setStep("pricing");
+        }}
         onStepSelect={goToStep}
       />
     );
@@ -119,6 +137,7 @@ export function PostPropertyWizard() {
         defaultValues={pricing}
         onBack={() => setStep("media")}
         onContinue={(values) => {
+          draftRef.current = null;
           setPricing(values);
           setStep("verification");
         }}

@@ -4,6 +4,7 @@
 // so the broker sees identical validation client-side first.
 
 import { z } from "zod";
+import "@/lib/validation/zodMessages";
 import { Furnishing, ListingType, PaymentStructure, PriceFlexibility, PropertyType } from "@/lib/enums";
 
 // Types whose Step 1 sub-form only collects the shared residential fields
@@ -167,8 +168,8 @@ export const propertyInfoSchema = z.object({
   jv_details: jvDetailsSchema.optional(),
   address_line: z.string().trim().min(1, "Address is required").max(255),
   locality: z.string().trim().min(1, "Locality is required").max(100),
-  city: z.string().trim().min(1, "City is required").max(100),
-  state: z.string().trim().min(1, "State is required").max(100),
+  city: z.string({ error: "Select a city" }).trim().min(1, "Select a city").max(100),
+  state: z.string({ error: "Select a state" }).trim().min(1, "State is required").max(100),
   pincode: z
     .string()
     .trim()

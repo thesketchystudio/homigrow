@@ -74,7 +74,7 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex w-full flex-col gap-6">
+    <form noValidate onSubmit={onSubmit} className="flex w-full flex-col gap-6">
       <div className="flex flex-col gap-2">
         <h1 className="font-heading text-[34px] font-bold leading-[51px] tracking-[-0.5px] text-brand-primary-700">
           Hello!

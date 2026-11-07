@@ -80,7 +80,7 @@ export function ChangePasswordDialog({ open, onClose }: { open: boolean; onClose
         </>
       }
     >
-      <form
+      <form noValidate
         id="change-password-form"
         onSubmit={handleSubmit((values) => mutation.mutate(values))}
         className="flex flex-col gap-4"

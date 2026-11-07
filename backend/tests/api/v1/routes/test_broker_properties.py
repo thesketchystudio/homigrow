@@ -900,6 +900,44 @@ class TestUploadHardening:
         assert response.status_code == 422
         assert response.json()["error"]["code"] == "MEDIA_LIMIT_REACHED"
 
+    def test_a_full_photo_gallery_still_accepts_one_video(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546105")
+        property_id = self._create_property(client, broker)
+        batch = [("images", (f"{i}.jpg", SAMPLE_JPEG, "image/jpeg")) for i in range(10)]
+        for _ in range(3):
+            client.post(f"/api/v1/properties/{property_id}/media", headers=_auth_headers(broker), files=batch)
+
+        response = client.post(
+            f"/api/v1/properties/{property_id}/media/video", headers=_auth_headers(broker), files=[_VIDEO_FILE]
+        )
+
+        assert response.status_code == 200
+
+    def test_a_second_video_is_rejected(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546106")
+        property_id = self._create_property(client, broker)
+        url = f"/api/v1/properties/{property_id}/media/video"
+        assert client.post(url, headers=_auth_headers(broker), files=[_VIDEO_FILE]).status_code == 200
+
+        response = client.post(url, headers=_auth_headers(broker), files=[_VIDEO_FILE])
+
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "VIDEO_LIMIT_REACHED"
+
+    def test_a_video_over_50_mb_gets_a_readable_422(self, client, db_session):
+        broker = _make_broker(db_session, phone="+919876546107")
+        property_id = self._create_property(client, broker)
+        oversize = SAMPLE_MP4 + bytes(50 * 1024 * 1024)
+
+        response = client.post(
+            f"/api/v1/properties/{property_id}/media/video",
+            headers=_auth_headers(broker),
+            files=[("video", ("big.mp4", oversize, "video/mp4"))],
+        )
+
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "FILE_TOO_LARGE"
+
     def test_deleting_media_removes_the_storage_object(self, client, db_session, _mock_s3_client):
         broker = _make_broker(db_session, phone="+919876546104")
         property_id = self._create_property(client, broker)

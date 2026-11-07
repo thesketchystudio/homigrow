@@ -41,7 +41,8 @@ RECENT_LEADS_LIMIT = 4
 # Upload caps: per request bounds a single call's work, per listing bounds
 # how much one listing can accumulate in the public bucket (photos + videos).
 MAX_MEDIA_PER_REQUEST = 10
-MAX_MEDIA_PER_PROPERTY = 30
+MAX_PHOTOS_PER_PROPERTY = 30
+MAX_VIDEOS_PER_PROPERTY = 1
 
 
 def _auto_approve(property_: Property) -> None:
@@ -261,18 +262,28 @@ def update_property(db: Session, broker: User, property_id: UUID, data: Property
     return property_
 
 
-def _ensure_media_capacity(property_: Property, incoming: int) -> None:
+def _ensure_photo_capacity(property_: Property, incoming: int) -> None:
     """
-    Rejects an upload that would push a listing past the per-request or
-    per-listing media limits, so a single account can't fill the public
-    bucket with unbounded files for one listing.
+    Rejects a photo upload that would push a listing past the per-request or
+    per-listing photo limits, so a single account can't fill the public
+    bucket with unbounded files for one listing. Videos are counted
+    separately so a full photo gallery never blocks a walkthrough video.
     """
     if incoming > MAX_MEDIA_PER_REQUEST:
         message = f"Upload at most {MAX_MEDIA_PER_REQUEST} files at a time."
         raise ValidationFailed("TOO_MANY_FILES", message, {"images": message})
-    if len(property_.media) + incoming > MAX_MEDIA_PER_PROPERTY:
-        message = f"A listing can have at most {MAX_MEDIA_PER_PROPERTY} photos and videos."
+    existing = sum(1 for media in property_.media if media.media_type == MediaType.image)
+    if existing + incoming > MAX_PHOTOS_PER_PROPERTY:
+        message = f"A listing can have at most {MAX_PHOTOS_PER_PROPERTY} photos."
         raise ValidationFailed("MEDIA_LIMIT_REACHED", message, {"images": message})
+
+
+def _ensure_video_capacity(property_: Property) -> None:
+    """Rejects a second video on a listing; the broker must remove the current one first."""
+    existing = sum(1 for media in property_.media if media.media_type == MediaType.video)
+    if existing >= MAX_VIDEOS_PER_PROPERTY:
+        message = "A listing can have one video. Remove the current one to add another."
+        raise ValidationFailed("VIDEO_LIMIT_REACHED", message, {"video": message})
 
 
 def delete_media(db: Session, broker: User, property_id: UUID, media_id: UUID) -> None:
@@ -315,7 +326,7 @@ def add_media(db: Session, broker: User, property_id: UUID, uploads: list[tuple[
     property becomes its cover image.
     """
     property_ = _get_owned_property(db, broker, property_id)
-    _ensure_media_capacity(property_, len(uploads))
+    _ensure_photo_capacity(property_, len(uploads))
     next_position = len(property_.media)
     has_cover = any(media.is_cover for media in property_.media)
 
@@ -345,7 +356,7 @@ def add_video(db: Session, broker: User, property_id: UUID, content: bytes, cont
     treated as the cover image — cover selection stays photo-only.
     """
     property_ = _get_owned_property(db, broker, property_id)
-    _ensure_media_capacity(property_, 1)
+    _ensure_video_capacity(property_)
     url = storage_service.upload_property_video(property_.id, content, content_type)
     media = PropertyMedia(
         property_id=property_.id,

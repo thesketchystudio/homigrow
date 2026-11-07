@@ -64,7 +64,7 @@ export function ResetPasswordForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex w-full flex-col gap-8">
+    <form noValidate onSubmit={onSubmit} className="flex w-full flex-col gap-8">
       <div className="flex flex-col gap-1">
         <h1 className="font-heading text-[34px] font-bold leading-[51px] tracking-[-0.5px] text-foreground">
           Reset your password.

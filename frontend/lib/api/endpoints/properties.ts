@@ -4,6 +4,7 @@
 // GET /properties serves the Listings search grid.
 
 import { apiRequest, apiRequestMultipart } from "@/lib/api/client";
+import { chunk, PHOTOS_PER_REQUEST } from "@/lib/property-media";
 import type { Furnishing, LeadStatus, ListingType, MediaType, OwnershipType, PaymentStructure, PriceFlexibility, PropertyStatus, PropertyType, VerificationStatus } from "@/lib/enums";
 import type { JVDetailsValues, LandDetailsValues, PGDetailsValues, PlotDetailsValues } from "@/lib/validation/postProperty";
 
@@ -269,10 +270,22 @@ export function createProperty(data: PropertyCreateInput): Promise<PropertyRead>
   return apiRequest<PropertyRead>("/properties", { method: "POST", body: data });
 }
 
-export function uploadPropertyMedia(propertyId: string, images: File[]): Promise<PropertyMediaRead[]> {
-  const formData = new FormData();
-  for (const image of images) formData.append("images", image);
-  return apiRequestMultipart<PropertyMediaRead[]>(`/properties/${propertyId}/media`, formData);
+// The API accepts a limited number of photos per request, so a larger set is
+// sent as consecutive batches; the first batch lands first, which keeps the
+// first photo as the cover.
+export async function uploadPropertyMedia(
+  propertyId: string,
+  images: File[],
+  onBatchUploaded?: (count: number) => void,
+): Promise<PropertyMediaRead[]> {
+  const uploaded: PropertyMediaRead[] = [];
+  for (const batch of chunk(images, PHOTOS_PER_REQUEST)) {
+    const formData = new FormData();
+    for (const image of batch) formData.append("images", image);
+    uploaded.push(...(await apiRequestMultipart<PropertyMediaRead[]>(`/properties/${propertyId}/media`, formData)));
+    onBatchUploaded?.(batch.length);
+  }
+  return uploaded;
 }
 
 export function uploadPropertyVideo(propertyId: string, video: File): Promise<PropertyMediaRead> {

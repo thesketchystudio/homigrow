@@ -253,7 +253,7 @@ export default function EarlyAccess() {
                   Fill in your details and we&apos;ll keep you updated
                 </p>
 
-                <form onSubmit={handleSubmit}>
+                <form noValidate onSubmit={handleSubmit}>
                   <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
                     <div>
                       <label

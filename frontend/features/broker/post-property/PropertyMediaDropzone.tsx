@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ImageIcon, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { oversizedPhotosMessage, splitOversizedPhotos } from "@/lib/property-media";
 
 // Each tile owns its own object URL instead of the parent computing one
 // array of urls. The URL is created and assigned to the <img> imperatively
@@ -63,7 +64,8 @@ type PropertyMediaDropzoneProps = {
   accept?: string;
   showPreviews?: boolean;
   // Hero Photography caps at 5 per the Figma "0/5 Photos" counter; Interior
-  // and Floor Plans have no cap yet, so this is left unset for those.
+  // and Floor Plans are capped by what is left of the listing's photo limit,
+  // which the parent works out across all three boxes.
   maxFiles?: number;
 };
 
@@ -72,7 +74,7 @@ export function PropertyMediaDropzone({
   onChange,
   error,
   title = "Upload Photos",
-  helperText = "Drag & drop or browse — JPG, PNG, or WEBP, max 10MB each",
+  helperText = "Drag & drop or browse — JPG, PNG, or WEBP, max 10 MB each",
   accept = "image/jpeg,image/png,image/webp",
   showPreviews = true,
   maxFiles,
@@ -83,17 +85,21 @@ export function PropertyMediaDropzone({
   const isFull = maxFiles !== undefined && images.length >= maxFiles;
 
   const addFiles = (files: FileList | File[]) => {
-    const incoming = Array.from(files);
-    const room = maxFiles === undefined ? incoming.length : Math.max(0, maxFiles - images.length);
+    // Files over the size limit are left out here, with their names shown,
+    // instead of failing the whole upload at submit time.
+    const { accepted, oversized } = splitOversizedPhotos(Array.from(files));
+    const sizeMessage = oversized.length > 0 ? oversizedPhotosMessage(oversized) : undefined;
+    const room = maxFiles === undefined ? accepted.length : Math.max(0, maxFiles - images.length);
 
     if (room <= 0) {
-      setCapMessage(`Maximum ${maxFiles} photos allowed.`);
+      setCapMessage([sizeMessage, `Maximum ${maxFiles} photos allowed.`].filter(Boolean).join(" "));
       return;
     }
 
-    onChange([...images, ...incoming.slice(0, room)]);
-    const skipped = incoming.length - room;
-    setCapMessage(skipped > 0 ? `${skipped} photo${skipped === 1 ? "" : "s"} skipped — maximum ${maxFiles} photos allowed.` : undefined);
+    onChange([...images, ...accepted.slice(0, room)]);
+    const skipped = accepted.length - room;
+    const capNote = skipped > 0 ? `${skipped} photo${skipped === 1 ? "" : "s"} skipped — maximum ${maxFiles} photos allowed.` : undefined;
+    setCapMessage([sizeMessage, capNote].filter(Boolean).join(" ") || undefined);
   };
 
   const removeAt = (index: number) => {

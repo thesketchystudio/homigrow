@@ -4,6 +4,7 @@
 // user sees identical validation client-side first.
 
 import { z } from "zod";
+import "@/lib/validation/zodMessages";
 
 export const accountFormSchema = z.object({
   full_name: z.string().trim().min(1, "Full name is required"),
@@ -24,16 +25,28 @@ export const notificationsFormSchema = z.object({
 });
 export type NotificationsFormValues = z.infer<typeof notificationsFormSchema>;
 
+// Matches the API's list limits so an over-long list is caught beside the
+// field instead of being rejected by the server on save.
+function commaList(label: string) {
+  return z.string().refine(
+    (value) => value.split(",").filter((item) => item.trim()).length <= 20,
+    `${label}: enter at most 20 items, separated by commas`,
+  ).refine(
+    (value) => value.split(",").every((item) => item.trim().length <= 100),
+    `${label}: each item must be 100 characters or fewer`,
+  );
+}
+
 export const brokerProfileFormSchema = z.object({
-  full_name: z.string().trim().min(1, "Full name is required"),
+  full_name: z.string().trim().min(1, "Full name is required").max(100, "Full name must be 100 characters or fewer"),
   bio: z.string().trim().max(1000, "Bio must be 1000 characters or fewer"),
   company_name: z.string().trim().max(150, "Company name must be 150 characters or fewer"),
   experience_years: z.number().int().min(0).max(80, "Enter a number between 0 and 80").optional(),
   // Comma-separated free text — BrokerProfile.specializations/service_areas
   // are plain JSONB string lists with no fixed vocabulary, so this is
   // split into an array on submit rather than driven by a fixed option set.
-  specializations: z.string(),
-  service_areas: z.string(),
+  specializations: commaList("Specializations"),
+  service_areas: commaList("Service areas"),
 });
 export type BrokerProfileFormValues = z.infer<typeof brokerProfileFormSchema>;
 

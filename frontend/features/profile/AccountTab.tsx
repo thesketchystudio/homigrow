@@ -137,7 +137,7 @@ function AccountForm({ user }: { user: UserRead }) {
   );
 
   return (
-    <form id="account-form" onSubmit={handleSubmit(onSubmit)} className="flex max-w-3xl flex-col gap-8">
+    <form noValidate id="account-form" onSubmit={handleSubmit(onSubmit)} className="flex max-w-3xl flex-col gap-8">
       <section className="flex flex-col gap-6">
         <h2 className="font-heading text-brand-primary-400 text-[20px] leading-[28px] font-bold">Account Information</h2>
         <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">

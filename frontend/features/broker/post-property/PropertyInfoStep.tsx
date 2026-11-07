@@ -139,7 +139,7 @@ export function PropertyInfoStep({ defaultValues, jvAgreementFile, onJvAgreement
   const labelClassName = "text-[10px] font-bold uppercase tracking-[1px] text-brand-primary-600/80";
 
   return (
-    <form onSubmit={onSubmit} className="flex w-full flex-col gap-8">
+    <form noValidate onSubmit={onSubmit} className="flex w-full flex-col gap-8">
       <h1 className="font-heading text-[48px] font-bold leading-15 text-brand-primary-600">Post your listing</h1>
 
       <PostPropertyStepper current="info" onStepSelect={onStepSelect} />

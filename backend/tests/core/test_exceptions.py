@@ -9,7 +9,7 @@ product route.
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.core.exceptions import ConflictError, install_exception_handlers
 
@@ -29,6 +29,11 @@ class _CheckedBody(BaseModel):
         return value
 
 
+class _LimitedBody(BaseModel):
+    title: str = Field(max_length=10)
+    tags: list[str] = Field(max_length=3)
+
+
 def _make_app() -> FastAPI:
     app = FastAPI()
     install_exception_handlers(app)
@@ -46,6 +51,10 @@ def _make_app() -> FastAPI:
     @app.post("/validate")
     def _validate(body: _Body):
         return {"name": body.name}
+
+    @app.post("/validate-limited")
+    def _validate_limited(body: _LimitedBody):
+        return {"title": body.title}
 
     @app.post("/validate-checked")
     def _validate_checked(body: _CheckedBody):
@@ -96,6 +105,24 @@ class TestExceptionEnvelopes:
 
         assert response.status_code == 422
         assert response.json()["error"]["fields"]["code"] == "Code must be upper case."
+
+    def test_technical_pydantic_messages_become_plain_language(self):
+        client = TestClient(_make_app(), raise_server_exceptions=False)
+
+        missing = client.post("/validate", json={}).json()["error"]["fields"]["name"]
+        wrong_type = client.post("/validate", json={"name": 5}).json()["error"]["fields"]["name"]
+
+        assert missing == "This field is required."
+        assert wrong_type == "Enter a valid value."
+
+    def test_length_limits_name_the_limit(self):
+        client = TestClient(_make_app(), raise_server_exceptions=False)
+
+        response = client.post("/validate-limited", json={"title": "x" * 11, "tags": ["a"] * 4})
+
+        fields = response.json()["error"]["fields"]
+        assert fields["title"] == "Must be 10 characters or fewer."
+        assert fields["tags"] == "Choose or enter at most 3 items."
 
     def test_unhandled_exception_returns_a_generic_500(self):
         client = TestClient(_make_app(), raise_server_exceptions=False)

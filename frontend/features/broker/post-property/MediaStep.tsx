@@ -25,6 +25,7 @@ import { PostPropertyStepper, type StepKey } from "@/features/broker/post-proper
 import { FreePlanUsageBar } from "@/features/broker/post-property/FreePlanUsageBar";
 import { PropertyMediaDropzone } from "@/features/broker/post-property/PropertyMediaDropzone";
 import { PropertyVideoDropzone } from "@/features/broker/post-property/PropertyVideoDropzone";
+import { MAX_PHOTOS_PER_LISTING } from "@/lib/property-media";
 
 type MediaStepProps = {
   heroImages: File[];
@@ -63,6 +64,10 @@ export function MediaStep({
   onStepSelect,
 }: MediaStepProps) {
   const [touched, setTouched] = useState(false);
+  // A listing holds 30 photos in total, shared by the three boxes below, so
+  // each box may use whatever the other two have not taken.
+  const totalPhotos = heroImages.length + interiorImages.length + floorPlanImages.length;
+  const photosLeft = MAX_PHOTOS_PER_LISTING - totalPhotos;
   const hasMinInteriorPhotos = interiorImages.length >= 3;
   const interiorError = touched && !hasMinInteriorPhotos ? "Add at least 3 interior photos before continuing." : undefined;
 
@@ -78,14 +83,16 @@ export function MediaStep({
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="font-heading text-[16px] font-bold text-foreground">Hero Photography</h2>
-              <span className="font-body text-[12px] text-muted-foreground">{heroImages.length}/5 Photos</span>
+              <span className="font-body text-[12px] text-muted-foreground">
+                {heroImages.length}/5 Photos · {totalPhotos}/{MAX_PHOTOS_PER_LISTING} in this listing
+              </span>
             </div>
             <PropertyMediaDropzone
               images={heroImages}
               onChange={onHeroImagesChange}
               title="Hero Architectural Shot"
-              helperText="Drag & drop or browse — JPG, PNG, WEBP — Max 20MB each"
-              maxFiles={5}
+              helperText="Drag & drop or browse — JPG, PNG, WEBP — Max 10 MB each"
+              maxFiles={Math.min(5, heroImages.length + photosLeft)}
             />
           </div>
 
@@ -96,7 +103,8 @@ export function MediaStep({
               onChange={onInteriorImagesChange}
               error={interiorError}
               title="Interior Shots"
-              helperText="Living spaces, kitchen, bathrooms — Min. 3 photos"
+              helperText="Living spaces, kitchen, bathrooms — Min. 3 photos, max 10 MB each"
+              maxFiles={interiorImages.length + photosLeft}
             />
           </div>
 
@@ -106,7 +114,8 @@ export function MediaStep({
               images={floorPlanImages}
               onChange={onFloorPlanImagesChange}
               title="Upload Floor Plan"
-              helperText="JPG, PNG, or WEBP — Detailed layout preferred"
+              helperText="JPG, PNG, or WEBP — Detailed layout preferred, max 10 MB each"
+              maxFiles={floorPlanImages.length + photosLeft}
             />
           </div>
 
