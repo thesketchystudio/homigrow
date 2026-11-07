@@ -173,7 +173,7 @@ function NotificationsForm({ user }: { user: UserRead }) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex max-w-3xl flex-col gap-8">
+    <form noValidate onSubmit={handleSubmit(onSubmit)} className="flex max-w-3xl flex-col gap-8">
       <section className="flex flex-col gap-6">
         <div className="flex flex-col gap-0.5">
           <h2 className="font-heading text-brand-primary-400 text-[20px] leading-[28px] font-bold">

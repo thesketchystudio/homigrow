@@ -148,7 +148,7 @@ export function ChangeEmailDialog({ open, onClose, user }: { open: boolean; onCl
       }
     >
       {step === "request" ? (
-        <form id="change-email-request-form" onSubmit={requestForm.handleSubmit(submitRequest)} className="flex flex-col gap-4">
+        <form noValidate id="change-email-request-form" onSubmit={requestForm.handleSubmit(submitRequest)} className="flex flex-col gap-4">
           <TextField
             label="New Email Address"
             id="new_email"
@@ -169,7 +169,7 @@ export function ChangeEmailDialog({ open, onClose, user }: { open: boolean; onCl
           )}
         </form>
       ) : (
-        <form id="change-email-confirm-form" onSubmit={confirmForm.handleSubmit(submitConfirm)} className="flex flex-col gap-4">
+        <form noValidate id="change-email-confirm-form" onSubmit={confirmForm.handleSubmit(submitConfirm)} className="flex flex-col gap-4">
           <TextField
             label={`Code sent to ${newEmail}`}
             id="code"

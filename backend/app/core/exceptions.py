@@ -85,13 +85,43 @@ def _error_response(status_code: int, code: str, message: str, fields: Optional[
 _VALUE_ERROR_PREFIX = "Value error, "
 
 
+def _friendly_message(error: dict) -> str:
+    """
+    Turns pydantic's technical message into plain language a user can act
+    on ("String should have at most 100 characters" -> "Must be 100
+    characters or fewer"). Types without a rewrite keep pydantic's text, with
+    the custom-validator prefix removed.
+    """
+    ctx = error.get("ctx") or {}
+    kind = error["type"]
+    if kind == "missing":
+        return "This field is required."
+    if kind == "string_too_long":
+        return f"Must be {ctx['max_length']} characters or fewer."
+    if kind == "string_too_short":
+        return f"Must be at least {ctx['min_length']} characters."
+    if kind == "too_long":
+        return f"Choose or enter at most {ctx['max_length']} items."
+    if kind == "too_short":
+        return f"Enter at least {ctx['min_length']} items."
+    if kind in ("greater_than", "greater_than_equal"):
+        bound = ctx.get("gt", ctx.get("ge"))
+        return f"Must be {'greater than' if kind == 'greater_than' else 'at least'} {bound}."
+    if kind in ("less_than", "less_than_equal"):
+        bound = ctx.get("lt", ctx.get("le"))
+        return f"Must be {'less than' if kind == 'less_than' else 'at most'} {bound}."
+    if kind in ("string_type", "int_type", "int_parsing", "float_type", "float_parsing", "bool_type", "enum", "literal_error"):
+        return "Enter a valid value."
+    return error["msg"].removeprefix(_VALUE_ERROR_PREFIX)
+
+
 def _validation_fields(exc: RequestValidationError) -> dict:
-    """Maps pydantic's error list to {field_path: message}, dropping the leading body/query/path location marker and pydantic's "Value error, " prefix on custom-validator messages."""
+    """Maps pydantic's error list to {field_path: plain-language message}, dropping the leading body/query/path location marker."""
     fields: dict = {}
     for error in exc.errors():
         loc = [str(part) for part in error["loc"] if part not in ("body", "query", "path")]
         key = ".".join(loc) or "__root__"
-        fields[key] = error["msg"].removeprefix(_VALUE_ERROR_PREFIX)
+        fields[key] = _friendly_message(error)
     return fields
 
 

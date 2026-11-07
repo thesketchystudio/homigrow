@@ -199,7 +199,7 @@ export function PricingStep({ listingType, defaultValues, onBack, onContinue, on
   const onFormSubmit = handleSubmit(onContinue);
 
   return (
-    <form onSubmit={onFormSubmit} className="flex w-full flex-col gap-8">
+    <form noValidate onSubmit={onFormSubmit} className="flex w-full flex-col gap-8">
       <h1 className="font-heading text-[48px] font-bold leading-15 text-brand-primary-600">Post your listing</h1>
 
       <PostPropertyStepper current="pricing" onStepSelect={onStepSelect} />

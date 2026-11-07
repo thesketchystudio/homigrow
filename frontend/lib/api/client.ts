@@ -177,6 +177,19 @@ export function refreshAccessToken(): Promise<string | null> {
   return refreshPromise;
 }
 
+// A request the server rejected for invalid input carries only the generic
+// "Request validation failed." message, with the real reasons in `fields`.
+// Screens that show just the message would hide them, so the first reason is
+// spelled out with the field it belongs to ("Bio: Must be 1000 characters or fewer.").
+function validationSummary(error: { code?: string; fields?: Record<string, string> } | undefined): string | undefined {
+  if (error?.code !== "VALIDATION_FAILED" || !error.fields) return undefined;
+  const [path, reason] = Object.entries(error.fields)[0] ?? [];
+  if (!path || !reason) return undefined;
+  const name = path.split(".").filter((part) => !/^\d+$/.test(part)).pop() ?? "";
+  const label = name.replace(/_/g, " ").replace(/^./, (letter) => letter.toUpperCase());
+  return label && label !== "__root__" ? `${label}: ${reason}` : reason;
+}
+
 async function processResponse<T>(response: Response): Promise<T> {
   if (response.status === 204) {
     return undefined as T;
@@ -189,7 +202,7 @@ async function processResponse<T>(response: Response): Promise<T> {
     throw new ApiError(
       response.status,
       error?.code ?? "UNKNOWN_ERROR",
-      error?.message ?? "Something went wrong. Please try again.",
+      validationSummary(error) ?? error?.message ?? "Something went wrong. Please try again.",
       error?.fields,
     );
   }

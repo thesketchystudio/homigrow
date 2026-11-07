@@ -88,7 +88,7 @@ export function SignupFormStep({ role, onSuccess, onGoogleAuthSuccess, onBack }:
   });
 
   return (
-    <form onSubmit={onSubmit} className="flex w-full flex-col gap-10">
+    <form noValidate onSubmit={onSubmit} className="flex w-full flex-col gap-10">
       <AuthProgressBar step={2} totalSteps={totalSteps} phase="onboarding" />
 
       <div className="flex flex-col gap-10">

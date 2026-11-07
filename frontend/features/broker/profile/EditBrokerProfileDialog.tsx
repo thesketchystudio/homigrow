@@ -115,7 +115,7 @@ export function EditBrokerProfileDialog({ open, onClose, user }: { open: boolean
         </>
       }
     >
-      <form id="broker-profile-edit-form" onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <form noValidate id="broker-profile-edit-form" onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label htmlFor="full_name">Full Name</Label>
           <Input id="full_name" aria-invalid={Boolean(errors.full_name)} {...register("full_name")} />
@@ -149,14 +149,22 @@ export function EditBrokerProfileDialog({ open, onClose, user }: { open: boolean
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="specializations">Specializations</Label>
-          <Input id="specializations" placeholder="Residential, Luxury Villas, Commercial" {...register("specializations")} />
-          <p className="text-muted-foreground text-xs">Comma-separated.</p>
+          <Input id="specializations" aria-invalid={Boolean(errors.specializations)} placeholder="Residential, Luxury Villas, Commercial" {...register("specializations")} />
+          {errors.specializations ? (
+            <p className="text-destructive text-sm">{errors.specializations.message}</p>
+          ) : (
+            <p className="text-muted-foreground text-xs">Comma-separated, up to 20.</p>
+          )}
         </div>
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="service_areas">Primary Cities / Service Areas</Label>
-          <Input id="service_areas" placeholder="Bangalore, Mumbai, Hyderabad" {...register("service_areas")} />
-          <p className="text-muted-foreground text-xs">Comma-separated.</p>
+          <Input id="service_areas" aria-invalid={Boolean(errors.service_areas)} placeholder="Bangalore, Mumbai, Hyderabad" {...register("service_areas")} />
+          {errors.service_areas ? (
+            <p className="text-destructive text-sm">{errors.service_areas.message}</p>
+          ) : (
+            <p className="text-muted-foreground text-xs">Comma-separated, up to 20.</p>
+          )}
         </div>
       </form>
     </Modal>

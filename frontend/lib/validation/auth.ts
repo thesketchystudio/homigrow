@@ -6,6 +6,7 @@
 // below only drives the local strength meter/gate, a bypassable UX nicety.
 
 import { z } from "zod";
+import "@/lib/validation/zodMessages";
 import { UserRole } from "@/lib/enums";
 
 export const MIN_PASSWORD_STRENGTH_SCORE = 3;
@@ -28,8 +29,8 @@ export const signupFormSchema = z
     email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
     phone: phoneDigits,
     role: z.enum([UserRole.client, UserRole.broker]),
-    city: z.string().trim().min(1, "City is required"),
-    state: z.string().trim().min(1, "State is required"),
+    city: z.string({ error: "Select your city" }).trim().min(1, "Select your city"),
+    state: z.string({ error: "Select your state" }).trim().min(1, "Select your state"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirm_password: z.string().min(1, "Confirm your password"),
     agree_to_terms: z.literal(true, { error: "You must agree to continue" }),
