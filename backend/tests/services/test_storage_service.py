@@ -59,3 +59,37 @@ class TestUploadBrokerDocument:
             user_id, BrokerDocumentType.rera_certificate, SAMPLE_PDF, "application/pdf"
         )
         assert key.startswith(f"{user_id}/{BrokerDocumentType.rera_certificate.value}/")
+
+
+class TestStorageFailures:
+    def _failing_client(self, monkeypatch):
+        from botocore.exceptions import ClientError
+
+        class _Failing:
+            def put_object(self, **kwargs):
+                raise ClientError({"Error": {"Code": "SignatureDoesNotMatch", "Message": "internal detail"}}, "PutObject")
+
+        monkeypatch.setattr("app.services.storage_service._get_client", lambda: _Failing())
+
+    def test_a_storage_failure_becomes_a_retryable_503_with_a_plain_message(self, monkeypatch):
+        self._failing_client(monkeypatch)
+
+        with pytest.raises(AppError) as exc_info:
+            storage_service.upload_property_image(uuid.uuid4(), SAMPLE_JPEG, "image/jpeg")
+
+        assert exc_info.value.status_code == 503
+        assert exc_info.value.code == "STORAGE_UNAVAILABLE"
+        assert "internal detail" not in exc_info.value.message
+        assert "SignatureDoesNotMatch" not in exc_info.value.message
+
+    def test_every_upload_path_reports_the_same_failure(self, monkeypatch):
+        self._failing_client(monkeypatch)
+        user_id = uuid.uuid4()
+
+        for upload in (
+            lambda: storage_service.upload_broker_document(user_id, BrokerDocumentType.rera_certificate, SAMPLE_PDF, "application/pdf"),
+            lambda: storage_service.upload_property_document(uuid.uuid4(), SAMPLE_PDF, "application/pdf"),
+        ):
+            with pytest.raises(AppError) as exc_info:
+                upload()
+            assert exc_info.value.code == "STORAGE_UNAVAILABLE"

@@ -70,13 +70,8 @@ export function EditBrokerProfileDialog({ open, onClose, user }: { open: boolean
       onClose();
     },
     onError: (error: ApiError) => {
-      if (error.fields) {
-        for (const [field, message] of Object.entries(error.fields)) {
-          toast.error(message ?? `${field}: invalid value`);
-        }
-      } else {
-        toast.error(error.message);
-      }
+      // The message already names the first field and its reason.
+      toast.error(error.message);
     },
   });
 
