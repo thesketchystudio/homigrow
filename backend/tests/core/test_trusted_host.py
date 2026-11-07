@@ -32,5 +32,29 @@ class TestAllowedHostsSetting:
             Settings(ENVIRONMENT="production", DEBUG_LOG_SECRETS=False)
 
     def test_production_with_explicit_hosts_is_accepted(self):
-        settings = Settings(ENVIRONMENT="production", ALLOWED_HOSTS="api.homigrow.com", DEBUG_LOG_SECRETS=False)
+        settings = Settings(
+            ENVIRONMENT="production",
+            ALLOWED_HOSTS="api.homigrow.com",
+            DEBUG_LOG_SECRETS=False,
+            SUPABASE_URL="https://example.supabase.co",
+        )
         assert settings.allowed_hosts_list == ["api.homigrow.com"]
+
+
+class TestStorageUrlSetting:
+    def test_production_without_a_storage_url_fails_startup(self):
+        with pytest.raises(ValueError, match="SUPABASE_URL"):
+            Settings(ENVIRONMENT="production", ALLOWED_HOSTS="api.homigrow.com", DEBUG_LOG_SECRETS=False, SUPABASE_URL="")
+
+    def test_production_with_a_plain_http_storage_url_fails_startup(self):
+        with pytest.raises(ValueError, match="SUPABASE_URL"):
+            Settings(
+                ENVIRONMENT="production",
+                ALLOWED_HOSTS="api.homigrow.com",
+                DEBUG_LOG_SECRETS=False,
+                SUPABASE_URL="http://example.supabase.co",
+            )
+
+    def test_development_does_not_need_a_storage_url(self):
+        assert Settings(ENVIRONMENT="dev", SUPABASE_URL="").SUPABASE_URL == ""
+

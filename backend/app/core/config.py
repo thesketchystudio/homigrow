@@ -128,6 +128,13 @@ class Settings(BaseSettings):
             raise ValueError("ALLOWED_HOSTS must be set to the API's public hostname(s) when ENVIRONMENT=production")
         return self
 
+    @model_validator(mode="after")
+    def _require_storage_url_in_production(self) -> "Settings":
+        """Fails startup in production without an https SUPABASE_URL, since every uploaded photo would otherwise be saved with a link that cannot load."""
+        if self.ENVIRONMENT == "production" and not self.SUPABASE_URL.startswith("https://"):
+            raise ValueError("SUPABASE_URL must be the project's https URL when ENVIRONMENT=production")
+        return self
+
     @property
     def allowed_hosts_list(self) -> list[str]:
         """ALLOWED_HOSTS split into a clean list for TrustedHostMiddleware."""

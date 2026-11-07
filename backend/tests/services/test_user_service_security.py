@@ -67,6 +67,46 @@ class TestPasswordChangeSignsOutOtherSessions:
         assert verify_password(_NEW_PASSWORD, user.password_hash)
 
 
+class TestEndedSessionsAreNotTreatedAsTheft:
+    def test_an_old_device_refreshing_after_a_password_change_keeps_the_new_session(self, db_session):
+        user = make_user(db_session, phone="+919876580006", password=_PASSWORD)
+        _, old_device_refresh, _ = auth_service.login(db_session, "+919876580006", _PASSWORD)
+        _, new_refresh = user_service.change_password(db_session, user, _PASSWORD, _NEW_PASSWORD)
+
+        with pytest.raises(AppError) as exc_info:
+            auth_service.refresh(db_session, old_device_refresh)
+        assert exc_info.value.status_code == 401
+
+        access_token, _, refreshed_user = auth_service.refresh(db_session, new_refresh)
+        assert access_token and refreshed_user.id == user.id
+
+    def test_replaying_a_rotated_token_still_revokes_every_session(self, db_session):
+        user = make_user(db_session, phone="+919876580007", password=_PASSWORD)
+        _, first_refresh, _ = auth_service.login(db_session, "+919876580007", _PASSWORD)
+        _, second_refresh, _ = auth_service.login(db_session, "+919876580007", _PASSWORD)
+        auth_service.refresh(db_session, first_refresh)
+
+        with pytest.raises(AppError):
+            auth_service.refresh(db_session, first_refresh)
+
+        assert _active_sessions(db_session, user) == []
+        with pytest.raises(AppError):
+            auth_service.refresh(db_session, second_refresh)
+
+    def test_a_logged_out_token_presented_again_does_not_end_other_sessions(self, db_session):
+        user = make_user(db_session, phone="+919876580008", password=_PASSWORD)
+        _, logged_out_refresh, _ = auth_service.login(db_session, "+919876580008", _PASSWORD)
+        _, other_device_refresh, _ = auth_service.login(db_session, "+919876580008", _PASSWORD)
+        auth_service.logout(db_session, logged_out_refresh)
+
+        with pytest.raises(AppError):
+            auth_service.refresh(db_session, logged_out_refresh)
+
+        assert len(_active_sessions(db_session, user)) == 1
+        access_token, _, _ = auth_service.refresh(db_session, other_device_refresh)
+        assert access_token
+
+
 class TestPasswordCheckSharesTheLoginLockout:
     def test_repeated_wrong_passwords_lock_the_account(self, db_session):
         user = make_user(db_session, phone="+919876580003", password=_PASSWORD)

@@ -5,7 +5,9 @@ A single issued refresh token, identified by the hash of its opaque
 value (the raw value is never stored). Powers session listing/
 revocation and rotation-on-refresh — presenting an already-revoked
 token's hash is the theft signal that revokes every session belonging
-to that user.
+to that user. A token is revoked either because it was swapped for a new
+one (rotated) or because the session was ended on purpose (logout, password
+change, deactivation); only presenting a rotated token again signals theft.
 """
 
 from sqlalchemy import Column, DateTime, ForeignKey, Index, String, Text, text
@@ -13,6 +15,12 @@ from sqlalchemy.dialects.postgresql import INET, UUID
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
+
+
+# Why a refresh token was revoked. A token with no reason recorded (revoked
+# before the reason existed) is treated as rotated, the stricter reading.
+REVOKED_ROTATED = "rotated"
+REVOKED_ENDED = "ended"
 
 
 class RefreshToken(Base):
@@ -29,6 +37,7 @@ class RefreshToken(Base):
 
     expires_at = Column(DateTime(timezone=True), nullable=False)
     revoked_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_reason = Column(String(20), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=text("now()"))
 
     user = relationship("User")
