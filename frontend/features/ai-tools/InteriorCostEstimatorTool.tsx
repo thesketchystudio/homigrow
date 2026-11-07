@@ -10,6 +10,7 @@ import { Check } from "lucide-react";
 import { calculateInteriorCost, FINISH_GRADES, INTERIOR_ROOMS, type FinishGrade } from "@/lib/interiorCost";
 import { formatRupees } from "@/lib/finance";
 
+import { NumericInput } from "./NumericInput";
 import { ToolPageShell } from "./ToolPageShell";
 
 export function InteriorCostEstimatorTool() {
@@ -76,10 +77,9 @@ export function InteriorCostEstimatorTool() {
                     </button>
                     {isChecked && room.defaultArea !== undefined && (
                       <label className="flex items-center gap-1">
-                        <input
-                          type="number"
+                        <NumericInput
                           value={areas[room.id] ?? room.defaultArea}
-                          onChange={(e) => setAreas((prev) => ({ ...prev, [room.id]: Number(e.target.value) || 0 }))}
+                          onValueChange={(next) => setAreas((prev) => ({ ...prev, [room.id]: next }))}
                           className="w-16 rounded border border-brand-secondary-500 px-2 py-1 text-right font-heading text-[12px] font-bold text-brand-primary-500"
                         />
                         <span className="font-body text-[12px] text-brand-primary-100">sqft</span>

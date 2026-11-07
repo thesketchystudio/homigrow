@@ -19,6 +19,7 @@ import {
   type PropertyTaxType,
 } from "@/lib/propertyTax";
 
+import { NumericInput } from "./NumericInput";
 import { ResultCard } from "./ResultCard";
 import { ToolPageShell } from "./ToolPageShell";
 
@@ -88,20 +89,19 @@ export function PropertyTaxCalculatorTool() {
 
           <div className="flex flex-col gap-1.5">
             <span className="font-heading text-[14px] font-medium text-brand-primary-500">Built-up Area (sq ft)</span>
-            <input
-              type="number"
+            <NumericInput
+              allowDecimal
               value={area}
-              onChange={(e) => setArea(Number(e.target.value) || 0)}
+              onValueChange={setArea}
               className="rounded-lg border border-brand-secondary-500 px-4 py-3 font-body text-[14px] text-brand-primary-500"
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
             <span className="font-heading text-[14px] font-medium text-brand-primary-500">Year of Construction</span>
-            <input
-              type="number"
+            <NumericInput
               value={yearBuilt}
-              onChange={(e) => setYearBuilt(Number(e.target.value) || 0)}
+              onValueChange={setYearBuilt}
               className="rounded-lg border border-brand-secondary-500 px-4 py-3 font-body text-[14px] text-brand-primary-500"
             />
           </div>
