@@ -45,6 +45,12 @@ export type ModalProps = {
   children: ReactNode;
 };
 
+// A modal renders in a portal, but React still bubbles its events through the
+// component tree, so a form inside a modal that is itself opened from within
+// another form would also submit that outer form. Stopping the submit event at
+// the modal keeps each form's submission its own.
+const keepSubmitInsideModal = (event: { stopPropagation: () => void }) => event.stopPropagation();
+
 export default function Modal({
   open,
   onClose,
@@ -63,7 +69,7 @@ export default function Modal({
   if (variant === "drawer") {
     return (
       <Drawer open={open} onOpenChange={handleOpenChange} direction={side}>
-        <DrawerContent>
+        <DrawerContent onSubmit={keepSubmitInsideModal}>
           {(title || description) && (
             <DrawerHeader>
               {title && <DrawerTitle>{title}</DrawerTitle>}
@@ -79,7 +85,7 @@ export default function Modal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className={cn(MODAL_SIZE_CLASS[size])}>
+      <DialogContent className={cn(MODAL_SIZE_CLASS[size])} onSubmit={keepSubmitInsideModal}>
         {(title || description) && (
           <DialogHeader>
             {title && <DialogTitle>{title}</DialogTitle>}

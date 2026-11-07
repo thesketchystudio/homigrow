@@ -58,7 +58,7 @@ from app.models.enums import OTPPurpose, UserRole
 from app.models.lead import Lead
 from app.models.otp_code import OTPCode
 from app.models.property import Property
-from app.models.refresh_token import RefreshToken
+from app.models.refresh_token import REVOKED_ENDED, REVOKED_ROTATED, RefreshToken
 from app.models.user import User
 from app.services import email_service
 
@@ -312,7 +312,7 @@ def revoke_all_sessions(db: Session, user_id: UUID) -> None:
     db.query(RefreshToken).filter(
         RefreshToken.user_id == user_id,
         RefreshToken.revoked_at.is_(None),
-    ).update({"revoked_at": datetime.now(timezone.utc)}, synchronize_session=False)
+    ).update({"revoked_at": datetime.now(timezone.utc), "revoked_reason": REVOKED_ENDED}, synchronize_session=False)
 
 
 def _is_claimable(db: Session, user: User) -> bool:
@@ -605,8 +605,8 @@ def refresh(
 ) -> tuple[str, str, User]:
     """
     Rotates a presented refresh token: revokes it and issues a new
-    access/refresh pair. Presenting a token whose row is already
-    revoked is treated as a reuse/theft signal — instead of just
+    access/refresh pair. Presenting a token that was already
+    rotated is treated as a reuse/theft signal — instead of just
     failing, it revokes every active refresh token belonging to that
     user, forcing re-login everywhere.
     """
@@ -620,11 +620,15 @@ def refresh(
     now = datetime.now(timezone.utc)
 
     if row.revoked_at is not None:
-        db.query(RefreshToken).filter(
-            RefreshToken.user_id == row.user_id,
-            RefreshToken.revoked_at.is_(None),
-        ).update({"revoked_at": now}, synchronize_session=False)
-        db.commit()
+        # A session that was ended on purpose (logout, password change) is
+        # just refused. Only a token that was already swapped for a new one
+        # signals a copy, and then every session is revoked.
+        if row.revoked_reason != REVOKED_ENDED:
+            db.query(RefreshToken).filter(
+                RefreshToken.user_id == row.user_id,
+                RefreshToken.revoked_at.is_(None),
+            ).update({"revoked_at": now, "revoked_reason": REVOKED_ENDED}, synchronize_session=False)
+            db.commit()
         raise REFRESH_INVALID
 
     if row.expires_at <= now:
@@ -635,6 +639,7 @@ def refresh(
         raise REFRESH_INVALID
 
     row.revoked_at = now
+    row.revoked_reason = REVOKED_ROTATED
     access_token = create_access_token(user.id, user.role.value)
     new_refresh_token = _issue_refresh_token(db, user, user_agent, ip)
     db.commit()
@@ -655,6 +660,7 @@ def logout(db: Session, raw_token: Optional[str]) -> None:
     row = db.query(RefreshToken).filter(RefreshToken.token_hash == hash_refresh_token(raw_token)).first()
     if row is not None and row.revoked_at is None:
         row.revoked_at = datetime.now(timezone.utc)
+        row.revoked_reason = REVOKED_ENDED
         db.commit()
 
 

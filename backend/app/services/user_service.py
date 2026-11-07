@@ -20,7 +20,7 @@ from app.core.exceptions import AuthError, ConflictError, NotFoundError, Validat
 from app.core.security import hash_password, verify_password
 from app.models.enums import OTPPurpose, PropertyStatus, UserRole
 from app.models.property import Property
-from app.models.refresh_token import RefreshToken
+from app.models.refresh_token import REVOKED_ENDED, RefreshToken
 from app.models.user import User
 from app.services import auth_service
 
@@ -191,6 +191,7 @@ def revoke_session(db: Session, user: User, session_id: UUID) -> None:
 
     if row.revoked_at is None:
         row.revoked_at = datetime.now(timezone.utc)
+        row.revoked_reason = REVOKED_ENDED
         db.commit()
 
 
@@ -199,7 +200,7 @@ def revoke_all_sessions(db: Session, user: User) -> None:
     db.query(RefreshToken).filter(
         RefreshToken.user_id == user.id,
         RefreshToken.revoked_at.is_(None),
-    ).update({"revoked_at": datetime.now(timezone.utc)}, synchronize_session=False)
+    ).update({"revoked_at": datetime.now(timezone.utc), "revoked_reason": REVOKED_ENDED}, synchronize_session=False)
     db.commit()
 
 
@@ -228,5 +229,5 @@ def deactivate_account(db: Session, user: User) -> None:
     db.query(RefreshToken).filter(
         RefreshToken.user_id == user.id,
         RefreshToken.revoked_at.is_(None),
-    ).update({"revoked_at": datetime.now(timezone.utc)}, synchronize_session=False)
+    ).update({"revoked_at": datetime.now(timezone.utc), "revoked_reason": REVOKED_ENDED}, synchronize_session=False)
     db.commit()
