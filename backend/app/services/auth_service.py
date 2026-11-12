@@ -461,6 +461,7 @@ def login(
     password: str,
     user_agent: Optional[str] = None,
     ip: Optional[str] = None,
+    required_role: Optional[UserRole] = None,
 ) -> tuple[str, str, User]:
     """
     Verifies credentials and enforces the lockout policy: 5 consecutive
@@ -469,6 +470,12 @@ def login(
     user. Rejects a soft-deactivated account (is_active=false) so login
     can't silently undo a deactivation, and an account whose email was
     never verified (403 EMAIL_NOT_VERIFIED, after re-sending the code).
+
+    required_role restricts the sign-in to one role (the admin portal's
+    sign-in passes UserRole.admin). An account with any other role gets
+    the same BAD_CREDENTIALS error as a wrong password, so the portal
+    never reveals which addresses belong to admins, and no session or
+    verification code is issued for it.
     """
     bad_credentials = AuthError("BAD_CREDENTIALS", "Invalid phone/email or password.")
 
@@ -492,6 +499,9 @@ def login(
 
     if not verify_password(password, user.password_hash):
         record_failed_password(db, user)
+        raise bad_credentials
+
+    if required_role is not None and user.role != required_role:
         raise bad_credentials
 
     user.failed_login_attempts = 0

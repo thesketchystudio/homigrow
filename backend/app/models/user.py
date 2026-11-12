@@ -54,6 +54,13 @@ class User(Base, TimestampMixin):
     )
 
     is_active = Column(Boolean, nullable=False, server_default=text("true"))
+    # Set when an admin suspends the account (is_active is cleared at the
+    # same time, so every existing sign-in/session guard applies). Kept
+    # separate from is_active so an admin suspension can be told apart
+    # from a user deactivating their own account, and only the former can
+    # be lifted by an admin reinstatement.
+    suspended_at = Column(DateTime(timezone=True), nullable=True)
+    suspension_reason = Column(Text, nullable=True)
     # TODO: never set to true anywhere in the codebase today — phone is not actually verified in any current signup/login flow, so this flag is effectively dead/always-false.
     is_phone_verified = Column(Boolean, nullable=False, server_default=text("false"))
     is_email_verified = Column(Boolean, nullable=False, server_default=text("false"))

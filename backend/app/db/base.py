@@ -41,3 +41,4 @@ from app.models import boost  # noqa: E402,F401
 from app.models import boost_order  # noqa: E402,F401
 from app.models import refresh_token  # noqa: E402,F401
 from app.models import otp_code  # noqa: E402,F401
+from app.models import admin_audit_log  # noqa: E402,F401
