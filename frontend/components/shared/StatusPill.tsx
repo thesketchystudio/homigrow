@@ -42,13 +42,15 @@ export const leadStatusPillMap: Record<LeadStatus, StatusPillEntry> = {
 export type StatusPillProps = {
   value: string;
   map: StatusPillMap;
+  // Extra classes merged last, for a portal whose design sizes/cases the pill differently.
+  className?: string;
 };
 
-export default function StatusPill({ value, map }: StatusPillProps) {
+export default function StatusPill({ value, map, className }: StatusPillProps) {
   const entry = map[value];
 
   return (
-    <Badge variant="outline" className={cn("capitalize", TONE_CLASS[entry?.tone ?? "neutral"])}>
+    <Badge variant="outline" className={cn("capitalize", TONE_CLASS[entry?.tone ?? "neutral"], className)}>
       {entry?.label ?? value}
     </Badge>
   );

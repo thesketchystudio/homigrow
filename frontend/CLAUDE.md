@@ -1868,3 +1868,24 @@ separate from the general `<phase>_frontend_client` branch)
   stray "Inclusive of Maintenance" bug: the backend sends `null` for
   missing optionals, but the checks only tested `undefined`.
   `tsc`/`eslint` clean; verified live against the real backend.
+
+### Admin portal (on `feature/admin-frontend`, cut from `dev` 2026-11-12)
+- Built from Figma section `328:3`: Admin Sign In (`328:2050`), Dashboard
+  (`328:4`), All Listings (`328:429`), All Users (`328:830`/`328:1206`) and
+  Listing Review Queue (`328:1589`), against the new `/admin/*` API on
+  `feature/admin-backend`.
+- Routes: `/admin/login` (public, outside the guard) and `app/(admin)/admin/(portal)/`
+  for the guarded pages (`dashboard`, `listings`, `users`, `review-queue`);
+  bare `/admin` redirects to the dashboard. The admin shell is now a top nav
+  (`features/admin/AdminTopNav.tsx`), not the shared Sidebar (the broker portal
+  still uses Sidebar, unchanged).
+- Shared-code changes, all additive: `AuthGuard` got an optional `loginPath`
+  (default `/login`); `StatusPill` got an optional `className`;
+  `AdminAccountStatus` added to `lib/enums.ts`; new `useDebouncedValue` hook.
+- Left out on purpose (no data or not an admin action): the sign-in panel's
+  live counts, Rating/Reports columns and the Reported Users card, "Post
+  Property"/"New Listing" buttons, "Missing documents"/"Price dispute" flags
+  (a real "No photos" flag is shown instead), the footer's placeholder links.
+- Live-verified with Playwright against the real backend + Supabase dev DB
+  using a dedicated `admin.test@homigrow.local` account created with
+  `scripts/create_admin.py`.

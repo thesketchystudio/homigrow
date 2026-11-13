@@ -144,6 +144,16 @@ export const VerificationStatus = {
 } as const;
 export type VerificationStatus = (typeof VerificationStatus)[keyof typeof VerificationStatus];
 
+// Mirrors backend app/schemas/admin.py AdminAccountStatus — the derived
+// account state the admin Users table shows.
+export const AdminAccountStatus = {
+  active: "active",
+  pending: "pending",
+  suspended: "suspended",
+  deactivated: "deactivated",
+} as const;
+export type AdminAccountStatus = (typeof AdminAccountStatus)[keyof typeof AdminAccountStatus];
+
 export const BoostTier = {
   basic: "basic",
   featured: "featured",

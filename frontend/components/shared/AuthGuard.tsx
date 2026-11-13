@@ -33,10 +33,13 @@ const DEFAULT_FALLBACK = (
 export function AuthGuard({
   allowedRoles,
   fallback = DEFAULT_FALLBACK,
+  loginPath = "/login",
   children,
 }: {
   allowedRoles: UserRole[];
   fallback?: React.ReactNode;
+  // Where a logged-out visitor is sent; the Admin portal has its own sign-in page.
+  loginPath?: string;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -51,11 +54,11 @@ export function AuthGuard({
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
+      router.replace(`${loginPath}?returnTo=${encodeURIComponent(pathname)}`);
     } else if (status === "authenticated" && !roleAllowed && user) {
       router.replace(getRoleHomePath(user.role));
     }
-  }, [status, roleAllowed, pathname, router, user]);
+  }, [status, roleAllowed, pathname, router, user, loginPath]);
 
   if (status !== "authenticated" || !roleAllowed) {
     return <>{fallback}</>;
