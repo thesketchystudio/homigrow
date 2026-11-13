@@ -169,3 +169,23 @@ class BrokerDocumentType(str, Enum):
 
     rera_certificate = "rera_certificate"
     government_id = "government_id"
+
+
+class AdminAction(str, Enum):
+    """
+    Kind of an admin mutation recorded in admin_audit_log. Not a Postgres
+    enum type — the column is a plain varchar(50) so new actions need no
+    migration — but every write goes through this enum, never a raw string.
+    """
+
+    property_approved = "property_approved"
+    property_rejected = "property_rejected"
+    user_suspended = "user_suspended"
+    user_reinstated = "user_reinstated"
+
+
+class AdminAuditTarget(str, Enum):
+    """Kind of object an admin_audit_log row points at via target_id."""
+
+    property = "property"
+    user = "user"

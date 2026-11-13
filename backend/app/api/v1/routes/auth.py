@@ -1,7 +1,7 @@
 """
 app/api/v1/routes/auth.py
 
-Auth endpoints: signup, login, Google Sign-In, refresh, logout,
+Auth endpoints: signup, login, admin-portal login, Google Sign-In, refresh, logout,
 email-OTP request/verify, and password forgot/reset (password path).
 Routes only parse/validate input and translate the service result into
 a response schema — no business logic here. The refresh token itself
@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.core.cookies import REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH, set_refresh_cookie
 from app.core.middleware import limiter
 from app.db.session import get_db
+from app.models.enums import UserRole
 from app.schemas.auth import (
     ForgotPasswordRequest,
     GoogleAuthRequest,
@@ -105,6 +106,26 @@ def login(payload: LoginRequest, request: Request, response: Response, db: Sessi
         payload.password,
         user_agent=request.headers.get("user-agent"),
         ip=_client_ip(request),
+    )
+    set_refresh_cookie(response, refresh_token)
+    return TokenResponse(
+        access_token=access_token,
+        expires_in=settings.JWT_ACCESS_TTL_MIN * 60,
+        user=UserOut.model_validate(user),
+    )
+
+
+@router.post("/admin/login", response_model=TokenResponse)
+@limiter.limit("5/minute")
+def admin_login(payload: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)) -> TokenResponse:
+    """Admin portal sign-in: the password login restricted to admin accounts (any other role gets BAD_CREDENTIALS)."""
+    access_token, refresh_token, user = auth_service.login(
+        db,
+        payload.phone_or_email,
+        payload.password,
+        user_agent=request.headers.get("user-agent"),
+        ip=_client_ip(request),
+        required_role=UserRole.admin,
     )
     set_refresh_cookie(response, refresh_token)
     return TokenResponse(

@@ -827,6 +827,37 @@ Critical/high findings from the pre-launch security review, fixed in order:
   search still uses `LIKE '%…%'`; move to full-text/trigram indexing once
   listing volume warrants it.
 
+### Admin portal backend (on `feature/admin-backend`, cut from `dev` 2026-11-12)
+Pulls forward Phase 6's admin half (P6-T10..T13; plans/coupons admin and the
+audit-trail screen, P6-T14/T15, are not built).
+- **M14** (`e8b2c6d4a1f3`, additive only, verified up/down/up against the dev
+  DB): `admin_audit_log` (bigserial, append-only, RESTRICT FK to the admin),
+  `users.suspended_at` + `users.suspension_reason`, `properties.moderation_note`.
+- `POST /auth/admin/login`: the password login restricted to `role=admin`
+  (`auth_service.login(required_role=...)`); any other role gets the same
+  `BAD_CREDENTIALS` as a wrong password and no session or OTP is issued.
+  Lives under `/auth/` so the frontend client never refresh-retries its 401.
+- `/admin/*` (all `RequireAdmin`): `GET summary` (dashboard), `GET properties`
+  (any status; `status/q/broker_id/page` filters + per-status counts — the
+  Review Queue is `status=pending`), `GET properties/moderation-stats`,
+  `POST properties/{id}/moderate` (approve/reject pending only, row-locked,
+  reject needs a note, broker notified), `GET users` / `GET users/{id}`
+  (clients and brokers only — admins are never listed or actionable),
+  `POST users/{id}/suspend` (needs reason; revokes every session, active
+  listings → expired, their ids kept in the audit meta) and
+  `POST users/{id}/reinstate` (restores exactly those listings if still expired).
+- Every mutation writes its audit row via `admin_audit_service.record_admin_action`
+  in the same transaction. Action names are `AdminAction` in `enums.py`.
+- `scripts/create_admin.py <email> <phone> "<name>"`: the only way to create an
+  admin; hidden password prompt (or `ADMIN_PASSWORD`), strength-checked,
+  refuses an existing email/phone.
+- 52 new tests (`tests/api/v1/routes/test_admin.py`, incl. a 401/403 RBAC
+  matrix over every admin route). Full suite green.
+- **Still open:** H2 auto-approve is unchanged, so the Review Queue only ever
+  holds listings that reach `pending` some other way; removing `_auto_approve`
+  turns real moderation on. A suspended user's login says "deactivated" (shared
+  message, untouched).
+
 ### Known open decisions
 - (none) — SMS/OTP provider decided 2026-07-07: MSG91 (ADR-011 in
   docs/architecture/15_Decision_Log.md); integrate via

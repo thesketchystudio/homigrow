@@ -123,6 +123,9 @@ class Property(Base, TimestampMixin):
     views_count = Column(Integer, nullable=False, server_default="0")
 
     published_at = Column(DateTime(timezone=True), nullable=True)
+    # The admin's note from the most recent moderation decision (required
+    # on reject), so the broker can see why a listing was turned down.
+    moderation_note = Column(Text, nullable=True)
     expires_at = Column(DateTime(timezone=True), nullable=True)
 
     broker = relationship("User")
